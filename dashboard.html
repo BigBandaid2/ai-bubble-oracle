@@ -54,6 +54,13 @@
   header.page { margin: 4px 2px 18px; }
   header.page h1 { font-size: 24px; font-weight: 700; letter-spacing: -.3px; }
   header.page .sub { color: var(--muted); margin-top: 5px; font-size: 13.5px; max-width: 720px; }
+  .rangebar { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
+  .rangelabel { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .8px; color: var(--muted); }
+  #rangebar { display: inline-flex; gap: 4px; background: var(--panel); border: 1px solid var(--border); border-radius: 9px; padding: 3px; }
+  .rangechip { background: transparent; border: 0; color: var(--muted); font: inherit; font-size: 12.5px; font-weight: 500;
+    padding: 5px 13px; border-radius: 6px; cursor: pointer; }
+  .rangechip:hover { color: var(--text); background: var(--panel2); }
+  .rangechip.active { background: var(--accent); color: #fff; font-weight: 600; }
 
   #cardgrid { display: grid; grid-template-columns: 1fr; gap: 16px; align-items: start; }
   /* Two graphs per row once the main area is wide enough (sidebar is 344px). */
@@ -175,6 +182,7 @@
     <header class="page">
       <h1>AI bubble burst in 2026?</h1>
       <div class="sub" id="subtitle"></div>
+      <div class="rangebar"><span class="rangelabel">Range</span><div id="rangebar"></div></div>
     </header>
     <div id="cardgrid"></div>
   </main>
@@ -205,16 +213,6 @@ const $ = (s, el) => (el || document).querySelector(s);
 /* ---------------- option state ---------------- */
 
 const OPTIONS = {
-  range: {
-    label: "Date range",
-    help: "How far back every chart shows, always ending today. All graphs — including Polymarket and H100 — share this window.",
-    values: [
-      { val: "1m", t: "1 month", d: "last ~31 days" },
-      { val: "1q", t: "1 quarter", d: "last ~3 months" },
-      { val: "1y", t: "1 year", d: "last 12 months" },
-      { val: "3y", t: "3 years", d: "last 36 months" },
-    ],
-  },
   basis: {
     label: "All-time-high basis",
     help: "The rules say “all-time high” but not whether it means the highest close or the highest intraday price. Intraday triggers more easily.",
@@ -249,14 +247,21 @@ const DISP = DATA.displayStart;
 const WINMS = DATA.windowDays * 86400000;
 const strToArr = s => Uint8Array.from(s, c => c === "1" ? 1 : 0);
 
-// Visible x-window: the date-range option, ending today. All charts share it.
-const RANGE_DAYS = { "1m": 31, "1q": 92, "1y": 365, "3y": 1096 };
+// Visible x-window: the date-range chips on the page, always ending today.
+// All charts share it. "all" shows everything from the chart start.
+const RANGES = [
+  { val: "3m", t: "3 Months", days: 92 },
+  { val: "1y", t: "1 Year", days: 365 },
+  { val: "all", t: "All", days: null },
+];
 let SLICE = DISP;
 function sliceStart() {
-  const cutoff = AXT[LAST] - RANGE_DAYS[state.range] * 86400000;
+  const cfg = RANGES.find(r => r.val === state.range);
+  if (!cfg || cfg.days == null) return DISP;
+  const cutoff = AXT[LAST] - cfg.days * 86400000;
   let i = 0;
   while (i < LAST && AXT[i] < cutoff) i++;
-  return i;
+  return Math.max(i, DISP);
 }
 const daysBetween = (a, b) => Math.round((Date.parse(b + "T00:00:00Z") - Date.parse(a + "T00:00:00Z")) / 86400000);
 
@@ -485,14 +490,29 @@ function marketCard() {
   return sec;
 }
 
+// A condition is "dramatic" (surface it high) if it's met now — solid OR via
+// the 90-day trailing window. Both have res.met[LAST] set, i.e. status "met".
+function metRank(node) {
+  const res = RESULTS[node.key];
+  return res && statusOf(res) === "met" ? 0 : 1;
+}
+
 function renderCards() {
   const grid = $("#cardgrid");
   grid.innerHTML = "";
+  // 1) Polymarket, 2) the root contract — always first.
   if (DATA.market) grid.appendChild(marketCard());
+  const flat = [];
   (function walk(node, depth, parentLabel) {
-    grid.appendChild(nodeCard(node, depth, parentLabel));
+    flat.push({ node, depth, parentLabel });
     orderedChildren(node).forEach(c => walk(c, depth + 1, node.label));
   })(DATA.tree, 0, null);
+  const root = flat.shift();
+  grid.appendChild(nodeCard(root.node, root.depth, root.parentLabel));
+  // 3) met / met-trailing conditions first (drama above the fold), otherwise
+  //    normal tree order (stable sort preserves it). Sidebar tree is untouched.
+  flat.sort((a, b) => metRank(a.node) - metRank(b.node));
+  flat.forEach(e => grid.appendChild(nodeCard(e.node, e.depth, e.parentLabel)));
 }
 
 /* ---------------- canvas ---------------- */
@@ -662,7 +682,7 @@ function drawMarket(canvas, m) {
 function renderOptions() {
   const host = $("#options");
   host.innerHTML = "";
-  for (const key of ["range", "basis", "h100index"]) {
+  for (const key of ["basis", "h100index"]) {
     const cfg = OPTIONS[key];
     const g = document.createElement("div");
     g.className = "optgroup";
@@ -773,6 +793,29 @@ function renderSidebarTree() {
   host.appendChild(sidebarNode(DATA.tree));
 }
 
+/* ---------------- date-range chips (on the page, not the drawer) ---------- */
+
+function renderRangeBar() {
+  const host = $("#rangebar");
+  host.innerHTML = "";
+  RANGES.forEach(r => {
+    const b = document.createElement("button");
+    b.className = "rangechip" + (state.range === r.val ? " active" : "");
+    b.textContent = r.t;
+    b.onclick = () => {
+      if (state.range === r.val) return;
+      state.range = r.val;
+      SLICE = sliceStart();
+      renderRangeBar();
+      const main = document.getElementById("charts");
+      const y = main.scrollTop;
+      renderCards();          // only the x-window changed; no need to recompute the tree
+      main.scrollTop = y;
+    };
+    host.appendChild(b);
+  });
+}
+
 /* ---------------- orchestration ---------------- */
 
 function rerender() {
@@ -781,6 +824,7 @@ function rerender() {
   SLICE = sliceStart();
   computeAll();
   renderOptions();
+  renderRangeBar();
   renderCards();
   renderSidebarTree();
   main.scrollTop = y;
@@ -788,6 +832,7 @@ function rerender() {
 SLICE = sliceStart();
 computeAll();
 renderOptions();
+renderRangeBar();
 renderCards();
 renderSidebarTree();
 
