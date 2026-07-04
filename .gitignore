@@ -6,3 +6,5 @@ __pycache__/
 
 # Vercel CLI link metadata
 .vercel/
+
+.vercel
