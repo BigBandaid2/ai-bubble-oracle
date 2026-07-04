@@ -54,6 +54,8 @@
   header.page { margin: 4px 2px 18px; }
   header.page h1 { font-size: 24px; font-weight: 700; letter-spacing: -.3px; }
   header.page .sub { color: var(--muted); margin-top: 5px; font-size: 13.5px; max-width: 720px; }
+  header.page .sub a { color: var(--accent); text-decoration: none; white-space: nowrap; }
+  header.page .sub a:hover { text-decoration: underline; }
   .rangebar { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
   .rangelabel { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .8px; color: var(--muted); }
   #rangebar { display: inline-flex; gap: 4px; background: var(--panel); border: 1px solid var(--border); border-radius: 9px; padding: 3px; }
@@ -338,7 +340,8 @@ function lastMetOf(res) {
 
 /* ---------------- rendering ---------------- */
 
-document.getElementById("subtitle").textContent = DATA.note || "";
+document.getElementById("subtitle").innerHTML = (DATA.note ? DATA.note + " " : "") +
+  (DATA.marketUrl ? `<a href="${DATA.marketUrl}" target="_blank" rel="noopener">View the market on Polymarket &#8599;</a>` : "");
 document.getElementById("topsub").textContent = "Last update: " + (DATA.updated || "never") + " UTC";
 
 // A node "has an automated data source" if any leaf under it is data-driven.

@@ -11,6 +11,9 @@ CHART_START = "2022-01-01"
 # Market deadline, used by the "deadline-anchored" 90-day window interpretation.
 DEADLINE = "2026-12-31"
 
+# The Polymarket market page this oracle tracks.
+MARKET_URL = "https://polymarket.com/event/ai-bubble-burst-by"
+
 # The contract as a condition tree, from the Polymarket "AI bubble burst in
 # 2026?" market (condition id 0x857398c4...). Node types:
 #   drawdown — met while `ticker` closes at least `threshold` below its

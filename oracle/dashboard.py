@@ -20,7 +20,7 @@ import json
 from datetime import date, datetime, timedelta, timezone
 
 from .config import (BASES, CHART_START, CONTRACT, DASHBOARD_PATH, DEADLINE,
-                     drawdown_leaves)
+                     MARKET_URL, drawdown_leaves)
 from . import db
 from .tracker import compute_series
 
@@ -125,6 +125,7 @@ def _market_json(conn, master):
     return {
         "key": "market_price", "label": "Polymarket implied probability (YES)",
         "type": "market", "prob": prob, "current": current, "start": pairs[0][0],
+        "url": MARKET_URL,
     }
 
 
@@ -212,6 +213,7 @@ def build_payload(conn):
         "windowDays": 90,
         "dateAxis": master,
         "displayStart": display_start,
+        "marketUrl": MARKET_URL,
         "market": _market_json(conn, master),
         "tree": node_json(CONTRACT),
     }
