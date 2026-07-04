@@ -1,5 +1,7 @@
 # AI Bubble Oracle
 
+**Live: https://ai-bubble-oracle.vercel.app**
+
 Unofficial monitoring oracle for the Polymarket market **"AI bubble burst in 2026?"**
 (event `ai-bubble-burst-by`, condition id `0x857398c4502bc725fef7efb3cd503a30d3e18e486ab8173fdf505a76cf83b168`).
 
