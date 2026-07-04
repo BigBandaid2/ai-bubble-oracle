@@ -66,6 +66,10 @@
   main { flex: 1; padding: 20px 24px; min-width: 0; overflow-y: auto; }
   header.page { margin: 4px 2px 18px; }
   header.page h1 { font-size: 24px; font-weight: 700; letter-spacing: -.3px; }
+  .verdict { margin-top: 9px; font-size: 15.5px; color: var(--text); }
+  .verdict b { font-weight: 700; }
+  .verdict .v-met { color: var(--met); }
+  .verdict .v-prob { color: var(--accent); }
   .subrow { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 10px 28px; margin-top: 5px; }
   header.page .sub { color: var(--muted); font-size: 13.5px; max-width: 720px; }
   header.page .sub a { color: var(--accent); text-decoration: none; white-space: nowrap; }
@@ -78,11 +82,17 @@
   .rangechip:hover { color: var(--text); background: var(--panel2); }
   .rangechip.active { background: var(--accent); color: #fff; font-weight: 600; }
 
-  /* "open questions" ambiguities callout */
+  /* "open questions" ambiguities callout — collapsed to a single line by default */
   .ambibox { background: var(--panel); border: 1px solid var(--border); border-left: 3px solid #e0bf3e;
-    border-radius: 12px; padding: 12px 18px 14px; margin: 0 0 16px; scroll-margin-top: 72px; }
+    border-radius: 12px; padding: 0 18px; margin: 0 0 16px; scroll-margin-top: 72px; }
   .ambibox.flash { animation: flash 1.8s ease-out; }
-  .ambihead { font-size: 13.5px; font-weight: 700; color: var(--text); margin-bottom: 6px; }
+  .ambihead { font-size: 13px; font-weight: 600; color: var(--text); padding: 11px 0;
+    display: flex; align-items: center; gap: 9px; cursor: pointer; user-select: none; }
+  .ambihead:hover .ambihint { color: var(--text); }
+  .ambicaret { color: var(--muted2); font-size: 10px; flex-shrink: 0; }
+  .ambihint { color: var(--muted2); font-weight: 400; font-size: 12px; margin-left: auto; flex-shrink: 0; }
+  .ambibody { padding-bottom: 13px; }
+  .ambibox.collapsed .ambibody { display: none; }
   .ambirow { display: flex; align-items: center; gap: 10px 18px; flex-wrap: wrap; padding: 9px 0; border-top: 1px solid var(--border); }
   .ambiq { flex: 1; min-width: 240px; font-size: 12.5px; color: var(--muted); line-height: 1.5; }
   .ambiq b { color: var(--text); }
@@ -231,6 +241,7 @@
   <main id="charts">
     <header class="page">
       <h1>AI bubble burst in 2026?</h1>
+      <div class="verdict" id="verdict"></div>
       <div class="subrow">
         <div class="sub" id="subtitle"></div>
         <div class="rangebar"><span class="rangelabel">Range</span><div id="rangebar"></div></div>
@@ -855,21 +866,46 @@ function ambiSeg(key, values) {
   ).join("")}</span>`;
 }
 
+/* ---------------- plain-English verdict line ---------------- */
+
+function renderVerdict() {
+  const root = RESULTS[DATA.tree.key];
+  const met = root && root.count ? root.count[LAST] : 0;
+  const need = DATA.tree.minMet;
+  const total = DATA.tree.children.length;
+  const prob = DATA.market && DATA.market.current != null
+    ? `The market prices a <b class="v-prob">${(DATA.market.current * 100).toFixed(0)}% chance</b>.` : "";
+  $("#verdict").innerHTML =
+    `Right now: <b class="v-met">${met} of ${total}</b> conditions met — ` +
+    `<b>${need}</b> at once would resolve YES. ${prob}`;
+}
+
+// Collapsed by default — traders arriving via the #ambiguities deep link get
+// it expanded; everyone else sees a one-line hint.
+let ambiOpen = location.hash === "#ambiguities";
+
 function renderAmbiguities() {
   const host = $("#ambiguities");
   host.innerHTML = `
-    <div class="ambibox" id="ambibox">
-      <div class="ambihead">&#9888;&#65039; Two rules the market doesn't pin down — and they move the odds. Toggle to see the effect.</div>
-      <div class="ambirow">
-        <div class="ambiq"><b>“All-time high” — end-of-day close or intraday high?</b> Intraday highs sit higher, so a stock reaches its −50% mark sooner. Decisive for any condition hovering near its threshold.</div>
-        ${ambiSeg("basis", [{ val: "close", t: "End-of-day" }, { val: "intraday", t: "Intraday" }])}
+    <div class="ambibox${ambiOpen ? "" : " collapsed"}" id="ambibox">
+      <div class="ambihead" id="ambitoggle">
+        <span class="ambicaret">${ambiOpen ? "▼" : "▶"}</span>
+        &#9888;&#65039; Two rules the market doesn't pin down — and they can move the odds
+        <span class="ambihint">${ambiOpen ? "collapse" : "expand"}</span>
       </div>
-      <div class="ambirow">
-        <div class="ambiq"><b>Which SiliconData H100 index?</b> Neocloud (~$2/hr) vs. hyperscaler (~$7.5/hr). The $1.00 trigger is only realistically reachable against the neocloud tier.</div>
-        ${ambiSeg("h100index", [{ val: "neocloud", t: "Neocloud" }, { val: "hyperscaler", t: "Hyperscaler" }])}
+      <div class="ambibody">
+        <div class="ambirow">
+          <div class="ambiq"><b>“All-time high” — end-of-day close or intraday high?</b> Intraday highs sit higher, so a stock reaches its −50% mark sooner. Decisive for any condition hovering near its threshold.</div>
+          ${ambiSeg("basis", [{ val: "close", t: "End-of-day" }, { val: "intraday", t: "Intraday" }])}
+        </div>
+        <div class="ambirow">
+          <div class="ambiq"><b>Which SiliconData H100 index?</b> Neocloud (~$2/hr) vs. hyperscaler (~$7.5/hr). The $1.00 trigger is only realistically reachable against the neocloud tier.</div>
+          ${ambiSeg("h100index", [{ val: "neocloud", t: "Neocloud" }, { val: "hyperscaler", t: "Hyperscaler" }])}
+        </div>
+        <div class="ambifoot">Neither is specified in the rules. Full breakdown on the <a href="datasources.html#src:yahoo">Data Sources</a> page.</div>
       </div>
-      <div class="ambifoot">Neither is specified in the rules. Full breakdown on the <a href="datasources.html#src:yahoo">Data Sources</a> page.</div>
     </div>`;
+  $("#ambitoggle").onclick = () => { ambiOpen = !ambiOpen; renderAmbiguities(); };
   host.querySelectorAll("[data-ambi]").forEach(b => {
     b.onclick = () => {
       const k = b.getAttribute("data-ambi"), v = b.getAttribute("data-val");
@@ -908,6 +944,7 @@ function rerender() {
   const y = main.scrollTop;
   SLICE = sliceStart();
   computeAll();
+  renderVerdict();
   renderOptions();
   renderAmbiguities();
   renderRangeBar();
@@ -917,6 +954,7 @@ function rerender() {
 }
 SLICE = sliceStart();
 computeAll();
+renderVerdict();
 renderOptions();
 renderAmbiguities();
 renderRangeBar();
