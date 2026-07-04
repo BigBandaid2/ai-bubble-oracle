@@ -1,0 +1,103 @@
+"""AI Bubble Oracle — Phase 1: stock drawdown tracker.
+
+Tracks the equity-based conditions of the Polymarket "AI bubble burst in 2026?"
+market. See README.md for the full roadmap.
+
+Usage:
+    python main.py update    # fetch prices (full history on first run), rebuild events
+    python main.py status    # print the current condition report
+    python main.py events    # list threshold-crossing events
+    python main.py html      # generate dashboard.html + datasources.html (self-contained)
+"""
+
+import argparse
+import sys
+import time
+from datetime import datetime, timezone
+
+from oracle import db
+from oracle.config import TICKERS
+from oracle.dashboard import write_dashboard
+from oracle.datasources import write_datasources
+from oracle.h100 import fetch_h100_proxy, SEED_POINTS, import_h100_csv, export_h100_csv
+from oracle.report import status_report
+from oracle.tracker import rebuild_events
+from oracle.yahoo import fetch_history, YahooError
+
+
+def cmd_update(conn):
+    for ticker in TICKERS:
+        days = 90 if db.has_prices(conn, ticker) else None
+        try:
+            bars = fetch_history(ticker, days)
+        except YahooError as e:
+            print(f"ERROR fetching {ticker}: {e}", file=sys.stderr)
+            continue
+        db.upsert_prices(conn, ticker, bars)
+        first, last = bars[0]["date"], bars[-1]["date"]
+        span = "full history" if days is None else f"last {days}d"
+        print(f"{ticker}: {len(bars)} bars ({span}) {first} .. {last}")
+        time.sleep(1)  # be polite to Yahoo
+    events = rebuild_events(conn)
+    print(f"events rebuilt: {len(events)} crossings in history")
+
+    # H100 rental proxy (condition 5). Restore accumulated readings from the
+    # committed CSV, seed the published index points (both tiers), append
+    # today's live Vast.ai proxy reading, then persist back to the CSV.
+    restored = import_h100_csv(conn)
+    for d, index_type, src, val in SEED_POINTS:
+        db.upsert_h100(conn, d, index_type, src, val)
+    proxy = fetch_h100_proxy()
+    if proxy:
+        today = datetime.now(timezone.utc).date().isoformat()
+        db.upsert_h100(conn, today, "neocloud", "vast_proxy", proxy["usd_hr"], proxy["low"], proxy["n"])
+        print(f"H100 neocloud proxy: median ${proxy['usd_hr']}/hr (low ${proxy['low']}, n={proxy['n']})")
+    else:
+        print("H100 proxy: fetch failed (kept prior readings)")
+    kept = export_h100_csv(conn)
+    print(f"H100 history: restored {restored}, now {kept} readings in data/h100_history.csv")
+
+    db.set_meta(conn, "last_update", datetime.now(timezone.utc).isoformat(timespec="seconds"))
+
+
+def cmd_events(conn):
+    rows = conn.execute(
+        "SELECT date, ticker, basis, kind, drawdown, price, ath, condition_key"
+        " FROM events ORDER BY date"
+    ).fetchall()
+    if not rows:
+        print("no events (run `python main.py update` first)")
+        return
+    for e in rows:
+        print(f"{e['date']}  {e['ticker']:5s} {e['kind']:9s} ({e['basis']})"
+              f"  dd {e['drawdown']*100:.1f}%  px {e['price']:.2f} / ath {e['ath']:.2f}"
+              f"  [{e['condition_key']}]")
+
+
+def main():
+    p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    p.add_argument("command", choices=["update", "status", "events", "html", "datasources"], nargs="?", default="status")
+    args = p.parse_args()
+
+    conn = db.connect()
+    try:
+        if args.command == "update":
+            cmd_update(conn)
+            print(f"\ndashboard written:   {write_dashboard(conn)}")
+            print(f"datasources written: {write_datasources(conn)}\n")
+            print(status_report(conn))
+        elif args.command == "status":
+            print(status_report(conn))
+        elif args.command == "events":
+            cmd_events(conn)
+        elif args.command == "html":
+            print(f"dashboard written:   {write_dashboard(conn)}")
+            print(f"datasources written: {write_datasources(conn)}")
+        elif args.command == "datasources":
+            print(f"datasources written: {write_datasources(conn)}")
+    finally:
+        conn.close()
+
+
+if __name__ == "__main__":
+    main()

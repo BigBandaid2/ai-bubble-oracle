@@ -1,0 +1,8 @@
+# Rebuilt from Yahoo + the committed H100 CSV on every run, so not tracked.
+oracle.db
+
+__pycache__/
+*.pyc
+
+# Vercel CLI link metadata
+.vercel/

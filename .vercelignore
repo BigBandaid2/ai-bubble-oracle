@@ -1,0 +1,10 @@
+# Only the static site (dashboard.html, datasources.html, about.html) needs to
+# deploy. Everything that builds it stays out of the Vercel deployment.
+oracle/
+__pycache__/
+*.pyc
+*.py
+oracle.db
+data/
+.github/
+get_data_alpha_vantage.R

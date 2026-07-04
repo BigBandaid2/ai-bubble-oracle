@@ -1,0 +1,1207 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Bubble Oracle — Data Sources</title>
+<style>
+  :root {
+    --bg: #0a0b10; --panel: #1a1f23; --panel2: #242b32; --border: #1f2937;
+    --text: #f4f4f6; --muted: #80838e; --muted2: #6b6e7a; --accent: #0093fd;
+    --notmet: #2bae4c; --amber: #e0bf3e; --mart: #f55b55; --serve: #c4b5fd; --stg: #7af098; --load: #8ccefe;
+    --font: Inter, "Open Sauce One", "Segoe UI", system-ui, -apple-system, sans-serif;
+    --mono: "Geist Mono", "SF Mono", Consolas, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { height: 100%; }
+  /* App-shell: the page never scrolls; content + sidebar scroll in their own
+     panes so their scrollbars are never adjacent. */
+  body { background: var(--bg); color: var(--text); font: 14px/1.6 var(--font); overflow: hidden; }
+  a { color: var(--accent); }
+  /* subtle scrollbars */
+  * { scrollbar-width: thin; scrollbar-color: #2a3340 transparent; }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-thumb { background: #2a3340; border-radius: 6px; border: 2px solid transparent; background-clip: padding-box; }
+  ::-webkit-scrollbar-thumb:hover { background: #3a4453; background-clip: padding-box; }
+  ::-webkit-scrollbar-track { background: transparent; }
+
+  #topbar { display: flex; align-items: center; gap: 12px; padding: 0 24px; height: 56px;
+    background: var(--bg); border-bottom: 1px solid var(--border); z-index: 10; }
+  #topbar .mark { width: 26px; height: 26px; border-radius: 6px; background: var(--text); color: var(--bg);
+    display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 15px; }
+  #topbar .brand { font-size: 16px; font-weight: 700; letter-spacing: -.2px; }
+  .topnav { display: flex; gap: 4px; margin-left: 18px; }
+  .topnav a { color: var(--muted); text-decoration: none; font-size: 13px; font-weight: 500; padding: 6px 12px; border-radius: 7px; }
+  .topnav a:hover { color: var(--text); background: var(--panel2); }
+  .topnav a.active { color: var(--text); background: var(--panel); }
+  #topbar .sub { color: var(--muted); font-size: 12.5px; text-align: right; }
+  #opts-btn { margin-left: auto; background: var(--panel); border: 1px solid var(--border); color: var(--text);
+    font: inherit; font-size: 13px; padding: 6px 12px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+  #opts-btn:hover { background: var(--panel2); }
+
+  #app { display: flex; height: calc(100vh - 56px); }
+  main#scroll { flex: 1; min-width: 0; overflow-y: auto; }
+  #detail { max-width: 900px; margin: 0 auto; padding: 26px 30px 80px; }
+
+  /* right sidebar: source + asset navigation */
+  aside { width: 340px; flex-shrink: 0; background: var(--bg); border-left: 1px solid var(--border);
+    padding: 16px 10px; overflow-y: auto; }
+
+  /* slide-out options drawer */
+  #drawer-scrim { position: fixed; inset: 0; background: rgba(0,0,0,.5); opacity: 0; pointer-events: none; transition: opacity .2s; z-index: 20; }
+  #drawer-scrim.open { opacity: 1; pointer-events: auto; }
+  #drawer { position: fixed; top: 0; right: 0; height: 100vh; width: 320px; max-width: 90vw; background: var(--bg);
+    border-left: 1px solid var(--border); transform: translateX(100%); transition: transform .22s ease; z-index: 21; overflow-y: auto; padding: 18px 14px; }
+  #drawer.open { transform: translateX(0); }
+  .drawer-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  .drawer-head span { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); }
+  #drawer-close { background: transparent; border: 0; color: var(--muted); font-size: 20px; line-height: 1; cursor: pointer; }
+  #drawer-close:hover { color: var(--text); }
+  aside h3 { font-size: 11px; text-transform: uppercase; letter-spacing: 1.1px; color: var(--muted); font-weight: 600; margin: 4px 10px 8px; }
+  .navitem { display: flex; align-items: center; gap: 9px; padding: 8px 10px; border-radius: 8px; cursor: pointer; font-size: 13px; }
+  .navitem:hover { background: var(--panel2); }
+  .navitem.active { background: var(--panel); }
+  .navitem.active .nlabel { color: var(--text); font-weight: 600; }
+  .navitem .nlabel { flex: 1; color: var(--muted); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono); font-size: 12px; }
+  /* Uniform neutral marker — asset type is shown by name + position, not colour
+     (schema-column origin owns the colour system). */
+  .ldot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; background: var(--muted2); }
+  .navgroup { margin: 6px 6px 16px; }
+  .navgroup .gh { display: flex; align-items: center; gap: 8px; padding: 6px 6px 8px; }
+  .navgroup .gh .gcaret { width: 14px; text-align: center; color: var(--muted2); font-size: 9px; }
+  .navgroup .gh .gt { font-size: 12px; font-weight: 700; color: var(--text); flex: 1; }
+  /* status: fill vs. outline, not colour */
+  .st { font-size: 9px; font-weight: 700; padding: 2px 7px; border-radius: 100px; letter-spacing: .3px; }
+  .st.live { background: var(--panel2); color: var(--text); }
+  .st.live::before { content: ""; display: inline-block; width: 5px; height: 5px; border-radius: 50%; background: #2bae4c; margin-right: 5px; vertical-align: middle; }
+  .st.planned { background: transparent; color: var(--muted2); border: 1px solid var(--border); }
+
+  /* detail */
+  .crumb { font-size: 12px; color: var(--muted); font-family: var(--mono); }
+  h1.asset { font-size: 24px; font-weight: 700; letter-spacing: -.3px; margin: 6px 0 2px; font-family: var(--mono); display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .lbadge { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; padding: 3px 9px; border-radius: 6px; color: var(--muted); background: var(--panel2); border: 1px solid var(--border); font-family: var(--font); }
+  .statusbadge { font-size: 10px; font-weight: 700; padding: 3px 9px; border-radius: 100px; font-family: var(--font); letter-spacing: .3px; }
+  .why { font-size: 15px; color: var(--text); margin: 14px 0 6px; }
+  .desc { font-size: 14px; color: var(--muted); margin: 6px 0 4px; }
+
+  .metabar { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0; }
+  .metabar .m { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 7px 12px; font-size: 12px; }
+  .metabar .m .k { color: var(--muted2); text-transform: uppercase; letter-spacing: .5px; font-size: 9px; display: block; margin-bottom: 2px; }
+  .metabar .m .v { font-family: var(--mono); font-size: 12px; }
+
+  h4 { font-size: 12px; text-transform: uppercase; letter-spacing: .8px; color: var(--muted); margin: 28px 0 10px; font-weight: 600; }
+
+  .lineage { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 13px 15px; }
+  .lineage .arrow { color: var(--muted2); }
+  .lineage .grp { display: flex; flex-direction: column; gap: 5px; }
+  .lineage .lbl { font-size: 9px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted2); }
+  .pill { display: inline-flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: 12px; padding: 5px 10px; border-radius: 7px;
+    background: var(--panel2); border: 1px solid var(--border); cursor: pointer; color: var(--text); }
+  .pill:hover { border-color: var(--accent); }
+  .pill.self { background: rgba(0,147,253,.12); border-color: var(--accent); cursor: default; }
+  .pill.none { color: var(--muted2); cursor: default; font-family: var(--font); font-style: italic; }
+
+  .grain { background: var(--panel); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 8px; padding: 10px 14px; font-size: 13px; color: var(--muted); }
+  .grain b { color: var(--text); font-family: var(--mono); font-weight: 500; }
+
+  table.schema { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.schema th { text-align: left; color: var(--muted); font-weight: 600; font-size: 10px; text-transform: uppercase; letter-spacing: .5px; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  table.schema td { padding: 9px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  table.schema tr:last-child td { border-bottom: 0; }
+  table.schema .col { font-family: var(--mono); font-size: 12.5px; font-weight: 600; }
+  table.schema .typ { font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+  table.schema .ex { font-family: var(--mono); font-size: 12px; color: var(--text); background: var(--panel2); border-radius: 5px; padding: 2px 7px; white-space: nowrap; }
+  table.schema .note { font-size: 11.5px; color: var(--muted2); margin-top: 3px; }
+  .kind { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; padding: 2px 6px; border-radius: 4px; white-space: nowrap; }
+  .kind.key { background: rgba(0,147,253,.15); color: var(--accent); }
+  .kind.pass { background: rgba(128,131,142,.15); color: var(--muted); }
+  .kind.cast { background: rgba(122,240,152,.14); color: var(--stg); }
+  .kind.derived { background: rgba(224,191,62,.15); color: var(--amber); }
+  .kind.seed { background: rgba(140,206,254,.15); color: var(--load); }
+  .kind.meta { background: rgba(196,181,253,.15); color: var(--serve); }
+
+  .rowcard { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 4px 16px; }
+
+  ul.xforms { list-style: none; padding: 0; }
+  ul.xforms li { padding: 9px 0; border-bottom: 1px solid var(--border); font-size: 13.5px; color: #cdd3dd; }
+  ul.xforms li:last-child { border-bottom: 0; }
+  .xf { font-family: var(--font); font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px;
+    color: var(--accent); background: rgba(0,147,253,.10); padding: 2px 7px; border-radius: 100px; margin-right: 7px; }
+  .macro { font-family: var(--mono); font-size: 12px; background: var(--panel2); color: var(--text); padding: 1px 6px; border-radius: 5px; border: 1px solid var(--border); }
+
+  pre.sql { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px;
+    font-family: var(--mono); font-size: 12px; line-height: 1.65; color: #cdd3dd; white-space: pre-wrap; word-break: break-word; }
+  pre.sql .kw { color: #ff9fb0; } pre.sql .fn { color: var(--stg); } pre.sql .cm { color: var(--muted2); }
+
+  .tests { display: flex; flex-wrap: wrap; gap: 7px; }
+  .tests .t { font-family: var(--mono); font-size: 11.5px; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 5px 9px; color: var(--muted); }
+  .tests .t b { color: var(--notmet); }
+
+  .note { background: var(--panel); border: 1px solid var(--border); border-left: 3px solid var(--amber); border-radius: 8px; padding: 12px 16px; font-size: 13px; color: var(--muted); }
+  .note b { color: var(--text); }
+  code { font-family: var(--mono); background: var(--panel2); padding: 1px 5px; border-radius: 4px; font-size: 12.5px; }
+
+  /* overview asset graph — vertical, connected, scales to width (no h-scroll) */
+  svg.graph { width: 100%; max-width: 640px; height: auto; display: block; margin: 8px auto 6px; }
+  .gedge { fill: none; stroke: #55606f; stroke-width: 1.4; marker-end: url(#arw); }
+  .gnode { cursor: pointer; }
+  .gnode:hover rect.box { stroke: var(--accent); }
+  .gtext { fill: #e8ecf2; font-family: var(--mono); font-size: 11px; font-weight: 600; }
+  .gtext.planned { fill: var(--muted); }
+  .glbl { fill: var(--muted2); font-family: var(--font); font-size: 7px; font-weight: 700; letter-spacing: .6px; }
+  .flowline { display: flex; gap: 20px; margin: 12px 0; }
+  .flowline .fstep { flex: 1; text-align: center; }
+  .flowline .fnum { font-family: var(--mono); font-size: 20px; font-weight: 700; color: var(--accent); }
+  .flowline .flbl { font-size: 11px; color: var(--muted); }
+
+  /* landing: source cards */
+  .srccards { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; margin: 12px 0; }
+  .srccard { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 15px 16px; cursor: pointer; }
+  .srccard:hover { border-color: var(--accent); }
+  .srccard .h { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .srccard .h .nm { font-weight: 650; font-size: 15px; }
+  .srccard .bl { font-size: 12.5px; color: var(--muted); line-height: 1.5; }
+  .srccard .ft { margin-top: 11px; font-size: 11.5px; color: var(--muted2); display: flex; justify-content: space-between; align-items: center; }
+  .srccard .go { color: var(--accent); font-weight: 600; }
+
+  /* nav: clickable group header */
+  .navgroup .gh { cursor: pointer; border-radius: 7px; }
+  .navgroup .gh:hover { background: var(--panel2); }
+  .navgroup .gh.active .gt { color: var(--accent); }
+
+  /* source overview: options / ambiguities / caveats */
+  .infobox { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 2px 16px 8px; margin: 10px 0; }
+  .infobox h5 { font-size: 11px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); margin: 15px 0 2px; font-weight: 600; }
+  .infolist { list-style: none; padding: 0; margin: 4px 0 6px; }
+  .infolist li { padding: 9px 0; border-bottom: 1px solid var(--border); font-size: 13px; color: #cdd3dd; line-height: 1.5; }
+  .infolist li:last-child { border-bottom: 0; }
+  .infolist li b { color: var(--text); }
+  /* sidebar option toggles */
+  .optpanel { margin: 20px 4px 8px; border-top: 1px solid var(--border); padding-top: 14px; }
+  .opts-h { font-size: 11px; text-transform: uppercase; letter-spacing: 1.1px; color: var(--muted); font-weight: 600; margin: 0 6px 10px; }
+  .optgroup2 { margin: 0 6px 12px; }
+  .optlabel2 { font-size: 11.5px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
+  .seg2 { display: flex; gap: 3px; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 3px; }
+  .seg2 button { flex: 1; background: transparent; border: 0; color: var(--muted); font: inherit; font-size: 11.5px; padding: 6px 8px; border-radius: 6px; cursor: pointer; }
+  .seg2 button:hover { color: var(--text); background: var(--panel2); }
+  .seg2 button.active { background: var(--accent); color: #fff; font-weight: 600; }
+
+  /* option / ambiguity / caveat: distinguished by the label text, not colour */
+  .tag2 { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; padding: 2px 7px; border-radius: 4px; margin-right: 8px; white-space: nowrap; color: var(--muted); background: var(--panel2); border: 1px solid var(--border); }
+  .infolist li.opt { border-left: 2px solid var(--muted2); padding-left: 12px; }
+  .infolist li.amb { border-left: 2px dashed var(--muted2); padding-left: 12px; }
+  .infolist li.cav { border-left: 2px dotted var(--muted2); padding-left: 12px; }
+
+  /* cardinality table */
+  table.card2 { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  table.card2 th { text-align: left; color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .5px; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  table.card2 td { padding: 9px 10px; border-bottom: 1px solid var(--border); vertical-align: top; color: #cdd3dd; }
+  table.card2 tr:last-child td { border-bottom: 0; }
+  table.card2 td b { color: var(--text); }
+  table.card2 .rc { font-family: var(--mono); color: var(--accent); white-space: nowrap; }
+</style>
+</head>
+<body>
+<div id="topbar">
+  <div class="mark">AI</div>
+  <div class="brand">Bubble Oracle</div>
+  <nav class="topnav">
+    <a href="dashboard.html">Dashboard</a>
+    <a href="datasources.html" class="active">Data Sources</a>
+    <a href="about.html">About</a>
+  </nav>
+  <button id="opts-btn" aria-label="Options">&#9881; Options</button>
+  <div class="sub" id="topsub" style="margin-left:16px"></div>
+</div>
+<div id="app">
+  <main id="scroll"><div id="detail"></div></main>
+  <aside>
+    <h3>Sources &amp; ETL assets</h3>
+    <div id="nav"></div>
+  </aside>
+</div>
+
+<div id="drawer-scrim"></div>
+<div id="drawer">
+  <div class="drawer-head"><span>Options &amp; Ambiguities</span><button id="drawer-close" aria-label="Close">&times;</button></div>
+  <div id="drawer-options"></div>
+</div>
+
+<script>
+const DATA = {"updated":"2026-07-04T21:09:10+00:00","prices":{"columns":[{"name":"ticker","type":"TEXT"},{"name":"date","type":"TEXT"},{"name":"open","type":"REAL"},{"name":"high","type":"REAL"},{"name":"low","type":"REAL"},{"name":"close","type":"REAL"}],"byTicker":[{"ticker":"ANET","rows":3036,"first":"2014-06-06","last":"2026-07-02"},{"ticker":"ASML","rows":7877,"first":"1995-03-15","last":"2026-07-02"},{"ticker":"AVGO","rows":4252,"first":"2009-08-06","last":"2026-07-02"},{"ticker":"NVDA","rows":6903,"first":"1999-01-22","last":"2026-07-02"},{"ticker":"SMCI","rows":4846,"first":"2007-03-29","last":"2026-07-02"},{"ticker":"SOXX","rows":6279,"first":"2001-07-13","last":"2026-07-02"},{"ticker":"TSM","rows":7226,"first":"1997-10-09","last":"2026-07-02"}],"total":40419},"events":{"columns":[{"name":"condition_key","type":"TEXT"},{"name":"ticker","type":"TEXT"},{"name":"basis","type":"TEXT"},{"name":"date","type":"TEXT"},{"name":"kind","type":"TEXT"},{"name":"drawdown","type":"REAL"},{"name":"price","type":"REAL"},{"name":"ath","type":"REAL"}],"total":826},"example":{"ticker":"SMCI","condition":"smci_down_50","date":"2026-07-02","open":28.05,"high":29.22,"low":26.7,"close":27.22,"skey":"83feabfe1e94","athClose":118.81,"athIntraday":122.9,"ddClose":0.7709,"ddIntraday":0.7785,"triggerClose":59.4,"triggerIntraday":61.45,"threshold":0.5,"metInstant":1,"metInstantIntraday":1,"metTrailing":1,"lastBreach":"2025-07-31","supplierHits":["SMCI"],"supplierCount":1,"supplierTotal":5,"supplierMinMet":1},"h100":{"neocloud":{"date":"2026-07-04","usd_hr":2.105,"low":1.734,"n":20,"source":"vast_proxy","rows":4},"hyperscaler":{"date":"2026-04-20","usd_hr":7.48,"low":null,"n":null,"source":"silicondata_published","rows":4},"rowsAll":8}};
+const E = DATA.example || {};
+const E100 = (DATA.h100 && DATA.h100.neocloud) || {};   // neocloud tier for static asset examples
+const H100_ROWS_ALL = (DATA.h100 && DATA.h100.rowsAll) || 8;
+document.getElementById("topsub").textContent = "Last update: " + (DATA.updated || "never") + " UTC";
+
+const money = v => "$" + (v >= 100 ? v.toFixed(0) : v.toFixed(2));
+const LAYER_NAMES = { source: "Extract", raw: "Raw / Load", seed: "Seed", staging: "Staging",
+  intermediate: "Intermediate", mart: "Mart", serve: "Serve", overview: "Overview" };
+
+/* ============================ ASSET CATALOG ============================ */
+/* Each asset = a Dagster-style materialized table/view handed downstream.   */
+
+const ASSETS = [
+  /* -------- Yahoo Finance (live) -------- */
+  {
+    id: "raw.yahoo_chart", group: "yahoo", layer: "source", status: "live",
+    name: "raw.yahoo_chart", mat: "API response (JSON)", cadence: "on demand, per ticker",
+    dagster: "yahoo/chart", dbt: "source('yahoo','chart')",
+    grain: "one JSON document per ticker (arrays of daily bars)",
+    why: "The raw pull. A Python tap GETs the chart endpoint; nothing is reshaped yet.",
+    desc: "Semi-structured JSON: parallel arrays of epoch timestamps and OHLC values under indicators.quote[0]. Split-adjusted. This is the boundary of the pipeline — everything after is normalization.",
+    upstream: [],
+    json: `{
+  "chart": { "result": [ {
+    "meta": { "symbol": "SMCI", "gmtoffset": -14400 },
+    "timestamp": [ ..., 1782... ],
+    "indicators": { "quote": [ {
+      "open":  [ ..., ${E.open} ],
+      "high":  [ ..., ${E.high} ],
+      "low":   [ ..., ${E.low} ],
+      "close": [ ..., ${E.close} ]
+    } ] }
+  } ] }
+}`,
+    transforms: [{ tag: "extract", text: "HTTP GET with browser User-Agent; explicit period1/period2 epochs to force daily granularity. Analogous to an Airbyte/dlt source connector." }],
+    cardinality: "7 documents per run (one per ticker), each carrying the full daily history.",
+  },
+  {
+    id: "prices", group: "yahoo", layer: "raw", status: "live",
+    name: "prices", mat: "table · incremental upsert", cadence: "daily after US close",
+    dagster: "yahoo/prices", dbt: "—  (landed by the tap)",
+    grain: "one row per (ticker, trading date)",
+    why: "The raw arrays flattened into rows and persisted. This is what actually lives in oracle.db today.",
+    desc: "The JSON arrays are zipped into tabular rows and upserted with INSERT OR REPLACE keyed on (ticker, date) — i.e. an incremental load with unique_key=['ticker','date']. Holiday/halt padding (null close) is dropped on the way in.",
+    upstream: ["raw.yahoo_chart"],
+    schema: [
+      { col: "ticker", type: "TEXT", kind: "key", ex: E.ticker, note: "part of the primary key" },
+      { col: "date", type: "TEXT", kind: "key", ex: E.date, note: "epoch → local trading date" },
+      { col: "open", type: "REAL", kind: "pass", ex: E.open },
+      { col: "high", type: "REAL", kind: "pass", ex: E.high },
+      { col: "low", type: "REAL", kind: "pass", ex: E.low },
+      { col: "close", type: "REAL", kind: "pass", ex: E.close },
+    ],
+    transforms: [
+      { tag: "flatten", text: "zip the parallel timestamp/OHLC arrays into rows" },
+      { tag: "incremental", text: "upsert on (ticker, date) — re-pulled bars overwrite rather than duplicate" },
+    ],
+    tests: ["unique (ticker, date)", "not_null: ticker, date, close"],
+    cardinality: `${(DATA.prices.total).toLocaleString()} rows total across 7 tickers (live count from oracle.db).`,
+  },
+  {
+    id: "stg_yahoo__prices", group: "yahoo", layer: "staging", status: "live",
+    name: "stg_yahoo__prices", mat: "view", cadence: "on read",
+    dagster: "yahoo/stg_prices", dbt: "stg_yahoo__prices",
+    grain: "one row per (ticker, trading date)",
+    why: "Clean, typed, de-duplicated, with a stable surrogate key. The conventional dbt staging layer.",
+    desc: "Renames and casts raw columns, drops null-close rows, deduplicates the incremental overlap, and adds a hashed surrogate key so every downstream join has one clean key to reference.",
+    upstream: ["prices"],
+    schema: [
+      { col: "price_key", type: "TEXT", kind: "key", ex: E.skey + "…", note: "dbt_utils.generate_surrogate_key(['ticker','date'])" },
+      { col: "ticker", type: "STRING", kind: "pass", ex: E.ticker },
+      { col: "date", type: "DATE", kind: "cast", ex: E.date, note: "cast TEXT → DATE" },
+      { col: "open", type: "NUMERIC", kind: "cast", ex: E.open },
+      { col: "high", type: "NUMERIC", kind: "cast", ex: E.high },
+      { col: "low", type: "NUMERIC", kind: "cast", ex: E.low },
+      { col: "close", type: "NUMERIC", kind: "cast", ex: E.close },
+      { col: "_loaded_at", type: "TIMESTAMP", kind: "meta", ex: "2026-07-04T16:52Z", note: "load audit column" },
+    ],
+    transforms: [
+      { tag: "rename + cast", text: "map raw fields to typed columns" },
+      { tag: "filter", text: "where close is not null — drop holiday/halt padding" },
+      { tag: "dedupe", macro: "dbt_utils.deduplicate(partition_by='ticker, date', order_by='_loaded_at desc')" },
+      { tag: "surrogate key", macro: "dbt_utils.generate_surrogate_key(['ticker','date'])" },
+    ],
+    sql: `<span class="kw">select</span>
+  <span class="fn">{{ dbt_utils.generate_surrogate_key(['ticker','date']) }}</span> <span class="kw">as</span> price_key,
+  ticker, <span class="kw">cast</span>(date <span class="kw">as</span> date) <span class="kw">as</span> date,
+  open, high, low, close, _loaded_at
+<span class="kw">from</span> <span class="fn">{{ source('yahoo','prices') }}</span>
+<span class="kw">where</span> close <span class="kw">is not null</span>
+<span class="cm">-- then dbt_utils.deduplicate over (ticker, date)</span>`,
+    tests: ["unique: price_key", "not_null: price_key, close", "accepted_values: ticker in the 7 symbols"],
+    cardinality: "≈ same row count as prices, minus dropped null-close rows.",
+  },
+  {
+    id: "int_prices_aths", group: "yahoo", layer: "intermediate", status: "live",
+    name: "int_prices_aths", mat: "table", cadence: "full rebuild",
+    dagster: "yahoo/int_prices_aths", dbt: "int_prices_aths",
+    grain: "one row per (ticker, date), enriched",
+    why: "Adds the running all-time high and drawdown — the core numbers every drawdown condition reads.",
+    desc: "A window function accumulates the all-time high per ticker (both close and intraday bases), then drawdown = 1 − price / ATH is derived — a positive magnitude for how far below the peak the price sits. This is where the raw price becomes “how far below its peak.”",
+    upstream: ["stg_yahoo__prices"],
+    schema: [
+      { col: "price_key", type: "TEXT", kind: "key", ex: E.skey + "…" },
+      { col: "ticker", type: "STRING", kind: "pass", ex: E.ticker },
+      { col: "date", type: "DATE", kind: "pass", ex: E.date },
+      { col: "close", type: "NUMERIC", kind: "pass", ex: E.close },
+      { col: "ath_close", type: "NUMERIC", kind: "derived", ex: E.athClose, note: "max(close) over (partition by ticker order by date rows unbounded preceding)" },
+      { col: "ath_intraday", type: "NUMERIC", kind: "derived", ex: E.athIntraday, note: "max(high) over (…) — the other ATH basis" },
+      { col: "drawdown_close", type: "NUMERIC", kind: "derived", ex: E.ddClose, note: "1 − close / ath_close  (positive = fraction below the peak)" },
+    ],
+    transforms: [
+      { tag: "window", text: "running ATH via max() over an unbounded-preceding frame, per ticker, for each basis" },
+      { tag: "derived", text: "drawdown = 1 − price / ath  (a positive magnitude, so it shares a sign with the threshold)" },
+    ],
+    sql: `<span class="kw">select</span> *,
+  <span class="fn">max</span>(close) <span class="kw">over</span> (
+    <span class="kw">partition by</span> ticker <span class="kw">order by</span> date
+    <span class="kw">rows between unbounded preceding and current row</span>) <span class="kw">as</span> ath_close,
+  1 - close / ath_close <span class="kw">as</span> drawdown_close
+<span class="kw">from</span> <span class="fn">{{ ref('stg_yahoo__prices') }}</span>`,
+    tests: ["not_null: ath_close", "dbt_utils.accepted_range: drawdown_close between 0 and 1"],
+    cardinality: "1:1 with staging — enrichment only, no fan-out yet.",
+  },
+  {
+    id: "condition_thresholds", group: "yahoo", layer: "seed", status: "live",
+    name: "condition_thresholds", mat: "seed · csv", cadence: "on change",
+    dagster: "seeds/condition_thresholds", dbt: "condition_thresholds",
+    grain: "one row per condition (the contract tree, as data)",
+    why: "The contract itself — which conditions exist, their thresholds, and the parent/child hierarchy. Config, not observed data.",
+    desc: "A hand-maintained seed defining every node of the condition tree. The parent_key column makes it self-referencing, so it doubles as dim_conditions, the hierarchy dimension that fct_contract_resolution rolls up.",
+    upstream: [],
+    schema: [
+      { col: "condition_key", type: "STRING", kind: "key", ex: E.condition },
+      { col: "label", type: "STRING", kind: "seed", ex: "Supermicro (SMCI) down 50% from ATH" },
+      { col: "type", type: "STRING", kind: "seed", ex: "drawdown", note: "drawdown | count | manual" },
+      { col: "ticker", type: "STRING", kind: "seed", ex: E.ticker },
+      { col: "threshold", type: "NUMERIC", kind: "seed", ex: E.threshold, note: "0.50 = down 50%" },
+      { col: "parent_key", type: "STRING", kind: "seed", ex: "supplier_down_50", note: "self-reference → hierarchy" },
+      { col: "min_met", type: "INTEGER", kind: "seed", ex: "null", note: "set on count nodes only" },
+    ],
+    transforms: [{ tag: "seed", macro: "dbt seed" }],
+    tests: ["unique: condition_key", "relationships: parent_key → condition_thresholds.condition_key", "accepted_values: type"],
+    cardinality: "one row per node in the contract tree (currently 10 nodes).",
+  },
+  {
+    id: "int_condition_flags", group: "yahoo", layer: "intermediate", status: "live",
+    name: "int_condition_flags", mat: "table", cadence: "full rebuild",
+    dagster: "yahoo/int_condition_flags", dbt: "int_condition_flags",
+    grain: "one row per (condition, basis, date)",
+    why: "Turns prices into per-condition booleans, and is where the data fans out: one price row → several condition rows.",
+    desc: "Joins enriched prices to the thresholds seed on ticker (fanning each price row out to every condition that references it), unpivots the two ATH bases into a basis column, and derives the instant boolean met_instant = drawdown ≥ threshold — both positive, so the comparison reads directly (0.77 ≥ 0.50).",
+    upstream: ["int_prices_aths", "condition_thresholds"],
+    schema: [
+      { col: "condition_key", type: "STRING", kind: "key", ex: E.condition },
+      { col: "basis", type: "STRING", kind: "key", ex: "close", note: "close | intraday (unpivoted)" },
+      { col: "date", type: "DATE", kind: "key", ex: E.date },
+      { col: "drawdown", type: "NUMERIC", kind: "pass", ex: E.ddClose },
+      { col: "threshold", type: "NUMERIC", kind: "seed", ex: E.threshold },
+      { col: "met_instant", type: "BOOLEAN", kind: "derived", ex: E.metInstant, note: "drawdown ≥ threshold" },
+    ],
+    transforms: [
+      { tag: "join", text: "int_prices_aths ⋈ condition_thresholds on ticker" },
+      { tag: "unpivot", macro: "dbt_utils.unpivot", text: "stack the {close, intraday} bases into rows" },
+      { tag: "case", text: "met_instant = drawdown ≥ threshold  (both positive)" },
+    ],
+    tests: ["not_null: met_instant", "relationships: condition_key → condition_thresholds"],
+    cardinality: "≈ price rows × (conditions per ticker) × 2 bases — the first real fan-out.",
+  },
+  {
+    id: "int_condition_windows", group: "yahoo", layer: "intermediate", status: "live",
+    name: "int_condition_windows", mat: "table", cadence: "full rebuild",
+    dagster: "yahoo/int_condition_windows", dbt: "int_condition_windows",
+    grain: "one row per (condition, basis, window_mode, date)",
+    why: "Applies the 90-day window interpretations, so the dashboard toggle becomes a filter instead of a recompute.",
+    desc: "A range window computes the trailing-90-day flag (met at any point in the last 90 days), and the {instant, trailing} window modes are unpivoted into rows. The threshold-crossing events table is derived here too, from state transitions.",
+    upstream: ["int_condition_flags"],
+    schema: [
+      { col: "condition_key", type: "STRING", kind: "key", ex: E.condition },
+      { col: "basis", type: "STRING", kind: "key", ex: "close" },
+      { col: "window_mode", type: "STRING", kind: "key", ex: "trailing", note: "instant | trailing (unpivoted)" },
+      { col: "date", type: "DATE", kind: "key", ex: E.date },
+      { col: "met_instant", type: "BOOLEAN", kind: "pass", ex: E.metInstant },
+      { col: "met", type: "BOOLEAN", kind: "derived", ex: E.metTrailing, note: "resolution flag under this window_mode" },
+    ],
+    transforms: [
+      { tag: "range window", text: "max(met_instant) over (… range between interval '90 days' preceding and current row) → trailing flag" },
+      { tag: "unpivot", macro: "dbt_utils.unpivot", text: "stack the {instant, trailing} window modes" },
+      { tag: "change-data", text: "events = state transitions: met ≠ lag(met) over (order by date)", macro: "cf. dbt_utils.mutually_exclusive_ranges" },
+    ],
+    sql: `<span class="kw">select</span> *,
+  <span class="fn">max</span>(met_instant) <span class="kw">over</span> (
+    <span class="kw">partition by</span> condition_key, basis <span class="kw">order by</span> date
+    <span class="kw">range between interval</span> '90 days' <span class="kw">preceding and current row</span>
+  ) <span class="kw">as</span> met_trailing
+<span class="kw">from</span> <span class="fn">{{ ref('int_condition_flags') }}</span>`,
+    tests: ["not_null: met", "accepted_values: window_mode in (instant, trailing)"],
+    cardinality: `2× int_condition_flags (two window modes). ${DATA.events.total.toLocaleString()} crossing events derived.`,
+  },
+  {
+    id: "int_conditions_aligned", group: "yahoo", layer: "intermediate", status: "live",
+    name: "int_conditions_aligned", mat: "table", cadence: "full rebuild",
+    dagster: "yahoo/int_conditions_aligned", dbt: "int_conditions_aligned",
+    grain: "one row per (condition, basis, window_mode, spine date)",
+    why: "Puts every condition on one continuous calendar so parent counts can sum children day-by-day.",
+    desc: "Builds a gap-free date spine and left-joins each condition onto it, forward-filling the last known state. This reconciles the tickers' differing trading calendars (foreign ADRs, halts) so a count parent can safely add up children on any given day.",
+    upstream: ["int_condition_windows"],
+    schema: [
+      { col: "condition_key", type: "STRING", kind: "key", ex: E.condition },
+      { col: "basis", type: "STRING", kind: "key", ex: "close" },
+      { col: "window_mode", type: "STRING", kind: "key", ex: "trailing" },
+      { col: "date", type: "DATE", kind: "key", ex: E.date, note: "from the spine, not the source" },
+      { col: "met", type: "BOOLEAN", kind: "derived", ex: E.metTrailing, note: "forward-filled across gaps" },
+      { col: "was_filled", type: "BOOLEAN", kind: "meta", ex: "0", note: "1 if carried from a prior day" },
+    ],
+    transforms: [
+      { tag: "date spine", macro: "dbt_utils.date_spine(datepart='day', …)", text: "continuous axis, buffered ~110 days before chart start so the trailing window is correct at the left edge" },
+      { tag: "forward-fill", text: "coalesce(met, last_value(met ignore nulls) over (order by date))" },
+    ],
+    tests: ["not_null: met", "unique (condition_key, basis, window_mode, date)"],
+    cardinality: "conditions × 2 bases × 2 window_modes × |spine days| — dense and rectangular.",
+  },
+  {
+    id: "fct_condition_daily", group: "yahoo", layer: "mart", status: "live",
+    name: "fct_condition_daily", mat: "table", cadence: "full rebuild",
+    dagster: "marts/fct_condition_daily", dbt: "fct_condition_daily",
+    grain: "one row per (condition_key, basis, window_mode, date)",
+    why: "The leaf fact the dashboard reads. One row is exactly one point on one chart under one toggle setting.",
+    desc: "The presentation-ready fact for the equity-drawdown leaves: met state plus the price/ATH/trigger needed to draw each chart. The dashboard slices this by the active (basis, window_mode). (The H100 rental has its own parallel mart — see the H100 source.)",
+    upstream: ["int_conditions_aligned", "int_prices_aths"],
+    schema: [
+      { col: "condition_key", type: "STRING", kind: "key", ex: E.condition },
+      { col: "basis", type: "STRING", kind: "key", ex: "close" },
+      { col: "window_mode", type: "STRING", kind: "key", ex: "trailing" },
+      { col: "date", type: "DATE", kind: "key", ex: E.date },
+      { col: "met", type: "BOOLEAN", kind: "pass", ex: E.metTrailing },
+      { col: "met_instant", type: "BOOLEAN", kind: "pass", ex: E.metInstant },
+      { col: "close", type: "NUMERIC", kind: "pass", ex: E.close },
+      { col: "ath", type: "NUMERIC", kind: "pass", ex: E.athClose },
+      { col: "trigger_price", type: "NUMERIC", kind: "derived", ex: E.triggerClose, note: "ath × (1 − threshold)" },
+    ],
+    transforms: [
+      { tag: "join", text: "aligned met flags ⋈ prices for the chart series" },
+      { tag: "derived", text: "trigger_price = ath × (1 − threshold)" },
+    ],
+    tests: ["unique on the grain key", "not_null: met", "dbt_utils.accepted_range: drawdown ∈ [0, 1)"],
+    cardinality: "the leaf fact; one row per chart point per toggle combination.",
+  },
+  {
+    id: "fct_contract_resolution", group: "yahoo", layer: "mart", status: "live",
+    name: "fct_contract_resolution", mat: "table", cadence: "full rebuild",
+    dagster: "marts/fct_contract_resolution", dbt: "fct_contract_resolution",
+    grain: "one row per (parent condition_key, basis, window_mode, date)",
+    why: "The rollup: every parent (incl. the root “≥3 of 6”) resolved from how many children are met.",
+    desc: "A recursive rollup over dim_conditions. For each count node it sums the children's met flags per day and compares to min_met. Applied bottom-up, so the root resolves by the same rule as every group. The example shows the 'supplier' parent: 1 of 5 children met (only SMCI), min_met 1 → MET.",
+    upstream: ["fct_condition_daily", "condition_thresholds"],
+    schema: [
+      { col: "condition_key", type: "STRING", kind: "key", ex: E.parent || "supplier_down_50" },
+      { col: "basis", type: "STRING", kind: "key", ex: "close" },
+      { col: "window_mode", type: "STRING", kind: "key", ex: "trailing" },
+      { col: "date", type: "DATE", kind: "key", ex: E.date },
+      { col: "children_met", type: "INTEGER", kind: "derived", ex: E.supplierCount, note: `of ${E.supplierTotal} children (${(E.supplierHits||[]).join(', ')})` },
+      { col: "min_met", type: "INTEGER", kind: "seed", ex: E.supplierMinMet },
+      { col: "met", type: "BOOLEAN", kind: "derived", ex: (E.supplierCount >= E.supplierMinMet ? 1 : 0), note: "children_met ≥ min_met" },
+    ],
+    transforms: [
+      { tag: "rollup", text: "recursive CTE over dim_conditions; sum(child.met) group by parent" },
+      { tag: "case", text: "met = children_met ≥ min_met" },
+    ],
+    sql: `<span class="cm">-- recursive walk up the hierarchy, aggregating children</span>
+<span class="kw">select</span> parent_key <span class="kw">as</span> condition_key, basis, window_mode, date,
+  <span class="fn">sum</span>(met) <span class="kw">as</span> children_met,
+  <span class="fn">sum</span>(met) &gt;= <span class="fn">max</span>(min_met) <span class="kw">as</span> met
+<span class="kw">from</span> <span class="fn">{{ ref('fct_condition_daily') }}</span> f
+<span class="kw">join</span> <span class="fn">{{ ref('condition_thresholds') }}</span> c <span class="kw">using</span> (condition_key)
+<span class="kw">group by</span> parent_key, basis, window_mode, date`,
+    tests: ["unique on the grain key", "not_null: met", "dbt_utils.expression_is_true: children_met ≤ total_children"],
+    cardinality: "one row per parent node per day per toggle combination.",
+  },
+  {
+    id: "exposure.dashboard", group: "yahoo", layer: "serve", status: "live",
+    name: "exposure: ai_bubble_dashboard", mat: "exposure (JSON)", cadence: "on generate",
+    dagster: "dashboard (asset check / exposure)", dbt: "exposure: ai_bubble_dashboard",
+    grain: "one JSON payload embedded in dashboard.html",
+    why: "The consumer. Marts are serialized to the compact JSON the dashboard reads — reverse-ETL to a static file.",
+    desc: "Serializes the marts to the JSON embedded in dashboard.html: a master date axis, and per-leaf bitstrings of met state for each basis. Pre-computing all toggle slices here is why the browser filters instead of recomputing.",
+    upstream: ["fct_condition_daily", "fct_contract_resolution"],
+    json: `{
+  "dateAxis": [ "2021-09-13", …, "${E.date}" ],
+  "tree": { "key": "ai_bubble_2026", "type": "count", "minMet": 3,
+    "children": [ …, {
+      "key": "${E.condition}", "type": "drawdown", "ticker": "${E.ticker}",
+      "bases": { "close": { "ath": [ …, ${E.athClose} ],
+                            "inst": "0000…1111" } },   <span class="cm">// met bitstring</span>
+      "lastInst": { "close": "${E.lastBreach || ''}" }
+    } ] }
+}`,
+    transforms: [{ tag: "reverse-etl", text: "marts → static JSON in dashboard.html", macro: "dbt exposure" }],
+    cardinality: "one document; the terminal node of the DAG.",
+  },
+
+  /* -------- H100 rental (live proxy) -------- */
+  {
+    id: "raw.vast_offers", group: "h100", layer: "source", status: "live",
+    name: "raw.vast_offers", mat: "API response (JSON)", cadence: "daily",
+    dagster: "h100/vast_offers", dbt: "source('vast','bundles')",
+    grain: "one JSON document per collection (a list of live offers)",
+    why: "The free public proxy for the paywalled SiliconData index. Feeds condition 5.",
+    desc: "Vast.ai's public bundles API, queried for verified, on-demand H100 SXM offers. Each offer carries dph_total ($/hr) and num_gpus, so per-GPU price = dph_total / num_gpus. No key needed (browser User-Agent).",
+    upstream: [],
+    json: `GET console.vast.ai/api/v0/bundles/?q={
+  "gpu_name":  {"eq": "H100 SXM"},
+  "verified":  {"eq": true},
+  "type":      "on-demand",
+  "order":     [["dph_total","asc"]]
+}
+→ { "offers": [ { "dph_total": 1.735, "num_gpus": 1, "geolocation": "US", … }, … ] }`,
+    transforms: [{ tag: "extract", text: "HTTP GET; a Python tap parses offers and computes per-GPU $/hr. Analogous to a source connector." }],
+    cardinality: `≈ ${(E100.n || 28)} verified on-demand H100 offers in a typical pull.`,
+  },
+  {
+    id: "h100_prices", group: "h100", layer: "raw", status: "live",
+    name: "h100_prices", mat: "table · daily upsert", cadence: "daily",
+    dagster: "h100/h100_prices", dbt: "—  (landed by the tap)",
+    grain: "one row per date",
+    why: "The persisted daily index reading. This is what actually lives in oracle.db today.",
+    desc: "One reading per day, upserted on date. The Vast.ai median is the proxy index; a few real SDH100RT values quoted in public SiliconData posts are seeded (source='silicondata_published') for historical context, since the proxy only accumulates going forward.",
+    upstream: ["raw.vast_offers"],
+    schema: [
+      { col: "date", type: "TEXT", kind: "key", ex: E100.date, note: "primary key; latest source wins" },
+      { col: "source", type: "TEXT", kind: "key", ex: "vast_proxy", note: "vast_proxy | silicondata_published" },
+      { col: "usd_hr", type: "REAL", kind: "derived", ex: E100.usd_hr, note: "median per-GPU $/hr (the index proxy)" },
+      { col: "low", type: "REAL", kind: "derived", ex: E100.low, note: "cheapest offer" },
+      { col: "n", type: "INTEGER", kind: "meta", ex: E100.n, note: "sample size" },
+    ],
+    transforms: [
+      { tag: "aggregate", text: "usd_hr = median(dph_total / num_gpus) over the verified on-demand offers" },
+      { tag: "incremental", text: "upsert on date — one reading per day" },
+    ],
+    tests: ["not_null: usd_hr", "accepted_values: source in (vast_proxy, silicondata_published)"],
+    cardinality: `${H100_ROWS_ALL} readings so far (published seeds + daily proxy, both tiers, accumulating).`,
+  },
+  {
+    id: "int_h100_runlength", group: "h100", layer: "intermediate", status: "live",
+    name: "int_h100_runlength", mat: "table", cadence: "on rebuild",
+    dagster: "h100/int_h100_runlength", dbt: "int_h100_runlength",
+    grain: "one row per date, plus a met flag aligned to the master axis",
+    why: "Implements the “≤ $1.00 for five consecutive days” rule as a run-length window, and aligns the met flag to the contract's master date axis.",
+    desc: "Flags days at/below $1.00, tests for a 5-reading run, then forward-fills that met flag onto the master date axis so it lines up with the equity leaves (and obeys the same 90-day window toggle). Feeds the H100-specific mart.",
+    upstream: ["h100_prices"],
+    schema: [
+      { col: "date", type: "DATE", kind: "key", ex: E100.date },
+      { col: "usd_hr", type: "NUMERIC", kind: "pass", ex: E100.usd_hr },
+      { col: "below", type: "BOOLEAN", kind: "derived", ex: (E100.usd_hr <= 1 ? 1 : 0), note: "usd_hr ≤ 1.00" },
+      { col: "met", type: "BOOLEAN", kind: "derived", ex: 0, note: "5-reading run of below" },
+    ],
+    transforms: [
+      { tag: "case", text: "below = usd_hr ≤ 1.00" },
+      { tag: "range window", text: "min(below) over (order by date rows between 4 preceding and current row) = 1 → run of five" },
+      { tag: "forward-fill", text: "align met onto the master date axis so count parents can sum it" },
+    ],
+    tests: ["not_null: met", "source freshness (a stalled feed must not read as ‘not triggered’)"],
+    cardinality: "1:1 with h100_prices; met is all-false today (index ~$2.2, far above $1).",
+  },
+  {
+    id: "raw.silicondata_index", group: "h100", layer: "source", status: "planned",
+    name: "raw.silicondata_index", mat: "feed (planned)", cadence: "daily",
+    dagster: "h100/silicondata_index", dbt: "source('silicondata','sdh100rt')",
+    grain: "one row per date (authoritative)",
+    why: "The ACTUAL resolution source named in the rules — replaces the proxy once access exists.",
+    desc: "SiliconData's Silicon Index SDH100RT, published via Bloomberg / Refinitiv / enterprise API. Paywalled, so deferred to a future plan. When wired, it becomes the upstream of int_h100_runlength in place of the Vast.ai proxy — same downstream logic, authoritative input.",
+    upstream: [],
+    schema: [
+      { col: "date", type: "DATE", kind: "key", ex: "—" },
+      { col: "sdh100rt", type: "NUMERIC", kind: "pass", ex: "2.16", note: "published index $/hr" },
+    ],
+    transforms: [{ tag: "extract", text: "Bloomberg / Refinitiv / SiliconData enterprise API (requires paid access)" }],
+    cardinality: "one authoritative row per day (planned).",
+  },
+  {
+    id: "fct_h100_rental", group: "h100", layer: "mart", status: "live",
+    name: "fct_h100_rental", mat: "table", cadence: "on rebuild",
+    dagster: "marts/fct_h100_rental", dbt: "fct_h100_rental",
+    grain: "one row per (index_tier, date)",
+    why: "The H100 rental's own leaf fact — the presentation-ready table the H100 chart reads. Its own columns, not the equity fact's.",
+    desc: "The H100 analogue of fct_condition_daily, but with rental-specific columns: the index value, the ≤ $1 flag, and the 5-day run flag, per tier. Distinct grain and schema from the equity mart — this is where the H100 pipeline reaches presentation.",
+    upstream: ["int_h100_runlength"],
+    schema: [
+      { col: "index_tier", type: "STRING", kind: "key", ex: "neocloud", note: "neocloud | hyperscaler" },
+      { col: "date", type: "DATE", kind: "key", ex: E100.date },
+      { col: "usd_hr", type: "NUMERIC", kind: "pass", ex: E100.usd_hr, note: "the index value ($/GPU/hr)" },
+      { col: "below", type: "BOOLEAN", kind: "derived", ex: (E100.usd_hr <= 1 ? 1 : 0), note: "usd_hr ≤ threshold" },
+      { col: "met", type: "BOOLEAN", kind: "derived", ex: 0, note: "5-reading run of below" },
+      { col: "threshold", type: "NUMERIC", kind: "seed", ex: "1.00" },
+    ],
+    transforms: [
+      { tag: "pivot", text: "one row per tier per day; the tier becomes a key column" },
+      { tag: "join", text: "run-length met flag ⋈ the reading, for the chart series" },
+    ],
+    tests: ["unique (index_tier, date)", "not_null: met", "accepted_values: index_tier in (neocloud, hyperscaler)"],
+    cardinality: "the H100 leaf fact; one row per tier per day.",
+  },
+  {
+    id: "exposure.h100_series", group: "h100", layer: "serve", status: "live",
+    name: "exposure: h100_series", mat: "exposure (JSON)", cadence: "on generate",
+    dagster: "dashboard (h100 slice)", dbt: "exposure: h100_series",
+    grain: "the H100 block embedded in dashboard.html",
+    why: "The H100 pipeline's own conclusion — its slice of the served payload, from which the browser draws the chart and adds the met flag to the 3-of-6 count.",
+    desc: "The H100 analogue of exposure.dashboard: both tiers' sparse series plus the master-aligned met bitstring, serialized into the dashboard JSON. The browser combines this slice with the equity leaves' slices to compute the contract count client-side.",
+    upstream: ["fct_h100_rental"],
+    json: `"h100_rental_dollar": {
+  "type": "rental", "threshold": 1.0, "days": 5,
+  "tiers": {
+    "neocloud":    { "chartDates": [ …, "${E100.date}" ],
+                     "chartValues": [ …, ${E100.usd_hr} ],
+                     "inst": "0000…0000" },      <span class="cm">// met bitstring, master-aligned</span>
+    "hyperscaler": { "chartValues": [ …, 7.48 ], "inst": "0000…0000" }
+  }
+}`,
+    transforms: [{ tag: "reverse-etl", text: "H100 marts → the h100 block of the static JSON", macro: "dbt exposure" }],
+    cardinality: "one JSON block; the H100 pipeline's terminal node.",
+  },
+
+  /* -------- CourtListener (planned) -------- */
+  {
+    id: "court_dockets", group: "courtlistener", layer: "raw", status: "planned",
+    name: "court_dockets", mat: "table (planned)", cadence: "hourly alerts",
+    dagster: "recap/court_dockets", dbt: "—",
+    grain: "one row per federal docket",
+    why: "Feeds the OpenAI/Anthropic bankruptcy conditions. Chapter 7/11 filings are public and immediate.",
+    desc: "CourtListener RECAP party-name alerts.",
+    upstream: [],
+    schema: [
+      { col: "id", type: "INTEGER", kind: "key", ex: "70123456" },
+      { col: "case_name", type: "STRING", kind: "pass", ex: "In re: Example AI Inc." },
+      { col: "court", type: "STRING", kind: "pass", ex: "cacb" },
+      { col: "date_filed", type: "DATE", kind: "pass", ex: "—" },
+      { col: "chapter", type: "STRING", kind: "pass", ex: "11" },
+    ],
+    transforms: [{ tag: "extract", text: "REST party-name alerts, free API key" }],
+    cardinality: "one row per matching docket (rare).",
+  },
+  {
+    id: "stg_recap__dockets", group: "courtlistener", layer: "staging", status: "planned",
+    name: "stg_recap__dockets", mat: "view (planned)", cadence: "on read",
+    dagster: "recap/stg_dockets", dbt: "stg_recap__dockets",
+    grain: "one row per bankruptcy docket matched to a tracked entity",
+    why: "Filters to real bankruptcy petitions and fuzzy-matches parties to OpenAI/Anthropic, with a human gate.",
+    desc: "Dedupe, filter to chapters 7/11, and fuzzy-match parties; low-confidence hits go to a human-confirm gate before the flag counts.",
+    upstream: ["court_dockets"],
+    schema: [
+      { col: "docket_id", type: "INTEGER", kind: "key", ex: "70123456" },
+      { col: "entity", type: "STRING", kind: "derived", ex: "OpenAI", note: "fuzzy party match" },
+      { col: "confidence", type: "NUMERIC", kind: "derived", ex: "0.94" },
+      { col: "confirmed", type: "BOOLEAN", kind: "meta", ex: "false", note: "human gate" },
+    ],
+    transforms: [
+      { tag: "dedupe", macro: "dbt_utils.deduplicate", text: "by docket id" },
+      { tag: "filter", macro: "accepted_values(chapter in ['7','11'])" },
+      { tag: "entity match", text: "Jaro-Winkler party match; human-confirm gate for low confidence" },
+    ],
+    cardinality: "sparse; near-zero rows in the normal case.",
+  },
+
+  /* -------- GDELT (planned) -------- */
+  {
+    id: "news_articles", group: "gdelt", layer: "raw", status: "planned",
+    name: "news_articles", mat: "table (planned)", cadence: "15-min poll",
+    dagster: "gdelt/news_articles", dbt: "—",
+    grain: "one row per article URL",
+    why: "Feeds “OpenAI is acquired” — no structured source exists, so this is news + LLM classification.",
+    desc: "GDELT 2.0 Doc API plus curated RSS.",
+    upstream: [],
+    schema: [
+      { col: "url", type: "STRING", kind: "key", ex: "https://…" },
+      { col: "seendate", type: "TIMESTAMP", kind: "pass", ex: "—" },
+      { col: "title", type: "STRING", kind: "pass", ex: "…" },
+      { col: "domain", type: "STRING", kind: "pass", ex: "reuters.com" },
+    ],
+    transforms: [{ tag: "extract", text: "GDELT Doc API + RSS" }],
+    cardinality: "many low-signal rows per day.",
+  },
+  {
+    id: "int_acquisition_signals", group: "gdelt", layer: "intermediate", status: "planned",
+    name: "int_acquisition_signals", mat: "table (planned)", cadence: "daily",
+    dagster: "gdelt/int_acquisition_signals", dbt: "int_acquisition_signals",
+    grain: "one row per date",
+    why: "Classifies news into a daily acquisition signal, gated on a credible-reporting consensus.",
+    desc: "Dedupe by URL, run an LLM classifier (a dbt Python model / external UDF), then aggregate to a daily consensus signal with a human-confirm gate.",
+    upstream: ["news_articles"],
+    schema: [
+      { col: "date", type: "DATE", kind: "key", ex: "—" },
+      { col: "signal", type: "NUMERIC", kind: "derived", ex: "0.0", note: "consensus above confidence threshold" },
+      { col: "met", type: "BOOLEAN", kind: "derived", ex: "0" },
+    ],
+    transforms: [
+      { tag: "dedupe", macro: "dbt_utils.deduplicate", text: "by url; incremental on seendate" },
+      { tag: "python model", text: "LLM classifier → {is_acquisition, confidence} per article" },
+      { tag: "aggregate", text: "daily consensus; human-confirm gate before it counts" },
+    ],
+    cardinality: "one row per day (planned).",
+  },
+];
+
+const GROUPS = [
+  { id: "yahoo", name: "Yahoo Finance", status: "live" },
+  { id: "h100", name: "H100 rental (proxy)", status: "live" },
+  { id: "courtlistener", name: "CourtListener", status: "planned" },
+  { id: "gdelt", name: "GDELT news", status: "planned" },
+];
+
+const BY_ID = Object.fromEntries(ASSETS.map(a => [a.id, a]));
+const DOWNSTREAM = {};
+ASSETS.forEach(a => (a.upstream || []).forEach(u => (DOWNSTREAM[u] = DOWNSTREAM[u] || []).push(a.id)));
+
+/* ============================ rendering ============================ */
+
+let selected = "landing";
+const state = { basis: "close", window: "trailing", h100index: "neocloud" };
+
+/* Per-source vertical asset graphs: main spine down the centre-left, side
+   inputs off to the right, edges as curved connectors. viewBox scales to
+   width, so no horizontal scroll. */
+const GW = 196, GH = 46, MX = 220;
+const GRAPHS = {
+  yahoo: {
+    viewBox: "0 0 660 700",
+    nodes: [
+      { id: "raw.yahoo_chart", cx: MX, cy: 34 },
+      { id: "prices", cx: MX, cy: 100 },
+      { id: "stg_yahoo__prices", cx: MX, cy: 166 },
+      { id: "int_prices_aths", cx: MX, cy: 232 },
+      { id: "condition_thresholds", cx: 500, cy: 276, w: 188 },
+      { id: "int_condition_flags", cx: MX, cy: 320 },
+      { id: "int_condition_windows", cx: MX, cy: 386 },
+      { id: "int_conditions_aligned", cx: MX, cy: 452 },
+      { id: "fct_condition_daily", cx: MX, cy: 518 },
+      { id: "fct_contract_resolution", cx: MX, cy: 598 },
+      { id: "exposure.dashboard", cx: MX, cy: 664, short: "exposure: dashboard" },
+    ],
+    spine: [
+      ["raw.yahoo_chart", "prices"], ["prices", "stg_yahoo__prices"],
+      ["stg_yahoo__prices", "int_prices_aths"], ["int_prices_aths", "int_condition_flags"],
+      ["int_condition_flags", "int_condition_windows"], ["int_condition_windows", "int_conditions_aligned"],
+      ["int_conditions_aligned", "fct_condition_daily"], ["fct_condition_daily", "fct_contract_resolution"],
+      ["fct_contract_resolution", "exposure.dashboard"],
+    ],
+    curves: [
+      "M406,276 C 356,298 356,320 318,320",
+      "M500,295 C 600,390 600,560 318,598",
+      "M122,232 C 30,320 30,470 122,518",
+    ],
+  },
+  h100: {
+    viewBox: "0 0 660 420",
+    nodes: [
+      { id: "raw.vast_offers", cx: MX, cy: 40 },
+      { id: "h100_prices", cx: MX, cy: 118 },
+      { id: "raw.silicondata_index", cx: 498, cy: 118, w: 200 },
+      { id: "int_h100_runlength", cx: MX, cy: 196 },
+      { id: "fct_h100_rental", cx: MX, cy: 288 },
+      { id: "exposure.h100_series", cx: MX, cy: 366, short: "exposure: h100_series" },
+    ],
+    spine: [
+      ["raw.vast_offers", "h100_prices"], ["h100_prices", "int_h100_runlength"],
+      ["int_h100_runlength", "fct_h100_rental"], ["fct_h100_rental", "exposure.h100_series"],
+    ],
+    curves: ["M398,118 C 360,152 360,196 318,196"],   // silicondata (future) → runlength
+  },
+  courtlistener: {
+    viewBox: "0 0 460 210",
+    nodes: [
+      { id: "court_dockets", cx: MX, cy: 46 },
+      { id: "stg_recap__dockets", cx: MX, cy: 142 },
+    ],
+    spine: [["court_dockets", "stg_recap__dockets"]], curves: [],
+  },
+  gdelt: {
+    viewBox: "0 0 460 210",
+    nodes: [
+      { id: "news_articles", cx: MX, cy: 46 },
+      { id: "int_acquisition_signals", cx: MX, cy: 142 },
+    ],
+    spine: [["news_articles", "int_acquisition_signals"]], curves: [],
+  },
+};
+
+function buildGraph(groupId) {
+  const G = GRAPHS[groupId];
+  const byId = Object.fromEntries(G.nodes.map(n => [n.id, n]));
+  let edges = "";
+  G.spine.forEach(([f, t]) => {
+    const a = byId[f], b = byId[t];
+    edges += `<path class="gedge" d="M${a.cx},${a.cy + GH / 2} L${b.cx},${b.cy - GH / 2}"/>`;
+  });
+  G.curves.forEach(d => edges += `<path class="gedge" d="${d}"/>`);
+  let nodes = "";
+  G.nodes.forEach(n => {
+    const a = BY_ID[n.id], w = n.w || GW, x = n.cx - w / 2, y = n.cy - GH / 2;
+    const planned = a.status === "planned";
+    const stroke = planned ? "#3a4453" : "#4a5565";
+    const dash = planned ? ` stroke-dasharray="4 3"` : "";
+    const tcls = planned ? "gtext planned" : "gtext";
+    nodes += `<g class="gnode" data-goto="${n.id}">
+      <rect class="box" x="${x}" y="${y}" width="${w}" height="${GH}" rx="8" fill="#1a1f23" stroke="${stroke}" stroke-width="1.4"${dash}/>
+      <text class="glbl" x="${x + 9}" y="${y + 11}">${LAYER_NAMES[a.layer].toUpperCase()}</text>
+      <text class="${tcls}" x="${n.cx + 3}" y="${n.cy + 8}" text-anchor="middle">${n.short || a.name}</text>
+    </g>`;
+  });
+  return `<svg viewBox="${G.viewBox}" class="graph" xmlns="http://www.w3.org/2000/svg">
+    <defs><marker id="arw" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L6,3 L0,6 Z" fill="#55606f"/></marker></defs>
+    ${edges}${nodes}</svg>`;
+}
+
+function pill(id, cls) {
+  const a = BY_ID[id];
+  return `<span class="pill ${cls || ''}" data-goto="${id}">${a ? a.name : id}</span>`;
+}
+
+// Accordion: at most one source group's step list is expanded at a time.
+let expandedGroup = null;
+
+function renderNav() {
+  const host = document.getElementById("nav");
+  host.innerHTML = "";
+  const land = document.createElement("div");
+  land.className = "navitem" + (selected === "landing" ? " active" : "");
+  land.innerHTML = `<span class="nlabel" style="font-family:var(--font);font-size:13px">Data Source Intro</span>`;
+  land.onclick = () => select("landing");
+  host.appendChild(land);
+
+  GROUPS.forEach(g => {
+    const grp = document.createElement("div");
+    grp.className = "navgroup";
+    const open = expandedGroup === g.id;
+    const gh = document.createElement("div");
+    gh.className = "gh" + (selected === "src:" + g.id ? " active" : "");
+    gh.innerHTML = `<span class="gcaret">${open ? "▼" : "▶"}</span>` +
+      `<span class="gt">${g.name}</span><span class="st ${g.status}">${g.status.toUpperCase()}</span>`;
+    gh.querySelector(".gcaret").onclick = e => {
+      e.stopPropagation();
+      expandedGroup = open ? null : g.id;   // one open at a time
+      renderNav();
+    };
+    gh.onclick = () => { expandedGroup = g.id; select("src:" + g.id); };
+    grp.appendChild(gh);
+    if (open) {
+      // live steps first, planned sorted to the bottom (stable within each)
+      ASSETS.filter(a => a.group === g.id)
+        .sort((a, b) => (a.status === "planned" ? 1 : 0) - (b.status === "planned" ? 1 : 0))
+        .forEach(a => {
+          const it = document.createElement("div");
+          it.className = "navitem" + (selected === a.id ? " active" : "");
+          it.innerHTML = `<span class="ldot"></span><span class="nlabel">${a.name}</span>`;
+          it.onclick = () => select(a.id);
+          grp.appendChild(it);
+        });
+    }
+    host.appendChild(grp);
+  });
+}
+
+/* Option toggles live in the slide-out drawer — the options are explained on
+   these pages, and they re-render the reactive worked examples. */
+const OPTIONS = {
+  basis: { label: "All-time-high basis", values: [
+    { val: "close", t: "End-of-day" }, { val: "intraday", t: "Intraday" }] },
+  window: { label: "90-day window", values: [
+    { val: "trailing", t: "Trailing 90 days" }, { val: "instant", t: "Instant" }] },
+  h100index: { label: "H100 index tier", values: [
+    { val: "neocloud", t: "Neocloud" }, { val: "hyperscaler", t: "Hyperscaler" }] },
+};
+
+function renderOptions() {
+  const host = document.getElementById("drawer-options");
+  host.innerHTML = "";
+  for (const key of ["basis", "window", "h100index"]) {
+    const cfg = OPTIONS[key];
+    const g = document.createElement("div");
+    g.className = "optgroup2";
+    g.innerHTML = `<div class="optlabel2">${cfg.label}</div>`;
+    const seg = document.createElement("div");
+    seg.className = "seg2";
+    cfg.values.forEach(v => {
+      const b = document.createElement("button");
+      b.className = state[key] === v.val ? "active" : "";
+      b.textContent = v.t;
+      b.onclick = () => { if (state[key] !== v.val) { state[key] = v.val; renderOptions(); select(selected); } };
+      seg.appendChild(b);
+    });
+    g.appendChild(seg);
+    host.appendChild(g);
+  }
+}
+
+function schemaTable(a) {
+  if (a.json) return `<pre class="sql">${a.json}</pre>`;
+  if (!a.schema) return "";
+  const rows = a.schema.map(c => `
+    <tr>
+      <td><span class="col">${c.col}</span>${c.note ? `<div class="note">${c.note}</div>` : ""}</td>
+      <td class="typ">${c.type}</td>
+      <td><span class="kind ${c.kind}">${c.kind}</span></td>
+      <td><span class="ex">${c.ex}</span></td>
+    </tr>`).join("");
+  const exHead = a.group === "yahoo" ? `Example (${E.ticker} · ${E.date})` : "Example";
+  return `<div class="rowcard"><table class="schema">
+    <thead><tr><th>Column</th><th>Type</th><th>Origin</th><th>${exHead}</th></tr></thead>
+    <tbody>${rows}</tbody></table></div>`;
+}
+
+function detailHtml(a) {
+  const up = (a.upstream && a.upstream.length) ? a.upstream.map(id => pill(id)).join("") : `<span class="pill none">source — no inputs</span>`;
+  const down = (DOWNSTREAM[a.id] || []);
+  const downHtml = down.length ? down.map(id => pill(id)).join("") : `<span class="pill none">terminal</span>`;
+  const statusCls = a.status === "live" ? "st live" : "st planned";
+
+  return `
+    <div class="crumb">${GROUPS.find(g => g.id === a.group).name} · ${LAYER_NAMES[a.layer]}</div>
+    <h1 class="asset">${a.name}
+      <span class="lbadge L-${a.layer}">${LAYER_NAMES[a.layer]}</span>
+      <span class="statusbadge ${statusCls}">${a.status.toUpperCase()}</span>
+    </h1>
+    <p class="why">${a.why}</p>
+
+    <div class="metabar">
+      <div class="m"><span class="k">Materialization</span><span class="v">${a.mat}</span></div>
+      <div class="m"><span class="k">Refresh</span><span class="v">${a.cadence}</span></div>
+      <div class="m"><span class="k">Dagster asset</span><span class="v">${a.dagster}</span></div>
+      <div class="m"><span class="k">dbt</span><span class="v">${a.dbt}</span></div>
+    </div>
+
+    <h4>Lineage</h4>
+    <div class="lineage">
+      <div class="grp"><span class="lbl">upstream</span><div>${up}</div></div>
+      <span class="arrow">→</span>
+      <div class="grp"><span class="lbl">this asset</span>${pill(a.id, "self")}</div>
+      <span class="arrow">→</span>
+      <div class="grp"><span class="lbl">downstream</span><div>${downHtml}</div></div>
+    </div>
+
+    <h4>What it is</h4>
+    <p class="desc">${a.desc}</p>
+    <div class="grain">Grain: <b>${a.grain}</b></div>
+
+    <h4>${a.json ? "Example payload" : "Schema &amp; example row"}</h4>
+    ${schemaTable(a)}
+
+    ${a.transforms ? `<h4>Transforms</h4><ul class="xforms">${a.transforms.map(t =>
+      `<li><span class="xf">${t.tag}</span>${t.text || ""}${t.macro ? ` <span class="macro">${t.macro}</span>` : ""}</li>`).join("")}</ul>` : ""}
+
+    ${a.sql ? `<h4>Logic</h4><pre class="sql">${a.sql}</pre>` : ""}
+
+    ${a.tests ? `<h4>Tests</h4><div class="tests">${a.tests.map(t => `<span class="t">✓ ${t}</span>`).join("")}</div>` : ""}
+
+    ${a.cardinality ? `<h4>Cardinality</h4><p class="desc">${a.cardinality}</p>` : ""}
+  `;
+}
+
+
+const H100_ROWS = H100_ROWS_ALL;
+const SOURCE_INFO = {
+  yahoo: {
+    blurb: "Split-adjusted daily prices from Yahoo Finance drive the four equity-drawdown conditions — NVIDIA, the SOXX semiconductor ETF, and any of the five hardware suppliers falling far enough from their all-time highs.",
+    options: [
+      { t: "All-time-high basis", d: "End-of-day vs. intraday. Sets which peak a drawdown is measured from; intraday highs are higher, so they trigger more easily." },
+      { t: "90-day window", d: "Trailing vs. instant. Sets how long a condition stays “met” after it crosses, and therefore when the contract can resolve." },
+    ],
+    ambiguities: [
+      { t: "Which “all-time high”?", d: "The rules don't say closing or intraday high. We compute both and expose the choice as an option." },
+      { t: "Pre-existing drawdowns", d: "SMCI has been >50% below its 2024 peak since before the market opened. Whether a drawdown that predates the market counts is a judgment call resolvers have so far answered “no.”" },
+    ],
+    caveats: [
+      { t: "Unofficial feed", d: "Yahoo's public chart API, not an exchange feed. Prices are split-adjusted (not dividend-adjusted), matching how they're quoted." },
+      { t: "Drawdown sign", d: "Stored as a positive magnitude (1 − price/ATH); a condition is met when it reaches the threshold." },
+    ],
+    cardinality: [
+      { asset: "prices", count: "≈" + DATA.prices.total.toLocaleString(), meaning: "One row per (ticker, trading day) across the 7 tickers — the raw input volume." },
+      { asset: "int_condition_flags", count: "× conditions", meaning: "The join to the thresholds seed fans each price row out to every condition that uses that ticker (a ticker used by two conditions doubles its rows)." },
+      { asset: "int_condition_windows", count: "× 2", meaning: "Each condition-day is expanded to 2 window modes (instant, trailing)." },
+      { asset: "int_conditions_aligned", count: "widest", meaning: "conditions × 2 bases × 2 windows × spine days — forward-filled onto a gap-free calendar. The widest point in the pipeline." },
+      { asset: "fct_contract_resolution", count: "rollup ↓", meaning: "Parents aggregate children to one row per parent per day (the 3-of-6 count) — rows collapse." },
+      { asset: "exposure.dashboard", count: "1 doc", meaning: "Everything collapses to a single JSON embedded in dashboard.html." },
+    ],
+  },
+  h100: {
+    blurb: "The H100 rental condition (index ≤ $1.00/hr for five straight days) resolves on SiliconData's index, which is paywalled — so this source is a free public approximation.",
+    options: [
+      { t: "Index tier — Neocloud vs. Hyperscaler", d: "SiliconData publishes two H100 indices and the rules name neither. <b>Neocloud (SDH100RT)</b> is the spot-like marketplace tier — neoclouds and providers like Vast.ai selling on-demand capacity; competitive, price-sensitive, ~$2/hr, and volatile (>20× the hyperscaler's daily variation). It's what our Vast.ai proxy measures. <b>Hyperscaler</b> is AWS/GCP/Azure/Oracle capacity priced via committed-use discounts, multi-year deals, and reserved instances — a ~3× premium (~$7.5/hr) and very stable (0.47% coefficient of variation). Because they differ ~3×, the choice is material: a fall to $1 is a plausible ~50% crash against neocloud but near-impossible against hyperscaler. The $1.00 trigger only makes sense for neocloud, which is the default." },
+      { t: "90-day window", d: "Inherited from the contract: once the “5 straight days ≤ $1” run occurs, does it stay met for 90 days (trailing) or only on the exact day (instant)?" },
+    ],
+    ambiguities: [
+      { t: "Which index?", d: "Neocloud (~$2) vs. hyperscaler (~$7.5) — the tier option above. It's the dominant ambiguity here, and it swings whether the condition is even reachable." },
+      { t: "Proxy vs. authoritative", d: "Our neocloud value is the Vast.ai on-demand median, not the actual SDH100RT (which needs Bloomberg/enterprise access). It tracks the published index within a few cents but isn't the resolution source." },
+    ],
+    caveats: [
+      { t: "It's an approximation", d: "The neocloud series is the Vast.ai median (proxy); the hyperscaler series is a handful of values quoted in public SiliconData posts (no live feed). Neither is the paywalled SDH100RT the rules name — that's a future plan." },
+      { t: "Sparse, forward-only history", d: "Vast.ai exposes only current offers, so daily history accumulates going forward. The “5 consecutive days” test needs daily data to be meaningful; today the index (~$2.2) sits far above $1, so it is never met." },
+    ],
+    cardinality: [
+      { asset: "raw.vast_offers", count: "~27", meaning: "Verified on-demand H100 offers pulled per run." },
+      { asset: "h100_prices", count: String(H100_ROWS), meaning: "One reading per day per tier — seeded published points plus the daily proxy." },
+      { asset: "int_h100_runlength", count: "≈1,200 × 2", meaning: "The met flag is forward-filled onto the ~1,200-day master trading axis, for 2 tiers — this is where H100 rows explode to line up with the equity leaves." },
+      { asset: "fct_h100_rental", count: "tier × day", meaning: "The H100 leaf fact — one presentation row per tier per day (value, ≤$1 flag, run flag)." },
+      { asset: "exposure.h100_series", count: "1 block", meaning: "The H100 slice of the served JSON; the browser adds its met flag to the 3-of-6 count." },
+    ],
+  },
+  courtlistener: {
+    blurb: "Federal bankruptcy dockets for the OpenAI / Anthropic bankruptcy conditions. Planned (Phase 3).",
+    options: [],
+    ambiguities: [
+      { t: "What counts as “bankruptcy”?", d: "A Chapter 7/11 petition, versus a restructuring rumor or a subsidiary filing. Needs a human read." },
+    ],
+    caveats: [
+      { t: "Not yet wired", d: "Planned. Entity matching to OpenAI/Anthropic is fuzzy; low-confidence hits go to a human-confirm gate before the flag counts." },
+    ],
+    cardinality: [
+      { asset: "court_dockets", count: "~0", meaning: "Sparse — a qualifying Chapter 7/11 filing is a rare event." },
+      { asset: "stg_recap__dockets", count: "~0", meaning: "Filtered to matched bankruptcy petitions; near-zero in the normal case." },
+    ],
+  },
+  gdelt: {
+    blurb: "News monitoring plus LLM classification for the OpenAI-acquisition condition. Planned (Phase 3).",
+    options: [],
+    ambiguities: [
+      { t: "What counts as “acquired”?", d: "An announced deal, a completed deal, or a majority-stake investment? “A consensus of credible reporting” is a judgment the rules explicitly allow." },
+    ],
+    caveats: [
+      { t: "Not yet wired", d: "Planned. An LLM classifies articles; a credible-reporting consensus plus a human-confirm gate is required before it counts." },
+    ],
+    cardinality: [
+      { asset: "news_articles", count: "many/day", meaning: "High-volume, low-signal; deduped by URL, then classified." },
+      { asset: "int_acquisition_signals", count: "1/day", meaning: "Collapsed to one consensus signal per day." },
+    ],
+  },
+};
+
+function landingHtml() {
+  const cards = GROUPS.map(g => {
+    const info = SOURCE_INFO[g.id];
+    const n = ASSETS.filter(a => a.group === g.id).length;
+    return `<div class="srccard" data-src="${g.id}">
+      <div class="h"><span class="nm">${g.name}</span><span class="st ${g.status}">${g.status.toUpperCase()}</span></div>
+      <div class="bl">${info.blurb}</div>
+      <div class="ft"><span>${n} asset${n === 1 ? "" : "s"}</span><span class="go">Overview &amp; lineage →</span></div>
+    </div>`;
+  }).join("");
+  return `
+    <div class="crumb">Data Source Intro</div>
+    <h1 class="asset" style="font-family:var(--font)">Data Source Intro</h1>
+    <p class="why">This section documents the data sources and processing logic behind the oracle — how raw external
+      data is pulled and normalized to produce the graphs, evaluate the contract's conditions, and surface the
+      ambiguities and options each condition carries. Every source is a chain of Dagster-style <b>assets</b>
+      (materialized tables/views handed step to step). Pick a source to see its options, lineage, and per-asset detail.</p>
+    <div class="note">
+      <b>Implementation note.</b> The oracle runs today as one Python process against SQLite (<code>oracle.db</code>),
+      not a Dagster/dbt project. The asset names, materializations, and macros describe the <i>logical</i> pipeline so
+      the normalization is legible in standard analytics-engineering terms. Assets marked
+      <span class="statusbadge st live">LIVE</span> exist now; the rest are planned.
+    </div>
+    <h4>Sources</h4>
+    <div class="srccards">${cards}</div>
+    <h4>How to read an asset page</h4>
+    <ul class="xforms">
+      <li><span class="xf">lineage</span> upstream inputs → this asset → downstream consumers, all clickable.</li>
+      <li><span class="xf">origin</span> every schema column is tagged
+        <span class="kind key">key</span> <span class="kind pass">pass</span>
+        <span class="kind cast">cast</span> <span class="kind derived">derived</span>
+        <span class="kind seed">seed</span> <span class="kind meta">meta</span> — so you can see what each step adds vs. carries through.</li>
+      <li><span class="xf">example</span> a real row is traced through every stage, so you can watch the shape and values change.</li>
+    </ul>
+  `;
+}
+
+function sourceOverviewHtml(gid) {
+  const grp = GROUPS.find(x => x.id === gid);
+  const info = SOURCE_INFO[gid];
+  const kind = { opt: "option", amb: "ambiguity", cav: "caveat" };
+  const section = (title, cls, items) => items.length
+    ? `<h5>${title}</h5><ul class="infolist">${items.map(i =>
+        `<li class="${cls}"><span class="tag2">${kind[cls]}</span><b>${i.t}</b> — ${i.d}</li>`).join("")}</ul>` : "";
+  // cardinality stages map to graph assets, so the table and the graph line up
+  const cardRows = info.cardinality.map(r => {
+    const stage = r.asset ? `<span class="pill" data-goto="${r.asset}">${BY_ID[r.asset].name}</span>` : `<b>${r.stage}</b>`;
+    return `<tr><td class="rc">${r.count}</td><td>${stage}</td><td>${r.meaning}</td></tr>`;
+  }).join("");
+
+  let extra = "";
+  if (gid === "h100") {
+    const tier = DATA.h100[state.h100index];
+    extra = `<p class="desc">Current ${state.h100index} reading: <b>$${tier.usd_hr.toFixed(2)}/hr</b>
+      (${tier.date}, ${tier.source}) — far above the $1.00 trigger. Switch the tier in the sidebar options.</p>`;
+  }
+
+  let worked = "";
+  if (gid === "yahoo") {
+    const close = state.basis === "close";
+    const ath = close ? E.athClose : E.athIntraday;
+    const dd = close ? E.ddClose : E.ddIntraday;
+    const trig = close ? E.triggerClose : E.triggerIntraday;
+    const bn = close ? "end-of-day" : "intraday";
+    worked = `<h4>The worked example — ${E.ticker}, ${E.date} (${bn} basis)</h4>
+       <p class="desc">Follow one condition end to end: ${E.ticker} closed at <b>${money(E.close)}</b>, against its
+       ${bn} all-time high of <b>${money(ath)}</b> — a drawdown of <b>${(dd * 100).toFixed(1)}%</b>, at or past the
+       50% threshold (trigger <b>${money(trig)}</b>), so <code>met = 1</code>. It is 1 of ${E.supplierTotal} hardware
+       suppliers past threshold, which (needing just 1) makes the parent “supplier collapse” condition MET.
+       Switch the basis in the sidebar options to see the numbers change.</p>`;
+  }
+
+  return `
+    <div class="crumb"><span data-nav="landing" style="cursor:pointer;color:var(--accent)">Data Source Intro</span> &middot; ${grp.name}</div>
+    <h1 class="asset" style="font-family:var(--font)">${grp.name}
+      <span class="statusbadge st ${grp.status}">${grp.status.toUpperCase()}</span></h1>
+    <p class="why">${info.blurb}</p>
+    ${extra}
+
+    <h4>Options, ambiguities &amp; caveats</h4>
+    <div class="infobox">
+      ${section("Options", "opt", info.options)}
+      ${section("Ambiguities", "amb", info.ambiguities)}
+      ${section("Caveats", "cav", info.caveats)}
+    </div>
+
+    <h4>Asset graph (top → bottom; click any asset)</h4>
+    ${buildGraph(gid)}
+
+    <h4>Cardinality — rows at each stage</h4>
+    <p class="desc">Cardinality is how many rows a stage holds. Each row below is a stage in the graph above, so you
+      can see where the pipeline <b>fans out</b> (a join multiplies rows) and where it <b>collapses</b>
+      (aggregation) — the shape and cost of the transform, ending in one compact served document.</p>
+    <div class="rowcard"><table class="card2">
+      <thead><tr><th>Rows</th><th>Stage (asset)</th><th>What it means</th></tr></thead>
+      <tbody>${cardRows}</tbody></table></div>
+
+    ${worked}
+  `;
+}
+
+function select(id) {
+  selected = id;
+  const host = document.getElementById("detail");
+  if (id === "landing") host.innerHTML = landingHtml();
+  else if (id.startsWith("src:")) { expandedGroup = id.slice(4); host.innerHTML = sourceOverviewHtml(id.slice(4)); }
+  else { const a = BY_ID[id]; if (a) expandedGroup = a.group; host.innerHTML = detailHtml(a); }
+  renderNav();
+  document.getElementById("scroll").scrollTop = 0;
+  if (location.hash.slice(1) !== id) history.replaceState(null, "", "#" + id);
+}
+
+document.getElementById("detail").addEventListener("click", e => {
+  const src = e.target.closest("[data-src]");
+  if (src) return select("src:" + src.getAttribute("data-src"));
+  const nav = e.target.closest("[data-nav]");
+  if (nav) return select(nav.getAttribute("data-nav"));
+  const t = e.target.closest("[data-goto]");
+  if (t) select(t.getAttribute("data-goto"));
+});
+
+renderOptions();
+
+/* slide-out options drawer */
+const drawer = document.getElementById("drawer");
+const scrim = document.getElementById("drawer-scrim");
+const closeDrawer = () => { drawer.classList.remove("open"); scrim.classList.remove("open"); };
+document.getElementById("opts-btn").onclick = () => { drawer.classList.add("open"); scrim.classList.add("open"); };
+document.getElementById("drawer-close").onclick = closeDrawer;
+scrim.onclick = closeDrawer;
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeDrawer(); });
+
+const initial = location.hash.slice(1);
+const validSrc = initial.startsWith("src:") && SOURCE_INFO[initial.slice(4)];
+select(BY_ID[initial] ? initial : validSrc ? initial : "landing");
+</script>
+</body>
+</html>

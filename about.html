@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Bubble Oracle — About</title>
+<style>
+  :root {
+    --bg: #0a0b10; --panel: #1a1f23; --panel2: #242b32; --border: #1f2937;
+    --text: #f4f4f6; --muted: #80838e; --muted2: #6b6e7a; --accent: #0093fd;
+    --font: Inter, "Open Sauce One", "Segoe UI", system-ui, -apple-system, sans-serif;
+    --mono: "Geist Mono", "SF Mono", Consolas, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { height: 100%; }
+  body { background: var(--bg); color: var(--text); font: 14px/1.65 var(--font); overflow: hidden; }
+  * { scrollbar-width: thin; scrollbar-color: #2a3340 transparent; }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-thumb { background: #2a3340; border-radius: 6px; border: 2px solid transparent; background-clip: padding-box; }
+  ::-webkit-scrollbar-thumb:hover { background: #3a4453; background-clip: padding-box; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  #topbar { display: flex; align-items: center; gap: 12px; padding: 0 24px; height: 56px;
+    background: var(--bg); border-bottom: 1px solid var(--border); z-index: 10; }
+  #topbar .mark { width: 26px; height: 26px; border-radius: 6px; background: var(--text); color: var(--bg);
+    display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 15px; }
+  #topbar .brand { font-size: 16px; font-weight: 700; letter-spacing: -.2px; }
+  .topnav { display: flex; gap: 4px; margin-left: 18px; }
+  .topnav a { color: var(--muted); font-size: 13px; font-weight: 500; padding: 6px 12px; border-radius: 7px; }
+  .topnav a:hover { color: var(--text); background: var(--panel2); text-decoration: none; }
+  .topnav a.active { color: var(--text); background: var(--panel); }
+
+  main { height: calc(100vh - 56px); overflow-y: auto; }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 40px 28px 80px; }
+  h1 { font-size: 30px; font-weight: 700; letter-spacing: -.4px; }
+  .lede { color: var(--muted); font-size: 16px; margin: 12px 0 8px; }
+  h2 { font-size: 18px; font-weight: 650; margin: 34px 0 8px; letter-spacing: -.2px; }
+  p { color: #cdd3dd; margin: 10px 0; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px; margin: 18px 0; }
+  .repo { display: inline-flex; align-items: center; gap: 9px; background: var(--panel); border: 1px solid var(--border);
+    border-radius: 10px; padding: 11px 16px; font-family: var(--mono); font-size: 13px; margin: 6px 0; }
+  .repo:hover { border-color: var(--accent); text-decoration: none; }
+  .note { background: var(--panel); border: 1px solid var(--border); border-left: 3px solid var(--accent);
+    border-radius: 8px; padding: 12px 16px; font-size: 13.5px; color: var(--muted); margin: 20px 0; }
+  .note b { color: var(--text); }
+  ul { margin: 8px 0 8px 2px; padding-left: 20px; }
+  li { color: #cdd3dd; margin: 7px 0; }
+  code { font-family: var(--mono); background: var(--panel2); padding: 1px 5px; border-radius: 4px; font-size: 12.5px; }
+  .foot { color: var(--muted2); font-size: 12px; margin-top: 40px; border-top: 1px solid var(--border); padding-top: 16px; }
+</style>
+</head>
+<body>
+<div id="topbar">
+  <div class="mark">AI</div>
+  <div class="brand">Bubble Oracle</div>
+  <nav class="topnav">
+    <a href="dashboard.html">Dashboard</a>
+    <a href="datasources.html">Data Sources</a>
+    <a href="about.html" class="active">About</a>
+  </nav>
+</div>
+<main>
+  <div class="wrap">
+    <h1>About the AI Bubble Oracle</h1>
+    <p class="lede">An open, data-driven tracker for the question everyone in AI is quietly asking:
+      <i>are we in a bubble, and if so, has it burst yet?</i></p>
+
+    <h2>What this is</h2>
+    <p>The AI Bubble Oracle takes a <b>codified definition of an "AI bubble burst"</b> — the six-part condition
+      from the Polymarket market <a href="https://polymarket.com/event/ai-bubble-burst-by" target="_blank" rel="noopener">"AI
+      bubble burst in 2026?"</a> — and tracks, from public data, exactly where we stand against it in real time.
+      Each condition (NVIDIA and semiconductor drawdowns, a major supplier collapse, an OpenAI/Anthropic
+      bankruptcy or acquisition, and H100 rental prices cratering) gets its own live chart, and the contract's
+      "3 of 6 within 90 days" rule is evaluated in front of you.</p>
+    <p>It is deliberately transparent about <i>how</i> it decides. The
+      <a href="datasources.html">Data Sources</a> section documents every feed, the processing pipeline that
+      normalizes it, and — importantly — the <b>ambiguities and options</b> baked into the rules (what counts as
+      an all-time high, how the 90-day window is read, which H100 index applies), so you can see how each
+      interpretation changes the answer.</p>
+
+    <h2>Where it's going</h2>
+    <p>Tracking a single market's resolution conditions is the starting point, not the destination. The larger
+      goal is to build a living dashboard of the <b>data sources and indicators that actually help anticipate</b>
+      an AI downturn — well beyond one market's rulebook.</p>
+    <ul>
+      <li>Wire up the conditions that are still manual today: bankruptcy dockets and acquisition news.</li>
+      <li>Add leading indicators — compute prices, capex and datacenter buildout, funding rounds, model-economics
+        signals — that may foreshadow a turn before the headline conditions trip.</li>
+      <li>Make every indicator inspectable and every assumption a toggle, so the tool argues its case rather than
+        asserting a number.</li>
+    </ul>
+
+    <h2>Open source</h2>
+    <p>The whole thing — data collectors, the evaluation engine, and the site generators — is public. Fork it,
+      check the methodology, or open an issue.</p>
+    <a class="repo" href="https://github.com/BigBandaid2/ai-bubble-oracle" target="_blank" rel="noopener">
+      &#9733; github.com/BigBandaid2/ai-bubble-oracle</a>
+    <p>The data refreshes automatically every day via a GitHub Action, and the site redeploys on every push.</p>
+
+    <div class="note">
+      <b>This is a monitoring tool, not the referee.</b> The Polymarket market itself resolves through UMA's
+      optimistic oracle — humans reading the rules — not through this site or any code here. Treat these numbers
+      as a fast, transparent read on where things stand, not as the official resolution. Nothing here is
+      financial advice.
+    </div>
+
+    <div class="foot">AI Bubble Oracle &middot; built with public data (Yahoo Finance, Vast.ai) &middot; stdlib Python + static HTML.</div>
+  </div>
+</main>
+</body>
+</html>

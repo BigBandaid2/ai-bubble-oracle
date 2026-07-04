@@ -1,0 +1,40 @@
+name: Daily data update
+
+# Refreshes all data (equity prices, H100 rental proxy), regenerates the
+# static site, and commits it. The push to main triggers a Vercel redeploy.
+on:
+  schedule:
+    - cron: "30 22 * * *"   # 22:30 UTC daily (~5:30pm US Eastern, after market close)
+  workflow_dispatch: {}      # allow manual runs from the Actions tab
+
+permissions:
+  contents: write
+
+concurrency:
+  group: daily-update
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run daily update (fetch data + regenerate site)
+        run: python main.py update
+
+      - name: Commit regenerated site + accumulated H100 history
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add dashboard.html datasources.html data/h100_history.csv
+          if git diff --staged --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "chore: daily data update ($(date -u +%Y-%m-%d))"
+            git push
+          fi

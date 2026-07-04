@@ -1,0 +1,183 @@
+"""Generate a self-contained dashboard.html from raw price data.
+
+Unlike the CLI report, the dashboard does NOT ship a pre-evaluated condition
+tree. Interpretation (all-time-high basis, 90-day window mode) is chosen
+interactively in the browser, so the payload ships the raw material and the
+page recomputes the whole tree client-side on every toggle:
+
+  - a master date axis (union of all tickers' trading days, from a buffer
+    before CHART_START so the trailing-90d window is correct at the left edge)
+  - per drawdown leaf: the close-price line, and for each ATH basis
+    (close / intraday) the running ATH, the trigger level, and a per-day
+    instant-met bitstring, all aligned to the master axis
+  - each leaf's full-history "last instant-met" date per basis (may predate
+    the chart), so "last met" is accurate even for old crossings
+
+Everything is inlined (JSON + CSS + JS), so the file works offline from disk.
+"""
+
+import json
+from datetime import date, timedelta
+
+from .config import (BASES, CHART_START, CONTRACT, DASHBOARD_PATH, DEADLINE,
+                     drawdown_leaves)
+from . import db
+from .tracker import compute_series
+
+TEMPLATE_PATH = DASHBOARD_PATH.parent / "oracle" / "dashboard_template.html"
+
+# Days of data kept before CHART_START so a 90-calendar-day trailing window is
+# already accurate on the first displayed day.
+BUFFER_DAYS = 110
+
+
+def _leaf_records(conn, leaf):
+    """Return ({date: record}, {basis: last_instant_met_date}) for one leaf.
+
+    record = {"px": close, "close": (ath, trigger, met), "intraday": (...)}.
+    Only dates on/after the buffer start are emitted; ATHs still accumulate
+    over full history. last-instant-met is computed over full history.
+    """
+    rows = db.load_prices(conn, leaf["ticker"])
+    buf_start = (date.fromisoformat(CHART_START) - timedelta(days=BUFFER_DAYS)).isoformat()
+    threshold = leaf["threshold"]
+    recs = {}
+    last_inst = {}
+    for basis in BASES:
+        last = None
+        for day in compute_series(rows, basis):
+            met = 1 if day["drawdown"] >= threshold else 0
+            if met:
+                last = day["date"]
+            if day["date"] < buf_start:
+                continue
+            r = recs.setdefault(day["date"], {})
+            r["px"] = round(day["close"], 2)
+            r[basis] = (round(day["ath"], 2), round(day["ath"] * (1 - threshold), 2), met)
+        last_inst[basis] = last
+    return recs, last_inst
+
+
+def _rental_type_series(rows, node, master):
+    """Build the chart series + master-aligned met bitstring for one index tier."""
+    dates = [r["date"] for r in rows]
+    values = [r["usd_hr"] for r in rows]
+    sources = [r["source"] for r in rows]
+
+    # "<= threshold for `days` consecutive readings" — run length over the series.
+    run, met_native = 0, []
+    for v in values:
+        run = run + 1 if v <= node["threshold"] else 0
+        met_native.append(1 if run >= node["days"] else 0)
+
+    # Align the met flag onto the master axis (forward-fill; 0 before first read).
+    inst, j, cur = [], 0, 0
+    for d in master:
+        while j < len(dates) and dates[j] <= d:
+            cur = met_native[j]
+            j += 1
+        inst.append(cur)
+
+    last_met = next((dates[i] for i in range(len(met_native) - 1, -1, -1) if met_native[i]), None)
+    return {
+        "chartDates": dates, "chartValues": values, "chartMet": met_native,
+        "current": values[-1], "currentDate": dates[-1], "source": sources[-1],
+        "inst": "".join(str(x) for x in inst), "lastMet": last_met,
+    }
+
+
+def _rental_json(conn, node, master):
+    """Payload for the H100 rental condition, one series per index tier.
+
+    Each tier ships its own sparse chart series plus a met bitstring aligned to
+    the master date axis, so whichever tier the dashboard toggle selects slots
+    into the contract's count and the 90-day window logic like a drawdown leaf.
+    """
+    tiers = {}
+    for index_type in ("neocloud", "hyperscaler"):
+        rows = db.load_h100(conn, index_type)
+        if rows:
+            tiers[index_type] = _rental_type_series(rows, node, master)
+    if not tiers:
+        return {"key": node["key"], "label": node["label"], "type": "manual",
+                "note": node.get("note", "")}
+    return {
+        "key": node["key"], "label": node["label"], "type": "rental",
+        "threshold": node["threshold"], "days": node["days"], "note": node.get("note", ""),
+        "tiers": tiers, "defaultTier": "neocloud",
+    }
+
+
+def build_payload(conn):
+    leaves = drawdown_leaves()
+    leaf_recs = {}
+    all_dates = set()
+    for leaf in leaves:
+        recs, last_inst = _leaf_records(conn, leaf)
+        leaf_recs[leaf["key"]] = (recs, last_inst)
+        all_dates.update(recs.keys())
+
+    master = sorted(all_dates)
+    display_start = next((i for i, d in enumerate(master) if d >= CHART_START), 0)
+
+    # Align each leaf onto the master axis, forward-filling gaps.
+    aligned = {}
+    for key, (recs, last_inst) in leaf_recs.items():
+        px, ath, trig, inst = [], {b: [] for b in BASES}, {b: [] for b in BASES}, {b: [] for b in BASES}
+        cur_px = None
+        cur = {b: (None, None, 0) for b in BASES}
+        for d in master:
+            r = recs.get(d)
+            if r:
+                cur_px = r.get("px", cur_px)
+                for b in BASES:
+                    if b in r:
+                        cur[b] = r[b]
+            px.append(cur_px)
+            for b in BASES:
+                a, t, m = cur[b]
+                ath[b].append(a)
+                trig[b].append(t)
+                inst[b].append(m)
+        aligned[key] = {"px": px, "ath": ath, "trigger": trig, "inst": inst, "last_inst": last_inst}
+
+    def node_json(node):
+        if node["type"] == "drawdown":
+            a = aligned[node["key"]]
+            return {
+                "key": node["key"], "label": node["label"], "type": "drawdown",
+                "ticker": node["ticker"], "threshold": node["threshold"],
+                "px": a["px"],
+                "bases": {b: {
+                    "ath": a["ath"][b],
+                    "trigger": a["trigger"][b],
+                    "inst": "".join(str(x) for x in a["inst"][b]),
+                } for b in BASES},
+                "lastInst": a["last_inst"],
+            }
+        if node["type"] == "count":
+            return {
+                "key": node["key"], "label": node["label"], "type": "count",
+                "minMet": node["min_met"], "children": [node_json(c) for c in node["children"]],
+            }
+        if node["type"] == "rental":
+            return _rental_json(conn, node, master)
+        return {"key": node["key"], "label": node["label"], "type": "manual",
+                "note": node.get("note", "")}
+
+    return {
+        "updated": db.get_meta(conn, "last_update"),
+        "note": CONTRACT.get("note", ""),
+        "deadline": DEADLINE,
+        "windowDays": 90,
+        "dateAxis": master,
+        "displayStart": display_start,
+        "tree": node_json(CONTRACT),
+    }
+
+
+def write_dashboard(conn, path=DASHBOARD_PATH):
+    payload = json.dumps(build_payload(conn), separators=(",", ":"))
+    template = TEMPLATE_PATH.read_text(encoding="utf-8")
+    path.write_text(template.replace("__DATA__", payload), encoding="utf-8")
+    return path

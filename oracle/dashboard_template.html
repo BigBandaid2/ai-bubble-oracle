@@ -1,0 +1,728 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Bubble Oracle</title>
+<style>
+  /* Palette lifted from polymarket.com dark theme design tokens */
+  :root {
+    --bg: #0a0b10; --panel: #1a1f23; --panel2: #242b32; --border: #1f2937;
+    --text: #f4f4f6; --muted: #80838e; --muted2: #6b6e7a; --accent: #0093fd;
+    --met: #f55b55; --met-strong: #f43437; --notmet: #2bae4c; --notmet-text: #34c759;
+    --unknown: #6b6e7a;
+    --ath: #99a1af; --trigger: #f43437; --price: #0093fd;
+    --font: Inter, "Open Sauce One", "Segoe UI", system-ui, -apple-system, sans-serif;
+    --mono: "Geist Mono", "SF Mono", Consolas, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { height: 100%; }
+  /* App-shell: the page itself never scrolls; the content and sidebar each
+     scroll inside their own pane, so their scrollbars are never adjacent. */
+  body { background: var(--bg); color: var(--text); font: 14px/1.5 var(--font); overflow: hidden; }
+  /* subtle scrollbars */
+  * { scrollbar-width: thin; scrollbar-color: #2a3340 transparent; }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-thumb { background: #2a3340; border-radius: 6px; border: 2px solid transparent; background-clip: padding-box; }
+  ::-webkit-scrollbar-thumb:hover { background: #3a4453; background-clip: padding-box; }
+  ::-webkit-scrollbar-track { background: transparent; }
+
+  #topbar {
+    display: flex; align-items: center; gap: 12px; padding: 0 24px; height: 56px;
+    background: var(--bg); border-bottom: 1px solid var(--border); z-index: 10;
+  }
+  #topbar .mark {
+    width: 26px; height: 26px; border-radius: 6px; background: var(--text);
+    color: var(--bg); display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 15px;
+  }
+  #topbar .brand { font-size: 16px; font-weight: 700; letter-spacing: -.2px; }
+  .topnav { display: flex; gap: 4px; margin-left: 18px; }
+  .topnav a {
+    color: var(--muted); text-decoration: none; font-size: 13px; font-weight: 500;
+    padding: 6px 12px; border-radius: 7px;
+  }
+  .topnav a:hover { color: var(--text); background: var(--panel2); }
+  .topnav a.active { color: var(--text); background: var(--panel); }
+  #topbar .sub { color: var(--muted); font-size: 12.5px; text-align: right; }
+  #opts-btn { margin-left: auto; background: var(--panel); border: 1px solid var(--border); color: var(--text);
+    font: inherit; font-size: 13px; padding: 6px 12px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+  #opts-btn:hover { background: var(--panel2); }
+
+  #app { display: flex; height: calc(100vh - 56px); }
+  main { flex: 1; padding: 20px 24px; min-width: 0; overflow-y: auto; }
+  header.page { margin: 4px 2px 18px; }
+  header.page h1 { font-size: 24px; font-weight: 700; letter-spacing: -.3px; }
+  header.page .sub { color: var(--muted); margin-top: 5px; font-size: 13.5px; max-width: 720px; }
+
+  #cardgrid { display: grid; grid-template-columns: 1fr; gap: 16px; align-items: start; }
+  /* Two graphs per row once the main area is wide enough (sidebar is 344px). */
+  @media (min-width: 1240px) { #cardgrid { grid-template-columns: 1fr 1fr; } }
+  section.chartcard {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+    padding: 16px 20px 14px; scroll-margin-top: 72px; min-width: 0;
+  }
+  section.chartcard.flash { animation: flash 1.6s ease-out; }
+  @keyframes flash { 0% { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(0,147,253,.30); } 100% { border-color: var(--border); box-shadow: none; } }
+  section.chartcard h2 { font-size: 16px; font-weight: 600; letter-spacing: -.2px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  section.chartcard .depthtag { color: var(--muted2); font-weight: 400; font-size: 12px; }
+  .chip { font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 100px; letter-spacing: .3px; white-space: nowrap; }
+  .chip.met { background: rgba(244,52,55,.14); color: var(--met); }
+  .chip.not_met { background: rgba(43,174,76,.14); color: var(--notmet-text); }
+  .chip.unknown { background: rgba(107,110,122,.16); color: var(--muted); }
+
+  .optchips { display: flex; gap: 6px; margin: 8px 0 2px; flex-wrap: wrap; }
+  .optchip {
+    font-size: 10.5px; font-weight: 500; padding: 3px 9px; border-radius: 100px;
+    background: var(--panel2); color: var(--muted); border: 1px solid var(--border);
+    display: inline-flex; align-items: center; gap: 5px;
+  }
+  .optchip b { color: var(--text); font-weight: 600; }
+  .optchip .k { color: var(--muted2); text-transform: uppercase; letter-spacing: .5px; font-size: 9px; }
+
+  .meta { color: var(--muted); font-size: 12.5px; margin: 8px 0 12px; }
+  .meta b { color: var(--text); font-weight: 600; font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 12px; }
+  canvas { width: 100%; height: 240px; display: block; }
+  .nodata {
+    height: 120px; display: flex; align-items: center; justify-content: center; text-align: center;
+    color: var(--muted); background: var(--bg); border: 1px dashed var(--border);
+    border-radius: 10px; font-size: 13px; padding: 0 30px;
+  }
+  .legend { display: flex; gap: 15px; margin-top: 10px; color: var(--muted); font-size: 11.5px; flex-wrap: wrap; }
+  .legend span { display: inline-flex; align-items: center; }
+  .legend i { display: inline-block; width: 16px; height: 3px; border-radius: 2px; margin-right: 5px; }
+  .legend i.sw { height: 11px; width: 13px; border-radius: 3px; }
+
+  aside {
+    width: 340px; flex-shrink: 0; background: var(--bg); border-left: 1px solid var(--border);
+    padding: 16px 12px; overflow-y: auto;
+  }
+
+  /* slide-out options drawer */
+  #drawer-scrim { position: fixed; inset: 0; background: rgba(0,0,0,.5); opacity: 0; pointer-events: none; transition: opacity .2s; z-index: 20; }
+  #drawer-scrim.open { opacity: 1; pointer-events: auto; }
+  #drawer { position: fixed; top: 0; right: 0; height: 100vh; width: 330px; max-width: 90vw; background: var(--bg);
+    border-left: 1px solid var(--border); transform: translateX(100%); transition: transform .22s ease; z-index: 21; overflow-y: auto; padding: 18px 16px; }
+  #drawer.open { transform: translateX(0); }
+  .drawer-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .drawer-head span { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); }
+  #drawer-close { background: transparent; border: 0; color: var(--muted); font-size: 20px; line-height: 1; cursor: pointer; }
+  #drawer-close:hover { color: var(--text); }
+  aside h3 { font-size: 11px; text-transform: uppercase; letter-spacing: 1.2px; color: var(--muted); font-weight: 600; margin: 4px 8px 10px; }
+  aside h3.mt { margin-top: 22px; border-top: 1px solid var(--border); padding-top: 16px; }
+
+  /* options / ambiguities */
+  .optgroup { margin: 2px 8px 16px; }
+  .optlabel { font-size: 12px; font-weight: 600; color: var(--text); margin-bottom: 7px; }
+  .seg { display: flex; flex-direction: column; gap: 3px; background: var(--panel); border: 1px solid var(--border); border-radius: 9px; padding: 3px; }
+  .seg.row { flex-direction: row; }
+  .seg button {
+    background: transparent; border: 0; color: var(--muted); font: inherit; font-size: 12.5px;
+    padding: 7px 11px; border-radius: 6px; cursor: pointer; text-align: left; flex: 1;
+    display: flex; flex-direction: column; gap: 2px;
+  }
+  .seg button .t { font-weight: 600; }
+  .seg button .d { font-size: 10.5px; color: var(--muted2); line-height: 1.3; }
+  .seg button:hover { color: var(--text); background: var(--panel2); }
+  .seg button.active { background: var(--accent); color: #fff; }
+  .seg button.active .d { color: rgba(255,255,255,.8); }
+  .opthelp { font-size: 11px; color: var(--muted2); margin-top: 7px; line-height: 1.5; }
+
+  .snode { margin: 1px 0; }
+  .srow { display: flex; align-items: center; gap: 8px; padding: 8px 8px; border-radius: 8px; cursor: pointer; }
+  .srow:hover { background: var(--panel2); }
+  .caret { width: 16px; height: 16px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+           color: var(--muted2); font-size: 9px; cursor: pointer; border-radius: 4px; user-select: none; }
+  .caret:hover { background: var(--border); color: var(--text); }
+  .caret.leafpad { visibility: hidden; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; box-sizing: border-box; }
+  .dot.met_solid { background: var(--met-strong); box-shadow: 0 0 7px rgba(244,52,55,.6); }
+  .dot.met_hollow { background: transparent; border: 2px solid var(--met-strong); }
+  .dot.not_met { background: var(--notmet); }
+  .dot.unknown { background: transparent; border: 2px solid var(--unknown); }
+  .slabel { flex: 1; min-width: 0; font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sdate { color: var(--muted); font-size: 10.5px; flex-shrink: 0; text-align: right; line-height: 1.25; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  .sdate .lbl { display: block; font-size: 8.5px; text-transform: uppercase; letter-spacing: .6px; font-family: var(--font); }
+  .schildren { margin-left: 17px; border-left: 1px solid var(--border); padding-left: 5px; }
+  .schildren.collapsed { display: none; }
+
+  .siglegend { margin: 2px 8px; font-size: 11.5px; color: var(--muted); }
+  .siglegend .row { display: flex; align-items: center; gap: 9px; padding: 4px 0; }
+</style>
+</head>
+<body>
+<div id="topbar">
+  <div class="mark">AI</div>
+  <div class="brand">Bubble Oracle</div>
+  <nav class="topnav">
+    <a href="dashboard.html" class="active">Dashboard</a>
+    <a href="datasources.html">Data Sources</a>
+    <a href="about.html">About</a>
+  </nav>
+  <button id="opts-btn" aria-label="Options">&#9881; Options</button>
+  <div class="sub" id="topsub" style="margin-left:16px"></div>
+</div>
+<div id="app">
+  <main id="charts">
+    <header class="page">
+      <h1>AI bubble burst in 2026?</h1>
+      <div class="sub" id="subtitle"></div>
+    </header>
+    <div id="cardgrid"></div>
+  </main>
+  <aside>
+    <h3>Conditions</h3>
+    <div id="tree"></div>
+
+    <h3 class="mt">Indicator legend</h3>
+    <div class="siglegend" id="siglegend">
+      <div class="row"><span class="dot met_solid"></span> Met now &mdash; currently past threshold</div>
+      <div class="row"><span class="dot met_hollow"></span> Met via 90-day window &mdash; crossed recently, since recovered</div>
+      <div class="row"><span class="dot not_met"></span> Not met</div>
+      <div class="row"><span class="dot unknown"></span> No automated data source yet</div>
+    </div>
+  </aside>
+</div>
+
+<div id="drawer-scrim"></div>
+<div id="drawer">
+  <div class="drawer-head"><span>Options &amp; Ambiguities</span><button id="drawer-close" aria-label="Close">&times;</button></div>
+  <div id="options"></div>
+</div>
+
+<script>
+const DATA = __DATA__;
+const $ = (s, el) => (el || document).querySelector(s);
+
+/* ---------------- option state ---------------- */
+
+const OPTIONS = {
+  basis: {
+    label: "All-time-high basis",
+    help: "The rules say “all-time high” but not whether it means the highest close or the highest intraday price. Intraday triggers more easily.",
+    values: [
+      { val: "close", t: "End-of-day", d: "Closing price vs. highest close" },
+      { val: "intraday", t: "Intraday", d: "Day's low vs. highest intraday high" },
+    ],
+  },
+  window: {
+    label: "90-day window",
+    help: "“Resolve once 3 conditions have been met within 90 days” is ambiguous. Each reading changes when a condition counts as met and when the market resolves.",
+    values: [
+      { val: "trailing", t: "Trailing 90 days", d: "A condition stays met for 90 days after it crosses; YES if 3 cross within any 90-day span" },
+      { val: "instant", t: "Instant (simultaneous)", d: "Conditions must be past threshold on the same day" },
+    ],
+  },
+  h100index: {
+    label: "H100 index tier",
+    help: "SiliconData publishes two H100 indices; the rules don't say which. Neocloud (SDH100RT) is the spot-like marketplace tier (~$2); Hyperscaler is the reserved/committed tier (~3× higher, ~$7.5). The $1.00 trigger only makes sense against neocloud. Affects the H100 condition only.",
+    values: [
+      { val: "neocloud", t: "Neocloud (SDH100RT)", d: "Spot-like marketplace tier · live Vast.ai proxy" },
+      { val: "hyperscaler", t: "Hyperscaler", d: "Reserved/committed tier · ~3× pricier · published only" },
+    ],
+  },
+};
+const state = { basis: "close", window: "trailing", h100index: "neocloud" };
+const OPT_TEXT = {
+  basis: { close: "End-of-day ATH", intraday: "Intraday ATH" },
+  window: { trailing: "90-day trailing", instant: "Instant" },
+  h100index: { neocloud: "Neocloud", hyperscaler: "Hyperscaler" },
+};
+
+/* ---------------- date axis helpers ---------------- */
+
+const AX = DATA.dateAxis;
+const AXT = AX.map(s => Date.parse(s + "T00:00:00Z"));
+const N = AX.length;
+const LAST = N - 1;
+const DISP = DATA.displayStart;
+const WINMS = DATA.windowDays * 86400000;
+const strToArr = s => Uint8Array.from(s, c => c === "1" ? 1 : 0);
+const daysBetween = (a, b) => Math.round((Date.parse(b + "T00:00:00Z") - Date.parse(a + "T00:00:00Z")) / 86400000);
+
+function trailingArr(inst) {
+  const out = new Uint8Array(N);
+  let ones = 0, lo = 0;
+  for (let i = 0; i < N; i++) {
+    ones += inst[i];
+    while (AXT[lo] < AXT[i] - WINMS) { ones -= inst[lo]; lo++; }
+    out[i] = ones > 0 ? 1 : 0;
+  }
+  return out;
+}
+/* ---------------- tree evaluation (reactive) ---------------- */
+
+function evalNode(node) {
+  if (node.type === "manual")
+    return { key: node.key, node, inst: null, met: null };
+
+  if (node.type === "drawdown") {
+    const inst = strToArr(node.bases[state.basis].inst);
+    const met = state.window === "instant" ? inst : trailingArr(inst);
+    return { key: node.key, node, inst, met };
+  }
+
+  if (node.type === "rental") {
+    const tier = node.tiers[state.h100index] || node.tiers[node.defaultTier];
+    const inst = strToArr(tier.inst);   // "<=$1 for 5 days" met, master-aligned
+    const met = state.window === "instant" ? inst : trailingArr(inst);
+    return { key: node.key, node, tier, inst, met };
+  }
+
+  // count
+  const kids = node.children.map(evalNode);
+  const withData = kids.filter(k => k.met);
+  if (!withData.length)  // no resolvable children -> the parent is unknown too
+    return { key: node.key, node, inst: null, met: null, kids,
+             total: node.children.length, unknown: node.children.length };
+  const count = new Int16Array(N), countInst = new Int16Array(N);
+  for (const k of withData)
+    for (let i = 0; i < N; i++) { count[i] += k.met[i]; countInst[i] += k.inst[i]; }
+  const met = new Uint8Array(N), inst = new Uint8Array(N);
+  for (let i = 0; i < N; i++) {
+    met[i] = count[i] >= node.minMet ? 1 : 0;
+    inst[i] = countInst[i] >= node.minMet ? 1 : 0;
+  }
+  return {
+    key: node.key, node, inst, met, kids, count, countInst,
+    total: node.children.length, unknown: node.children.length - withData.length,
+  };
+}
+
+let RESULTS = {};
+function indexResults(res) { RESULTS[res.key] = res; (res.kids || []).forEach(indexResults); }
+function computeAll() { RESULTS = {}; indexResults(evalNode(DATA.tree)); }
+
+function statusOf(res) {
+  if (!res.met) return "unknown";
+  return res.met[LAST] ? "met" : "not_met";
+}
+function dotOf(res) {
+  if (!res.inst) return "unknown";
+  if (res.inst[LAST]) return "met_solid";
+  if (res.met[LAST]) return "met_hollow";
+  return "not_met";
+}
+function lastMetOf(res) {
+  if (res.node.type === "drawdown") return res.node.lastInst[state.basis];
+  if (res.node.type === "rental") return res.tier.lastMet;
+  if (!res.met) return null;
+  for (let i = LAST; i >= 0; i--) if (res.met[i]) return AX[i];
+  return null;
+}
+
+/* ---------------- rendering ---------------- */
+
+document.getElementById("subtitle").textContent = DATA.note || "";
+document.getElementById("topsub").textContent = "Last update: " + (DATA.updated || "never") + " UTC";
+
+// A node "has an automated data source" if any leaf under it is data-driven.
+// Structural (toggle-independent), so the ordering is stable across options.
+function hasData(node) {
+  if (node.type === "drawdown" || node.type === "rental") return true;
+  if (node.type === "manual") return false;
+  return (node.children || []).some(hasData);
+}
+// Children in display order: data-backed first, no-data last, original order
+// preserved within each group (Array.sort is stable). Used by BOTH the main
+// area and the sidebar so they always match.
+function orderedChildren(node) {
+  return (node.children || []).slice().sort((a, b) => (hasData(a) ? 0 : 1) - (hasData(b) ? 0 : 1));
+}
+
+const fmt$ = v => v == null ? "–" : v >= 100 ? v.toFixed(0) : v >= 10 ? v.toFixed(1) : v.toFixed(2);
+const pct = v => (v > 0 ? "+" : "") + (v * 100).toFixed(1) + "%";
+
+function optChips(node) {
+  const chips = [];
+  const chip = (k, v) => `<span class="optchip"><span class="k">${k}</span><b>${v}</b></span>`;
+  if (node.type === "drawdown") {
+    chips.push(chip("ATH", OPT_TEXT.basis[state.basis]));
+    chips.push(chip("Window", OPT_TEXT.window[state.window]));
+  } else if (node.type === "count") {
+    chips.push(chip("Window", OPT_TEXT.window[state.window]));
+    chips.push(chip("ATH", OPT_TEXT.basis[state.basis]));
+  } else if (node.type === "rental") {
+    chips.push(chip("Tier", OPT_TEXT.h100index[state.h100index]));
+    chips.push(chip("Window", OPT_TEXT.window[state.window]));
+  }
+  return chips.length ? `<div class="optchips">${chips.join("")}</div>` : "";
+}
+
+function metaHtml(res) {
+  const node = res.node;
+  if (node.type === "drawdown") {
+    const px = node.px[LAST], ath = node.bases[state.basis].ath[LAST], trig = node.bases[state.basis].trigger[LAST];
+    const dd = 1 - px / ath;
+    const last = node.lastInst[state.basis];
+    let sticky = "";
+    if (state.window === "trailing" && res.met[LAST] && !res.inst[LAST] && last) {
+      const rem = DATA.windowDays - daysBetween(last, AX[LAST]);
+      sticky = ` &middot; <span style="color:var(--met)">counts for ${rem} more day${rem === 1 ? "" : "s"}</span> (last breached ${last})`;
+    }
+    return `<b>${node.ticker}</b> close <b>$${fmt$(px)}</b> (${node.px[LAST] != null ? AX[LAST] : "–"}) &middot; ` +
+      `ATH $${fmt$(ath)} &middot; drawdown <b>${(dd * 100).toFixed(1)}%</b> &middot; ` +
+      `trigger at $${fmt$(trig)} &middot; last breached: <b>${last || "never"}</b>${sticky}`;
+  }
+  if (node.type === "count") {
+    if (!res.met)
+      return `All ${res.total} sub-conditions await a data source &middot; met when any ${node.minMet} resolve.`;
+    return `<b>${res.count[LAST]} of ${res.total}</b> sub-conditions met (needs ${node.minMet})` +
+      (res.unknown ? ` &middot; ${res.unknown} with no data yet` : "") +
+      ` &middot; last met: <b>${lastMetOf(res) || "never"}</b>`;
+  }
+  if (node.type === "rental") {
+    const t = res.tier;
+    const tierName = state.h100index === "neocloud" ? "Neocloud SDH100RT" : "Hyperscaler";
+    const src = t.source === "vast_proxy" ? "Vast.ai on-demand median (proxy)" : "SiliconData (published)";
+    return `<b>${tierName}</b> &middot; ${src} <b>$${t.current.toFixed(2)}/hr</b> (${t.currentDate}) &middot; ` +
+      `trigger: &le; $${node.threshold.toFixed(2)}/hr for ${node.days} straight days &middot; ` +
+      `last at/below: <b>${t.lastMet || "never"}</b> &middot; ` +
+      `<span style="color:var(--muted2)">approximation — authoritative index is SiliconData's paywalled feed</span>`;
+  }
+  return "No automated data source yet &middot; tracked manually until Phase 3/4.";
+}
+
+function nodeCard(node, depth, parentLabel) {
+  const res = RESULTS[node.key];
+  const sec = document.createElement("section");
+  sec.className = "chartcard";
+  sec.id = "card-" + node.key;
+
+  const st = statusOf(res);
+  const chip = `<span class="chip ${st}">${st === "met" ? "MET" : st === "not_met" ? "NOT MET" : "NO DATA"}</span>`;
+  const tag = depth === 0 ? "contract" : "part of: " + parentLabel;
+  const h = document.createElement("h2");
+  h.innerHTML = `${node.label} ${chip} <span class="depthtag">${tag}</span>`;
+  sec.appendChild(h);
+  if (res.met) sec.insertAdjacentHTML("beforeend", optChips(node));
+
+  const meta = document.createElement("div");
+  meta.className = "meta";
+  meta.innerHTML = metaHtml(res);
+  sec.appendChild(meta);
+
+  if (node.type === "manual" || !res.met) {
+    const d = document.createElement("div");
+    d.className = "nodata";
+    d.textContent = node.type === "count"
+      ? "This condition resolves from its sub-conditions, none of which have a data feed yet."
+      : "No data feed connected. Planned: court-docket + news monitoring (Phase 3), GPU rental price feed (Phase 4).";
+    sec.appendChild(d);
+  } else {
+    const c = document.createElement("canvas");
+    sec.appendChild(c);
+    requestAnimationFrame(() => node.type === "drawdown" ? drawPrice(c, res)
+      : node.type === "rental" ? drawRental(c, res) : drawCount(c, res));
+    sec.appendChild(chartLegend(node));
+  }
+  return sec;
+}
+
+function chartLegend(node) {
+  const el = document.createElement("div");
+  el.className = "legend";
+  const trailingSwatch = state.window === "trailing"
+    ? `<span><i class="sw" style="background:rgba(244,52,55,.12)"></i>met (90-day window)</span>` : "";
+  if (node.type === "drawdown") {
+    el.innerHTML =
+      `<span><i style="background:var(--price)"></i>close</span>
+       <span><i style="background:var(--ath)"></i>running ATH</span>
+       <span><i style="background:var(--trigger)"></i>trigger (-${Math.round(node.threshold * 100)}%)</span>
+       <span><i class="sw" style="background:rgba(244,52,55,.24)"></i>past threshold</span>${trailingSwatch}`;
+  } else if (node.type === "rental") {
+    el.innerHTML =
+      `<span><i style="background:var(--price)"></i>H100 median $/hr (proxy)</span>
+       <span><i style="background:var(--trigger)"></i>trigger (&le; $${node.threshold.toFixed(2)})</span>
+       <span><i class="sw" style="background:rgba(244,52,55,.24)"></i>&le; trigger ${node.days} days</span>`;
+  } else {
+    el.innerHTML =
+      `<span><i style="background:var(--price)"></i>sub-conditions met</span>
+       <span><i style="background:var(--ath)"></i>past threshold now</span>
+       <span><i style="background:var(--trigger)"></i>needed (${node.minMet})</span>
+       <span><i class="sw" style="background:rgba(244,52,55,.18)"></i>condition met</span>`;
+  }
+  return el;
+}
+
+function renderCards() {
+  const grid = $("#cardgrid");
+  grid.innerHTML = "";
+  (function walk(node, depth, parentLabel) {
+    grid.appendChild(nodeCard(node, depth, parentLabel));
+    orderedChildren(node).forEach(c => walk(c, depth + 1, node.label));
+  })(DATA.tree, 0, null);
+}
+
+/* ---------------- canvas ---------------- */
+
+function setupCanvas(canvas) {
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  canvas.width = w * dpr; canvas.height = h * dpr;
+  const ctx = canvas.getContext("2d");
+  ctx.scale(dpr, dpr);
+  return { ctx, w, h };
+}
+const PAD = { l: 52, r: 12, t: 10, b: 22 };
+function xScale(i, n, w) { return PAD.l + (w - PAD.l - PAD.r) * (n <= 1 ? 0 : i / (n - 1)); }
+
+function niceTicks(min, max, count) {
+  const span = max - min || 1, step0 = span / count;
+  const mag = Math.pow(10, Math.floor(Math.log10(step0)));
+  const step = [1, 2, 2.5, 5, 10].map(m => m * mag).find(s => span / s <= count) || 10 * mag;
+  const ticks = [];
+  for (let v = Math.ceil(min / step) * step; v <= max + 1e-9; v += step) ticks.push(v);
+  return ticks;
+}
+
+function drawFrame(ctx, w, h, dates, yMin, yMax, yFmt) {
+  const css = getComputedStyle(document.documentElement);
+  ctx.clearRect(0, 0, w, h);
+  ctx.font = "10.5px 'Segoe UI', sans-serif";
+  const y2px = v => PAD.t + (h - PAD.t - PAD.b) * (1 - (v - yMin) / (yMax - yMin || 1));
+  ctx.textAlign = "right"; ctx.textBaseline = "middle";
+  for (const t of niceTicks(yMin, yMax, 5)) {
+    const y = y2px(t);
+    ctx.strokeStyle = css.getPropertyValue("--border"); ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(PAD.l, y); ctx.lineTo(w - PAD.r, y); ctx.stroke();
+    ctx.fillStyle = css.getPropertyValue("--muted"); ctx.fillText(yFmt(t), PAD.l - 7, y);
+  }
+  ctx.textAlign = "center"; ctx.textBaseline = "top";
+  let lastYear = "";
+  dates.forEach((d, i) => {
+    const yr = d.slice(0, 4);
+    if (yr !== lastYear) {
+      lastYear = yr;
+      const x = xScale(i, dates.length, w);
+      ctx.strokeStyle = css.getPropertyValue("--border");
+      ctx.beginPath(); ctx.moveTo(x, PAD.t); ctx.lineTo(x, h - PAD.b); ctx.stroke();
+      ctx.fillStyle = css.getPropertyValue("--muted"); ctx.fillText(yr, x, h - PAD.b + 6);
+    }
+  });
+  return y2px;
+}
+
+function shade(ctx, w, h, flags, n, color) {
+  ctx.fillStyle = color;
+  let start = null;
+  for (let i = 0; i <= n; i++) {
+    const on = i < n && flags[i];
+    if (on && start === null) start = i;
+    if (!on && start !== null) {
+      const x0 = xScale(start, n, w), x1 = xScale(Math.max(i - 1, start), n, w);
+      ctx.fillRect(x0, PAD.t, Math.max(x1 - x0, 1.5), h - PAD.t - PAD.b);
+      start = null;
+    }
+  }
+}
+
+function polyline(ctx, arr, n, w, y2px, color, width, dash) {
+  ctx.strokeStyle = color; ctx.lineWidth = width; ctx.setLineDash(dash || []);
+  ctx.beginPath();
+  let pen = false;
+  arr.forEach((v, i) => {
+    if (v == null) { pen = false; return; }
+    const x = xScale(i, n, w), y = y2px(v);
+    pen ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+    pen = true;
+  });
+  ctx.stroke(); ctx.setLineDash([]);
+}
+
+function stepline(ctx, arr, n, w, y2px, color, width) {
+  ctx.strokeStyle = color; ctx.lineWidth = width; ctx.beginPath();
+  arr.forEach((v, i) => {
+    const x = xScale(i, n, w), y = y2px(v);
+    if (i === 0) ctx.moveTo(x, y);
+    else { ctx.lineTo(x, y2px(arr[i - 1])); ctx.lineTo(x, y); }
+  });
+  ctx.stroke();
+}
+
+function drawPrice(canvas, res) {
+  const node = res.node;
+  const { ctx, w, h } = setupCanvas(canvas);
+  const dates = AX.slice(DISP);
+  const close = node.px.slice(DISP);
+  const ath = node.bases[state.basis].ath.slice(DISP);
+  const trig = node.bases[state.basis].trigger.slice(DISP);
+  const inst = Array.from(res.inst).slice(DISP);
+  const met = Array.from(res.met).slice(DISP);
+  const n = dates.length;
+  const nums = close.concat(ath, trig).filter(v => v != null);
+  const yMin = Math.min(...nums) * 0.95, yMax = Math.max(...nums) * 1.03;
+  const y2px = drawFrame(ctx, w, h, dates, yMin, yMax, v => "$" + fmt$(v));
+  if (state.window === "trailing")
+    shade(ctx, w, h, met.map((m, i) => m && !inst[i] ? 1 : 0), n, "rgba(244,52,55,.12)");
+  shade(ctx, w, h, inst, n, "rgba(244,52,55,.24)");
+  const css = getComputedStyle(document.documentElement);
+  polyline(ctx, ath, n, w, y2px, css.getPropertyValue("--ath"), 1.2, [5, 4]);
+  polyline(ctx, trig, n, w, y2px, css.getPropertyValue("--trigger"), 1.2, [2, 3]);
+  polyline(ctx, close, n, w, y2px, css.getPropertyValue("--price"), 1.6);
+}
+
+function drawCount(canvas, res) {
+  const node = res.node;
+  const { ctx, w, h } = setupCanvas(canvas);
+  const dates = AX.slice(DISP);
+  const count = Array.from(res.count).slice(DISP);
+  const countInst = Array.from(res.countInst).slice(DISP);
+  const met = Array.from(res.met).slice(DISP);
+  const n = dates.length;
+  const yMax = Math.max(res.total, node.minMet) + 0.5;
+  const y2px = drawFrame(ctx, w, h, dates, 0, yMax, v => Number.isInteger(v) ? String(v) : "");
+  shade(ctx, w, h, met, n, "rgba(244,52,55,.18)");
+  const css = getComputedStyle(document.documentElement);
+  ctx.strokeStyle = css.getPropertyValue("--trigger"); ctx.lineWidth = 1.2; ctx.setLineDash([2, 3]);
+  ctx.beginPath(); ctx.moveTo(PAD.l, y2px(node.minMet)); ctx.lineTo(w - PAD.r, y2px(node.minMet)); ctx.stroke();
+  ctx.setLineDash([]);
+  // faint "instant" count for contrast with the sticky/trailing count
+  if (state.window === "trailing")
+    stepline(ctx, countInst, n, w, y2px, css.getPropertyValue("--ath"), 1);
+  stepline(ctx, count, n, w, y2px, css.getPropertyValue("--price"), 1.7);
+}
+
+function drawRental(canvas, res) {
+  const node = res.node;
+  const { ctx, w, h } = setupCanvas(canvas);
+  // The rental series has its own (sparse) dates, not the master stock axis.
+  const dates = res.tier.chartDates, vals = res.tier.chartValues, metN = res.tier.chartMet;
+  const n = dates.length;
+  const nums = vals.concat([node.threshold]).filter(v => v != null);
+  const yMax = Math.max(...nums) * 1.15;
+  const y2px = drawFrame(ctx, w, h, dates, 0, yMax, v => "$" + v.toFixed(2));
+  shade(ctx, w, h, metN, n, "rgba(244,52,55,.24)");
+  const css = getComputedStyle(document.documentElement);
+  // trigger line at the $1.00 threshold
+  ctx.strokeStyle = css.getPropertyValue("--trigger"); ctx.lineWidth = 1.2; ctx.setLineDash([2, 3]);
+  ctx.beginPath(); ctx.moveTo(PAD.l, y2px(node.threshold)); ctx.lineTo(w - PAD.r, y2px(node.threshold)); ctx.stroke();
+  ctx.setLineDash([]);
+  // value line + a marker per reading (points are sparse, so show them)
+  polyline(ctx, vals, n, w, y2px, css.getPropertyValue("--price"), 1.6);
+  ctx.fillStyle = css.getPropertyValue("--price");
+  vals.forEach((v, i) => {
+    if (v == null) return;
+    ctx.beginPath(); ctx.arc(xScale(i, n, w), y2px(v), 2.6, 0, 6.2832); ctx.fill();
+  });
+}
+
+/* ---------------- sidebar: options ---------------- */
+
+function renderOptions() {
+  const host = $("#options");
+  host.innerHTML = "";
+  for (const key of ["basis", "window", "h100index"]) {
+    const cfg = OPTIONS[key];
+    const g = document.createElement("div");
+    g.className = "optgroup";
+    g.innerHTML = `<div class="optlabel">${cfg.label}</div>`;
+    const seg = document.createElement("div");
+    seg.className = "seg";
+    cfg.values.forEach(v => {
+      const b = document.createElement("button");
+      b.className = state[key] === v.val ? "active" : "";
+      b.innerHTML = `<span class="t">${v.t}</span><span class="d">${v.d}</span>`;
+      b.addEventListener("click", () => { if (state[key] !== v.val) { state[key] = v.val; rerender(); } });
+      seg.appendChild(b);
+    });
+    g.appendChild(seg);
+    g.insertAdjacentHTML("beforeend", `<div class="opthelp">${cfg.help}</div>`);
+    host.appendChild(g);
+  }
+}
+
+/* ---------------- sidebar: condition tree ---------------- */
+
+const collapsed = new Set();
+
+function sidebarNode(node) {
+  const res = RESULTS[node.key];
+  const wrap = document.createElement("div");
+  wrap.className = "snode";
+  const row = document.createElement("div");
+  row.className = "srow";
+  const hasKids = (node.children || []).length > 0;
+
+  const caret = document.createElement("span");
+  caret.className = "caret" + (hasKids ? "" : " leafpad");
+  caret.textContent = collapsed.has(node.key) ? "▶" : "▼";
+  row.appendChild(caret);
+
+  const dot = document.createElement("span");
+  dot.className = "dot " + dotOf(res);
+  row.appendChild(dot);
+
+  const label = document.createElement("span");
+  label.className = "slabel";
+  label.textContent = node.label;
+  label.title = node.label;
+  row.appendChild(label);
+
+  const lm = lastMetOf(res);
+  const date = document.createElement("span");
+  date.className = "sdate";
+  date.innerHTML = `<span class="lbl">last met</span>${lm || (res.inst == null ? "no data" : "never")}`;
+  row.appendChild(date);
+  wrap.appendChild(row);
+
+  if (hasKids) {
+    const kids = document.createElement("div");
+    kids.className = "schildren" + (collapsed.has(node.key) ? " collapsed" : "");
+    orderedChildren(node).forEach(c => kids.appendChild(sidebarNode(c)));
+    wrap.appendChild(kids);
+    caret.addEventListener("click", e => {
+      e.stopPropagation();
+      const now = kids.classList.toggle("collapsed");
+      caret.textContent = now ? "▶" : "▼";
+      if (now) collapsed.add(node.key); else collapsed.delete(node.key);
+    });
+  }
+  row.addEventListener("click", () => {
+    const card = document.getElementById("card-" + node.key);
+    card.scrollIntoView({ behavior: "smooth", block: "start" });
+    card.classList.remove("flash");
+    requestAnimationFrame(() => card.classList.add("flash"));
+  });
+  return wrap;
+}
+
+function renderSidebarTree() {
+  const host = $("#tree");
+  host.innerHTML = "";
+  host.appendChild(sidebarNode(DATA.tree));
+}
+
+/* ---------------- orchestration ---------------- */
+
+function rerender() {
+  const main = document.getElementById("charts");
+  const y = main.scrollTop;
+  computeAll();
+  renderOptions();
+  renderCards();
+  renderSidebarTree();
+  main.scrollTop = y;
+}
+computeAll();
+renderOptions();
+renderCards();
+renderSidebarTree();
+
+/* slide-out options drawer */
+const drawer = document.getElementById("drawer");
+const scrim = document.getElementById("drawer-scrim");
+const closeDrawer = () => { drawer.classList.remove("open"); scrim.classList.remove("open"); };
+document.getElementById("opts-btn").onclick = () => { drawer.classList.add("open"); scrim.classList.add("open"); };
+document.getElementById("drawer-close").onclick = closeDrawer;
+scrim.onclick = closeDrawer;
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeDrawer(); });
+
+let resizeTimer;
+window.addEventListener("resize", () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(renderCards, 200);
+});
+</script>
+</body>
+</html>
