@@ -23,7 +23,8 @@ CONTRACT = {
     "label": "AI bubble burst in 2026?",
     "type": "count",
     "min_met": 3,
-    "note": "Market resolves YES if at least 3 of the 6 conditions occur within a 90-day window.",
+    "note": "Market resolves YES if 3 of the 6 conditions occur within a single 90-day window "
+            "ending no later than the Dec 31, 2026 deadline (clarified Nov 20, 2025).",
     "children": [
         {
             "key": "nvda_down_50",

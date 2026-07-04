@@ -189,6 +189,7 @@
   /* option / ambiguity / caveat: distinguished by the label text, not colour */
   .tag2 { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; padding: 2px 7px; border-radius: 4px; margin-right: 8px; white-space: nowrap; color: var(--muted); background: var(--panel2); border: 1px solid var(--border); }
   .infolist li.opt { border-left: 2px solid var(--muted2); padding-left: 12px; }
+  .infolist li.clr { border-left: 2px solid #2bae4c; padding-left: 12px; }
   .infolist li.amb { border-left: 2px dashed var(--muted2); padding-left: 12px; }
   .infolist li.cav { border-left: 2px dotted var(--muted2); padding-left: 12px; }
 
@@ -402,70 +403,66 @@ const ASSETS = [
     id: "int_condition_windows", group: "yahoo", layer: "intermediate", status: "live",
     name: "int_condition_windows", mat: "table", cadence: "full rebuild",
     dagster: "yahoo/int_condition_windows", dbt: "int_condition_windows",
-    grain: "one row per (condition, basis, window_mode, date)",
-    why: "Applies the 90-day window interpretations, so the dashboard toggle becomes a filter instead of a recompute.",
-    desc: "A range window computes the trailing-90-day flag (met at any point in the last 90 days), and the {instant, trailing} window modes are unpivoted into rows. The threshold-crossing events table is derived here too, from state transitions.",
+    grain: "one row per (condition, basis, date)",
+    why: "Applies the clarified 90-day rule: a condition stays met for 90 days after it crosses.",
+    desc: "A range window computes the rolling-90-day met flag — the condition is met on any day within 90 days of a crossing. This is the interpretation fixed by the Nov 20, 2025 clarification (three events within one 90-day window). The threshold-crossing events table is derived here too, from state transitions.",
     upstream: ["int_condition_flags"],
     schema: [
       { col: "condition_key", type: "STRING", kind: "key", ex: E.condition },
       { col: "basis", type: "STRING", kind: "key", ex: "close" },
-      { col: "window_mode", type: "STRING", kind: "key", ex: "trailing", note: "instant | trailing (unpivoted)" },
       { col: "date", type: "DATE", kind: "key", ex: E.date },
-      { col: "met_instant", type: "BOOLEAN", kind: "pass", ex: E.metInstant },
-      { col: "met", type: "BOOLEAN", kind: "derived", ex: E.metTrailing, note: "resolution flag under this window_mode" },
+      { col: "met_instant", type: "BOOLEAN", kind: "pass", ex: E.metInstant, note: "currently past threshold" },
+      { col: "met", type: "BOOLEAN", kind: "derived", ex: E.metTrailing, note: "rolling-90-day resolution flag" },
     ],
     transforms: [
-      { tag: "range window", text: "max(met_instant) over (… range between interval '90 days' preceding and current row) → trailing flag" },
-      { tag: "unpivot", macro: "dbt_utils.unpivot", text: "stack the {instant, trailing} window modes" },
-      { tag: "change-data", text: "events = state transitions: met ≠ lag(met) over (order by date)", macro: "cf. dbt_utils.mutually_exclusive_ranges" },
+      { tag: "range window", text: "max(met_instant) over (… range between interval '90 days' preceding and current row) → rolling-90-day met flag" },
+      { tag: "change-data", text: "events = state transitions: met_instant ≠ lag(met_instant) over (order by date)", macro: "cf. dbt_utils.mutually_exclusive_ranges" },
     ],
     sql: `<span class="kw">select</span> *,
   <span class="fn">max</span>(met_instant) <span class="kw">over</span> (
     <span class="kw">partition by</span> condition_key, basis <span class="kw">order by</span> date
     <span class="kw">range between interval</span> '90 days' <span class="kw">preceding and current row</span>
-  ) <span class="kw">as</span> met_trailing
+  ) <span class="kw">as</span> met
 <span class="kw">from</span> <span class="fn">{{ ref('int_condition_flags') }}</span>`,
-    tests: ["not_null: met", "accepted_values: window_mode in (instant, trailing)"],
-    cardinality: `2× int_condition_flags (two window modes). ${DATA.events.total.toLocaleString()} crossing events derived.`,
+    tests: ["not_null: met", `${DATA.events.total.toLocaleString()} crossing events derived`],
+    cardinality: `1:1 with int_condition_flags (adds the rolling-window flag). ${DATA.events.total.toLocaleString()} crossing events derived.`,
   },
   {
     id: "int_conditions_aligned", group: "yahoo", layer: "intermediate", status: "live",
     name: "int_conditions_aligned", mat: "table", cadence: "full rebuild",
     dagster: "yahoo/int_conditions_aligned", dbt: "int_conditions_aligned",
-    grain: "one row per (condition, basis, window_mode, spine date)",
+    grain: "one row per (condition, basis, spine date)",
     why: "Puts every condition on one continuous calendar so parent counts can sum children day-by-day.",
     desc: "Builds a gap-free date spine and left-joins each condition onto it, forward-filling the last known state. This reconciles the tickers' differing trading calendars (foreign ADRs, halts) so a count parent can safely add up children on any given day.",
     upstream: ["int_condition_windows"],
     schema: [
       { col: "condition_key", type: "STRING", kind: "key", ex: E.condition },
       { col: "basis", type: "STRING", kind: "key", ex: "close" },
-      { col: "window_mode", type: "STRING", kind: "key", ex: "trailing" },
       { col: "date", type: "DATE", kind: "key", ex: E.date, note: "from the spine, not the source" },
-      { col: "met", type: "BOOLEAN", kind: "derived", ex: E.metTrailing, note: "forward-filled across gaps" },
+      { col: "met", type: "BOOLEAN", kind: "derived", ex: E.metTrailing, note: "rolling-90-day flag, forward-filled across gaps" },
       { col: "was_filled", type: "BOOLEAN", kind: "meta", ex: "0", note: "1 if carried from a prior day" },
     ],
     transforms: [
-      { tag: "date spine", macro: "dbt_utils.date_spine(datepart='day', …)", text: "continuous axis, buffered ~110 days before chart start so the trailing window is correct at the left edge" },
+      { tag: "date spine", macro: "dbt_utils.date_spine(datepart='day', …)", text: "continuous axis, buffered ~110 days before chart start so the 90-day window is correct at the left edge" },
       { tag: "forward-fill", text: "coalesce(met, last_value(met ignore nulls) over (order by date))" },
     ],
-    tests: ["not_null: met", "unique (condition_key, basis, window_mode, date)"],
-    cardinality: "conditions × 2 bases × 2 window_modes × |spine days| — dense and rectangular.",
+    tests: ["not_null: met", "unique (condition_key, basis, date)"],
+    cardinality: "conditions × 2 bases × |spine days| — dense and rectangular.",
   },
   {
     id: "fct_condition_daily", group: "yahoo", layer: "mart", status: "live",
     name: "fct_condition_daily", mat: "table", cadence: "full rebuild",
     dagster: "marts/fct_condition_daily", dbt: "fct_condition_daily",
-    grain: "one row per (condition_key, basis, window_mode, date)",
-    why: "The leaf fact the dashboard reads. One row is exactly one point on one chart under one toggle setting.",
-    desc: "The presentation-ready fact for the equity-drawdown leaves: met state plus the price/ATH/trigger needed to draw each chart. The dashboard slices this by the active (basis, window_mode). (The H100 rental has its own parallel mart — see the H100 source.)",
+    grain: "one row per (condition_key, basis, date)",
+    why: "The leaf fact the dashboard reads. One row is exactly one point on one chart under one basis setting.",
+    desc: "The presentation-ready fact for the equity-drawdown leaves: met state plus the price/ATH/trigger needed to draw each chart. The dashboard slices this by the active basis. (The H100 rental has its own parallel mart — see the H100 source.)",
     upstream: ["int_conditions_aligned", "int_prices_aths"],
     schema: [
       { col: "condition_key", type: "STRING", kind: "key", ex: E.condition },
       { col: "basis", type: "STRING", kind: "key", ex: "close" },
-      { col: "window_mode", type: "STRING", kind: "key", ex: "trailing" },
       { col: "date", type: "DATE", kind: "key", ex: E.date },
-      { col: "met", type: "BOOLEAN", kind: "pass", ex: E.metTrailing },
-      { col: "met_instant", type: "BOOLEAN", kind: "pass", ex: E.metInstant },
+      { col: "met", type: "BOOLEAN", kind: "pass", ex: E.metTrailing, note: "rolling-90-day flag" },
+      { col: "met_instant", type: "BOOLEAN", kind: "pass", ex: E.metInstant, note: "currently past threshold" },
       { col: "close", type: "NUMERIC", kind: "pass", ex: E.close },
       { col: "ath", type: "NUMERIC", kind: "pass", ex: E.athClose },
       { col: "trigger_price", type: "NUMERIC", kind: "derived", ex: E.triggerClose, note: "ath × (1 − threshold)" },
@@ -475,20 +472,19 @@ const ASSETS = [
       { tag: "derived", text: "trigger_price = ath × (1 − threshold)" },
     ],
     tests: ["unique on the grain key", "not_null: met", "dbt_utils.accepted_range: drawdown ∈ [0, 1)"],
-    cardinality: "the leaf fact; one row per chart point per toggle combination.",
+    cardinality: "the leaf fact; one row per chart point per basis.",
   },
   {
     id: "fct_contract_resolution", group: "yahoo", layer: "mart", status: "live",
     name: "fct_contract_resolution", mat: "table", cadence: "full rebuild",
     dagster: "marts/fct_contract_resolution", dbt: "fct_contract_resolution",
-    grain: "one row per (parent condition_key, basis, window_mode, date)",
-    why: "The rollup: every parent (incl. the root “≥3 of 6”) resolved from how many children are met.",
-    desc: "A recursive rollup over dim_conditions. For each count node it sums the children's met flags per day and compares to min_met. Applied bottom-up, so the root resolves by the same rule as every group. The example shows the 'supplier' parent: 1 of 5 children met (only SMCI), min_met 1 → MET.",
+    grain: "one row per (parent condition_key, basis, date)",
+    why: "The rollup: every parent (incl. the root “≥3 of 6”) resolved from how many children are met within the rolling 90-day window.",
+    desc: "A recursive rollup over dim_conditions. For each count node it sums the children's rolling-90-day met flags per day and compares to min_met. Because each child stays met for 90 days after it crosses, a parent is met when the required number of children have crossed within one 90-day span — the clarified rule. The example shows the 'supplier' parent: 1 of 5 children met (only SMCI), min_met 1 → MET.",
     upstream: ["fct_condition_daily", "condition_thresholds"],
     schema: [
       { col: "condition_key", type: "STRING", kind: "key", ex: E.parent || "supplier_down_50" },
       { col: "basis", type: "STRING", kind: "key", ex: "close" },
-      { col: "window_mode", type: "STRING", kind: "key", ex: "trailing" },
       { col: "date", type: "DATE", kind: "key", ex: E.date },
       { col: "children_met", type: "INTEGER", kind: "derived", ex: E.supplierCount, note: `of ${E.supplierTotal} children (${(E.supplierHits||[]).join(', ')})` },
       { col: "min_met", type: "INTEGER", kind: "seed", ex: E.supplierMinMet },
@@ -499,14 +495,14 @@ const ASSETS = [
       { tag: "case", text: "met = children_met ≥ min_met" },
     ],
     sql: `<span class="cm">-- recursive walk up the hierarchy, aggregating children</span>
-<span class="kw">select</span> parent_key <span class="kw">as</span> condition_key, basis, window_mode, date,
+<span class="kw">select</span> parent_key <span class="kw">as</span> condition_key, basis, date,
   <span class="fn">sum</span>(met) <span class="kw">as</span> children_met,
   <span class="fn">sum</span>(met) &gt;= <span class="fn">max</span>(min_met) <span class="kw">as</span> met
 <span class="kw">from</span> <span class="fn">{{ ref('fct_condition_daily') }}</span> f
 <span class="kw">join</span> <span class="fn">{{ ref('condition_thresholds') }}</span> c <span class="kw">using</span> (condition_key)
-<span class="kw">group by</span> parent_key, basis, window_mode, date`,
+<span class="kw">group by</span> parent_key, basis, date`,
     tests: ["unique on the grain key", "not_null: met", "dbt_utils.expression_is_true: children_met ≤ total_children"],
-    cardinality: "one row per parent node per day per toggle combination.",
+    cardinality: "one row per parent node per day per basis.",
   },
   {
     id: "exposure.dashboard", group: "yahoo", layer: "serve", status: "live",
@@ -577,7 +573,7 @@ const ASSETS = [
     dagster: "h100/int_h100_runlength", dbt: "int_h100_runlength",
     grain: "one row per date, plus a met flag aligned to the master axis",
     why: "Implements the “≤ $1.00 for five consecutive days” rule as a run-length window, and aligns the met flag to the contract's master date axis.",
-    desc: "Flags days at/below $1.00, tests for a 5-reading run, then forward-fills that met flag onto the master date axis so it lines up with the equity leaves (and obeys the same 90-day window toggle). Feeds the H100-specific mart.",
+    desc: "Flags days at/below $1.00, tests for a 5-reading run, then forward-fills that met flag onto the master date axis so it lines up with the equity leaves (and obeys the same rolling 90-day rule). Feeds the H100-specific mart.",
     upstream: ["h100_prices"],
     schema: [
       { col: "date", type: "DATE", kind: "key", ex: E100.date },
@@ -897,8 +893,6 @@ function renderNav() {
 const OPTIONS = {
   basis: { label: "All-time-high basis", values: [
     { val: "close", t: "End-of-day" }, { val: "intraday", t: "Intraday" }] },
-  window: { label: "90-day window", values: [
-    { val: "trailing", t: "Trailing 90 days" }, { val: "instant", t: "Instant" }] },
   h100index: { label: "H100 index tier", values: [
     { val: "neocloud", t: "Neocloud" }, { val: "hyperscaler", t: "Hyperscaler" }] },
 };
@@ -906,7 +900,7 @@ const OPTIONS = {
 function renderOptions() {
   const host = document.getElementById("drawer-options");
   host.innerHTML = "";
-  for (const key of ["basis", "window", "h100index"]) {
+  for (const key of ["basis", "h100index"]) {
     const cfg = OPTIONS[key];
     const g = document.createElement("div");
     g.className = "optgroup2";
@@ -996,7 +990,9 @@ const SOURCE_INFO = {
     blurb: "Split-adjusted daily prices from Yahoo Finance drive the four equity-drawdown conditions — NVIDIA, the SOXX semiconductor ETF, and any of the five hardware suppliers falling far enough from their all-time highs.",
     options: [
       { t: "All-time-high basis", d: "End-of-day vs. intraday. Sets which peak a drawdown is measured from; intraday highs are higher, so they trigger more easily." },
-      { t: "90-day window", d: "Trailing vs. instant. Sets how long a condition stays “met” after it crosses, and therefore when the contract can resolve." },
+    ],
+    clarified: [
+      { t: "90-day window (clarified Nov 20, 2025)", d: "The three qualifying events must fall within a <b>single 90-day window that ends no later than the Dec 31, 2026 deadline</b>. Example: crossings on Jan 10, Feb 5 and Mar 3, 2026 qualify (one 90-day span); Jan 10, Apr 20 and Nov 1, 2026 do not (more than 90 days apart). The oracle uses this rolling-window rule, so a condition counts for 90 days after it crosses. The earlier “must be simultaneous” reading is ruled out and is no longer a selectable option." },
     ],
     ambiguities: [
       { t: "Which “all-time high”?", d: "The rules don't say closing or intraday high. We compute both and expose the choice as an option." },
@@ -1009,8 +1005,8 @@ const SOURCE_INFO = {
     cardinality: [
       { asset: "prices", count: "≈" + DATA.prices.total.toLocaleString(), meaning: "One row per (ticker, trading day) across the 7 tickers — the raw input volume." },
       { asset: "int_condition_flags", count: "× conditions", meaning: "The join to the thresholds seed fans each price row out to every condition that uses that ticker (a ticker used by two conditions doubles its rows)." },
-      { asset: "int_condition_windows", count: "× 2", meaning: "Each condition-day is expanded to 2 window modes (instant, trailing)." },
-      { asset: "int_conditions_aligned", count: "widest", meaning: "conditions × 2 bases × 2 windows × spine days — forward-filled onto a gap-free calendar. The widest point in the pipeline." },
+      { asset: "int_condition_windows", count: "1:1", meaning: "Adds the rolling-90-day met flag — a condition stays met for 90 days after it crosses. No fan-out." },
+      { asset: "int_conditions_aligned", count: "widest", meaning: "conditions × 2 bases × spine days — forward-filled onto a gap-free calendar. The widest point in the pipeline." },
       { asset: "fct_contract_resolution", count: "rollup ↓", meaning: "Parents aggregate children to one row per parent per day (the 3-of-6 count) — rows collapse." },
       { asset: "exposure.dashboard", count: "1 doc", meaning: "Everything collapses to a single JSON embedded in dashboard.html." },
     ],
@@ -1019,7 +1015,6 @@ const SOURCE_INFO = {
     blurb: "The H100 rental condition (index ≤ $1.00/hr for five straight days) resolves on SiliconData's index, which is paywalled — so this source is a free public approximation.",
     options: [
       { t: "Index tier — Neocloud vs. Hyperscaler", d: "SiliconData publishes two H100 indices and the rules name neither. <b>Neocloud (SDH100RT)</b> is the spot-like marketplace tier — neoclouds and providers like Vast.ai selling on-demand capacity; competitive, price-sensitive, ~$2/hr, and volatile (>20× the hyperscaler's daily variation). It's what our Vast.ai proxy measures. <b>Hyperscaler</b> is AWS/GCP/Azure/Oracle capacity priced via committed-use discounts, multi-year deals, and reserved instances — a ~3× premium (~$7.5/hr) and very stable (0.47% coefficient of variation). Because they differ ~3×, the choice is material: a fall to $1 is a plausible ~50% crash against neocloud but near-impossible against hyperscaler. The $1.00 trigger only makes sense for neocloud, which is the default." },
-      { t: "90-day window", d: "Inherited from the contract: once the “5 straight days ≤ $1” run occurs, does it stay met for 90 days (trailing) or only on the exact day (instant)?" },
     ],
     ambiguities: [
       { t: "Which index?", d: "Neocloud (~$2) vs. hyperscaler (~$7.5) — the tier option above. It's the dominant ambiguity here, and it swings whether the condition is even reachable." },
@@ -1107,7 +1102,7 @@ function landingHtml() {
 function sourceOverviewHtml(gid) {
   const grp = GROUPS.find(x => x.id === gid);
   const info = SOURCE_INFO[gid];
-  const kind = { opt: "option", amb: "ambiguity", cav: "caveat" };
+  const kind = { opt: "option", clr: "clarified", amb: "ambiguity", cav: "caveat" };
   const section = (title, cls, items) => items.length
     ? `<h5>${title}</h5><ul class="infolist">${items.map(i =>
         `<li class="${cls}"><span class="tag2">${kind[cls]}</span><b>${i.t}</b> — ${i.d}</li>`).join("")}</ul>` : "";
@@ -1146,9 +1141,10 @@ function sourceOverviewHtml(gid) {
     <p class="why">${info.blurb}</p>
     ${extra}
 
-    <h4>Options, ambiguities &amp; caveats</h4>
+    <h4>Options, clarifications, ambiguities &amp; caveats</h4>
     <div class="infobox">
       ${section("Options", "opt", info.options)}
+      ${section("Clarified rules", "clr", info.clarified || [])}
       ${section("Ambiguities", "amb", info.ambiguities)}
       ${section("Caveats", "cav", info.caveats)}
     </div>

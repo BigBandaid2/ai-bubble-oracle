@@ -127,6 +127,10 @@
   .seg button.active { background: var(--accent); color: #fff; }
   .seg button.active .d { color: rgba(255,255,255,.8); }
   .opthelp { font-size: 11px; color: var(--muted2); margin-top: 7px; line-height: 1.5; }
+  .clarified { margin: 6px 8px 4px; padding: 12px 13px; background: var(--panel); border: 1px solid var(--border);
+    border-left: 3px solid var(--notmet); border-radius: 8px; font-size: 11.5px; color: var(--muted); line-height: 1.55; }
+  .clarified-h { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--notmet-text); margin-bottom: 5px; }
+  .clarified b { color: var(--text); }
 
   .snode { margin: 1px 0; }
   .srow { display: flex; align-items: center; gap: 8px; padding: 8px 8px; border-radius: 8px; cursor: pointer; }
@@ -205,14 +209,6 @@ const OPTIONS = {
       { val: "intraday", t: "Intraday", d: "Day's low vs. highest intraday high" },
     ],
   },
-  window: {
-    label: "90-day window",
-    help: "“Resolve once 3 conditions have been met within 90 days” is ambiguous. Each reading changes when a condition counts as met and when the market resolves.",
-    values: [
-      { val: "trailing", t: "Trailing 90 days", d: "A condition stays met for 90 days after it crosses; YES if 3 cross within any 90-day span" },
-      { val: "instant", t: "Instant (simultaneous)", d: "Conditions must be past threshold on the same day" },
-    ],
-  },
   h100index: {
     label: "H100 index tier",
     help: "SiliconData publishes two H100 indices; the rules don't say which. Neocloud (SDH100RT) is the spot-like marketplace tier (~$2); Hyperscaler is the reserved/committed tier (~3× higher, ~$7.5). The $1.00 trigger only makes sense against neocloud. Affects the H100 condition only.",
@@ -222,10 +218,10 @@ const OPTIONS = {
     ],
   },
 };
+// window is fixed to the clarified rolling-90-day rule (no longer a toggle).
 const state = { basis: "close", window: "trailing", h100index: "neocloud" };
 const OPT_TEXT = {
   basis: { close: "End-of-day ATH", intraday: "Intraday ATH" },
-  window: { trailing: "90-day trailing", instant: "Instant" },
   h100index: { neocloud: "Neocloud", hyperscaler: "Hyperscaler" },
 };
 
@@ -338,13 +334,10 @@ function optChips(node) {
   const chip = (k, v) => `<span class="optchip"><span class="k">${k}</span><b>${v}</b></span>`;
   if (node.type === "drawdown") {
     chips.push(chip("ATH", OPT_TEXT.basis[state.basis]));
-    chips.push(chip("Window", OPT_TEXT.window[state.window]));
   } else if (node.type === "count") {
-    chips.push(chip("Window", OPT_TEXT.window[state.window]));
     chips.push(chip("ATH", OPT_TEXT.basis[state.basis]));
   } else if (node.type === "rental") {
     chips.push(chip("Tier", OPT_TEXT.h100index[state.h100index]));
-    chips.push(chip("Window", OPT_TEXT.window[state.window]));
   }
   return chips.length ? `<div class="optchips">${chips.join("")}</div>` : "";
 }
@@ -612,7 +605,7 @@ function drawRental(canvas, res) {
 function renderOptions() {
   const host = $("#options");
   host.innerHTML = "";
-  for (const key of ["basis", "window", "h100index"]) {
+  for (const key of ["basis", "h100index"]) {
     const cfg = OPTIONS[key];
     const g = document.createElement("div");
     g.className = "optgroup";
@@ -630,6 +623,15 @@ function renderOptions() {
     g.insertAdjacentHTML("beforeend", `<div class="opthelp">${cfg.help}</div>`);
     host.appendChild(g);
   }
+  host.insertAdjacentHTML("beforeend", `
+    <div class="clarified">
+      <div class="clarified-h">90-day window — clarified rule</div>
+      The three qualifying events must fall within a <b>single 90-day window that ends no later than the
+      Dec 31, 2026 deadline</b> (clarification added Nov 20, 2025). For example, crossings on Jan 10, Feb 5 and
+      Mar 3, 2026 qualify (one 90-day span), but Jan 10, Apr 20 and Nov 1, 2026 do not (more than 90 days apart).
+      The oracle uses this rolling-window rule; the earlier “must be simultaneous” reading is ruled out, so this
+      is no longer a selectable option.
+    </div>`);
 }
 
 /* ---------------- sidebar: condition tree ---------------- */
