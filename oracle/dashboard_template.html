@@ -4,6 +4,19 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>AI Bubble Oracle</title>
+<meta name="description" content="A live, open-source scoreboard for the Polymarket 'AI bubble burst in 2026?' market — every condition tracked from public data, with the rules ambiguities laid bare.">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="AI Bubble Oracle">
+<meta property="og:title" content="AI Bubble Oracle — is the AI bubble bursting?">
+<meta property="og:description" content="A live, open-source scoreboard for the Polymarket 'AI bubble burst in 2026?' market — every condition tracked from public data.">
+<meta property="og:url" content="https://ai-bubble-oracle.vercel.app/">
+<meta property="og:image" content="https://ai-bubble-oracle.vercel.app/og-image.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="AI Bubble Oracle — is the AI bubble bursting?">
+<meta name="twitter:description" content="A live, open-source scoreboard for the Polymarket 'AI bubble burst in 2026?' market — every condition tracked from public data.">
+<meta name="twitter:image" content="https://ai-bubble-oracle.vercel.app/og-image.jpg">
 <style>
   /* Palette lifted from polymarket.com dark theme design tokens */
   :root {
@@ -64,6 +77,22 @@
     padding: 5px 13px; border-radius: 6px; cursor: pointer; }
   .rangechip:hover { color: var(--text); background: var(--panel2); }
   .rangechip.active { background: var(--accent); color: #fff; font-weight: 600; }
+
+  /* "open questions" ambiguities callout */
+  .ambibox { background: var(--panel); border: 1px solid var(--border); border-left: 3px solid #e0bf3e;
+    border-radius: 12px; padding: 12px 18px 14px; margin: 0 0 16px; scroll-margin-top: 72px; }
+  .ambibox.flash { animation: flash 1.8s ease-out; }
+  .ambihead { font-size: 13.5px; font-weight: 700; color: var(--text); margin-bottom: 6px; }
+  .ambirow { display: flex; align-items: center; gap: 10px 18px; flex-wrap: wrap; padding: 9px 0; border-top: 1px solid var(--border); }
+  .ambiq { flex: 1; min-width: 240px; font-size: 12.5px; color: var(--muted); line-height: 1.5; }
+  .ambiq b { color: var(--text); }
+  .ambiseg { display: inline-flex; gap: 3px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 3px; flex-shrink: 0; }
+  .ambiseg button { background: transparent; border: 0; color: var(--muted); font: inherit; font-size: 12px; padding: 6px 12px; border-radius: 6px; cursor: pointer; white-space: nowrap; }
+  .ambiseg button:hover { color: var(--text); background: var(--panel2); }
+  .ambiseg button.active { background: var(--accent); color: #fff; font-weight: 600; }
+  .ambifoot { font-size: 11.5px; color: var(--muted2); margin-top: 9px; }
+  .ambifoot a { color: var(--accent); text-decoration: none; }
+  .ambifoot a:hover { text-decoration: underline; }
 
   #cardgrid { display: grid; grid-template-columns: 1fr; gap: 16px; align-items: start; }
   /* Two graphs per row once the main area is wide enough (sidebar is 344px). */
@@ -164,6 +193,24 @@
 
   .siglegend { margin: 2px 8px; font-size: 11.5px; color: var(--muted); }
   .siglegend .row { display: flex; align-items: center; gap: 9px; padding: 4px 0; }
+
+  /* --- mobile: stack the panes, the page scrolls normally --- */
+  @media (max-width: 820px) {
+    html, body { overflow-x: hidden; }
+    body { overflow-y: auto; }
+    #app { flex-direction: column; height: auto; }
+    main { height: auto; overflow: visible; padding: 16px 16px 56px; }
+    aside { width: auto; height: auto; overflow: visible; border-left: none; border-top: 1px solid var(--border); margin: 8px 0 0; }
+    #topbar .sub { display: none; }
+  }
+  @media (max-width: 520px) {
+    #topbar { padding: 0 12px; gap: 8px; }
+    #topbar .brand { display: none; }
+    .topnav { margin-left: 4px; gap: 2px; }
+    .topnav a { padding: 6px 9px; font-size: 12.5px; }
+    #opts-btn { padding: 6px 10px; font-size: 12.5px; }
+    header.page h1 { font-size: 21px; }
+  }
 </style>
 <!-- Vercel Web Analytics (static-site script; no-op off the Vercel deployment) -->
 <script defer src="/_vercel/insights/script.js"></script>
@@ -189,6 +236,7 @@
         <div class="rangebar"><span class="rangelabel">Range</span><div id="rangebar"></div></div>
       </div>
     </header>
+    <div id="ambiguities"></div>
     <div id="cardgrid"></div>
   </main>
   <aside>
@@ -799,6 +847,37 @@ function renderSidebarTree() {
   host.appendChild(sidebarNode(DATA.tree));
 }
 
+/* ---------------- "open questions" ambiguities callout ---------------- */
+
+function ambiSeg(key, values) {
+  return `<span class="ambiseg">${values.map(v =>
+    `<button class="${state[key] === v.val ? "active" : ""}" data-ambi="${key}" data-val="${v.val}">${v.t}</button>`
+  ).join("")}</span>`;
+}
+
+function renderAmbiguities() {
+  const host = $("#ambiguities");
+  host.innerHTML = `
+    <div class="ambibox" id="ambibox">
+      <div class="ambihead">&#9888;&#65039; Two rules the market doesn't pin down — and they move the odds. Toggle to see the effect.</div>
+      <div class="ambirow">
+        <div class="ambiq"><b>“All-time high” — end-of-day close or intraday high?</b> Intraday highs sit higher, so a stock reaches its −50% mark sooner. Decisive for any condition hovering near its threshold.</div>
+        ${ambiSeg("basis", [{ val: "close", t: "End-of-day" }, { val: "intraday", t: "Intraday" }])}
+      </div>
+      <div class="ambirow">
+        <div class="ambiq"><b>Which SiliconData H100 index?</b> Neocloud (~$2/hr) vs. hyperscaler (~$7.5/hr). The $1.00 trigger is only realistically reachable against the neocloud tier.</div>
+        ${ambiSeg("h100index", [{ val: "neocloud", t: "Neocloud" }, { val: "hyperscaler", t: "Hyperscaler" }])}
+      </div>
+      <div class="ambifoot">Neither is specified in the rules. Full breakdown on the <a href="datasources.html#src:yahoo">Data Sources</a> page.</div>
+    </div>`;
+  host.querySelectorAll("[data-ambi]").forEach(b => {
+    b.onclick = () => {
+      const k = b.getAttribute("data-ambi"), v = b.getAttribute("data-val");
+      if (state[k] !== v) { state[k] = v; rerender(); }
+    };
+  });
+}
+
 /* ---------------- date-range chips (on the page, not the drawer) ---------- */
 
 function renderRangeBar() {
@@ -830,6 +909,7 @@ function rerender() {
   SLICE = sliceStart();
   computeAll();
   renderOptions();
+  renderAmbiguities();
   renderRangeBar();
   renderCards();
   renderSidebarTree();
@@ -838,9 +918,18 @@ function rerender() {
 SLICE = sliceStart();
 computeAll();
 renderOptions();
+renderAmbiguities();
 renderRangeBar();
 renderCards();
 renderSidebarTree();
+
+/* deep link: /dashboard.html#ambiguities highlights the callout */
+if (location.hash === "#ambiguities") {
+  requestAnimationFrame(() => {
+    const box = document.getElementById("ambibox");
+    if (box) { box.scrollIntoView({ block: "start" }); box.classList.add("flash"); }
+  });
+}
 
 /* slide-out options drawer */
 const drawer = document.getElementById("drawer");

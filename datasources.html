@@ -4,6 +4,19 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>AI Bubble Oracle — Data Sources</title>
+<meta name="description" content="How the AI Bubble Oracle turns public data into the numbers on the dashboard — every source, the processing pipeline, and the rules ambiguities.">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="AI Bubble Oracle">
+<meta property="og:title" content="AI Bubble Oracle — Data Sources & pipeline">
+<meta property="og:description" content="Every data feed and processing step behind the AI bubble scoreboard, made inspectable.">
+<meta property="og:url" content="https://ai-bubble-oracle.vercel.app/datasources.html">
+<meta property="og:image" content="https://ai-bubble-oracle.vercel.app/og-image.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="AI Bubble Oracle — Data Sources & pipeline">
+<meta name="twitter:description" content="Every data feed and processing step behind the AI bubble scoreboard, made inspectable.">
+<meta name="twitter:image" content="https://ai-bubble-oracle.vercel.app/og-image.jpg">
 <style>
   :root {
     --bg: #0a0b10; --panel: #1a1f23; --panel2: #242b32; --border: #1f2937;
@@ -200,6 +213,25 @@
   table.card2 tr:last-child td { border-bottom: 0; }
   table.card2 td b { color: var(--text); }
   table.card2 .rc { font-family: var(--mono); color: var(--accent); white-space: nowrap; }
+
+  /* --- mobile: stack the panes, the page scrolls normally --- */
+  @media (max-width: 820px) {
+    html, body { overflow-x: hidden; }
+    body { overflow-y: auto; }
+    #app { flex-direction: column; height: auto; }
+    main#scroll { height: auto; overflow: visible; }
+    #detail { padding: 16px 16px 48px; }
+    aside { width: auto; height: auto; overflow: visible; border-left: none; border-top: 1px solid var(--border); }
+    #topbar .sub { display: none; }
+  }
+  @media (max-width: 520px) {
+    #topbar { padding: 0 12px; gap: 8px; }
+    #topbar .brand { display: none; }
+    .topnav { margin-left: 4px; gap: 2px; }
+    .topnav a { padding: 6px 9px; font-size: 12.5px; }
+    #opts-btn { padding: 6px 10px; font-size: 12.5px; }
+    .dag { }
+  }
 </style>
 <!-- Vercel Web Analytics (static-site script; no-op off the Vercel deployment) -->
 <script defer src="/_vercel/insights/script.js"></script>

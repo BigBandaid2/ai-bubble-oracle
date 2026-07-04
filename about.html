@@ -4,6 +4,19 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>AI Bubble Oracle — About</title>
+<meta name="description" content="An open, data-driven tracker for whether the AI bubble has burst — its goals, methodology, and roadmap.">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="AI Bubble Oracle">
+<meta property="og:title" content="AI Bubble Oracle — About">
+<meta property="og:description" content="An open, data-driven tracker for whether the AI bubble has burst — goals, methodology, and roadmap.">
+<meta property="og:url" content="https://ai-bubble-oracle.vercel.app/about.html">
+<meta property="og:image" content="https://ai-bubble-oracle.vercel.app/og-image.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="AI Bubble Oracle — About">
+<meta name="twitter:description" content="An open, data-driven tracker for whether the AI bubble has burst — goals, methodology, and roadmap.">
+<meta name="twitter:image" content="https://ai-bubble-oracle.vercel.app/og-image.jpg">
 <style>
   :root {
     --bg: #0a0b10; --panel: #1a1f23; --panel2: #242b32; --border: #1f2937;
@@ -49,6 +62,14 @@
   li { color: #cdd3dd; margin: 7px 0; }
   code { font-family: var(--mono); background: var(--panel2); padding: 1px 5px; border-radius: 4px; font-size: 12.5px; }
   .foot { color: var(--muted2); font-size: 12px; margin-top: 40px; border-top: 1px solid var(--border); padding-top: 16px; }
+  @media (max-width: 520px) {
+    #topbar { padding: 0 12px; gap: 8px; }
+    #topbar .brand { display: none; }
+    .topnav { margin-left: 4px; gap: 2px; }
+    .topnav a { padding: 6px 9px; font-size: 12.5px; }
+    .wrap { padding: 28px 18px 60px; }
+    h1 { font-size: 25px; }
+  }
 </style>
 <!-- Vercel Web Analytics (static-site script; no-op off the Vercel deployment) -->
 <script defer src="/_vercel/insights/script.js"></script>
@@ -106,6 +127,13 @@
       optimistic oracle — humans reading the rules — not through this site or any code here. Treat these numbers
       as a fast, transparent read on where things stand, not as the official resolution. Nothing here is
       financial advice.
+    </div>
+
+    <div class="note">
+      <b>Unaffiliated, and a hobby.</b> This is an independent hobby project — not affiliated with, endorsed by,
+      or connected to Polymarket in any way. The look and feel borrows heavily from Polymarket's own design;
+      thank you for the aesthetic. If any of that's a problem, ping me on X at
+      <a href="https://x.com/DiveeUp" target="_blank" rel="noopener">@DiveeUp</a> and I'll sort it out.
     </div>
 
     <div class="foot">AI Bubble Oracle &middot; built with public data (Yahoo Finance, Vast.ai) &middot; stdlib Python + static HTML.</div>

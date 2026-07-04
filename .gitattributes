@@ -2,3 +2,6 @@
 # fight over CRLF/LF.
 * text=auto eol=lf
 *.db binary
+*.jpg binary
+*.jpeg binary
+*.png binary
