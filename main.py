@@ -20,6 +20,7 @@ from oracle.config import TICKERS
 from oracle.dashboard import write_dashboard
 from oracle.datasources import write_datasources
 from oracle.h100 import fetch_h100_proxy, SEED_POINTS, import_h100_csv, export_h100_csv
+from oracle.polymarket import fetch_market_history, import_polymarket_csv, export_polymarket_csv
 from oracle.report import status_report
 from oracle.tracker import rebuild_events
 from oracle.yahoo import fetch_history, YahooError
@@ -56,6 +57,19 @@ def cmd_update(conn):
         print("H100 proxy: fetch failed (kept prior readings)")
     kept = export_h100_csv(conn)
     print(f"H100 history: restored {restored}, now {kept} readings in data/h100_history.csv")
+
+    # Polymarket's own implied YES-probability over time. Full history is
+    # re-fetchable; the CSV is a fallback so a stalled API doesn't blank the chart.
+    pm_restored = import_polymarket_csv(conn)
+    pm_hist = fetch_market_history()
+    if pm_hist:
+        db.upsert_polymarket(conn, pm_hist)
+        print(f"Polymarket: fetched {len(pm_hist)} daily points "
+              f"({pm_hist[0][0]}..{pm_hist[-1][0]}, latest {pm_hist[-1][1] * 100:.0f}% YES)")
+    else:
+        print(f"Polymarket: fetch failed (kept {pm_restored} cached points)")
+    pm_kept = export_polymarket_csv(conn)
+    print(f"Polymarket history: {pm_kept} points in data/polymarket_history.csv")
 
     db.set_meta(conn, "last_update", datetime.now(timezone.utc).isoformat(timespec="seconds"))
 

@@ -17,7 +17,7 @@ Everything is inlined (JSON + CSS + JS), so the file works offline from disk.
 """
 
 import json
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 from .config import (BASES, CHART_START, CONTRACT, DASHBOARD_PATH, DEADLINE,
                      drawdown_leaves)
@@ -29,6 +29,34 @@ TEMPLATE_PATH = DASHBOARD_PATH.parent / "oracle" / "dashboard_template.html"
 # Days of data kept before CHART_START so a 90-calendar-day trailing window is
 # already accurate on the first displayed day.
 BUFFER_DAYS = 110
+
+
+def _calendar_spine():
+    """Daily calendar dates from the buffer start through today (UTC).
+
+    Every graph — equities, H100, Polymarket — shares this one axis, so their
+    time scales line up. Equity closes forward-fill across weekends; sparse
+    series (H100, Polymarket) are null before their first reading.
+    """
+    d = date.fromisoformat(CHART_START) - timedelta(days=BUFFER_DAYS)
+    today = datetime.now(timezone.utc).date()
+    out = []
+    while d <= today:
+        out.append(d.isoformat())
+        d += timedelta(days=1)
+    return out
+
+
+def _align_series(pairs, master):
+    """Align sorted (date, value) pairs onto the master axis: null before the
+    first reading, forward-filled (last known value) afterward."""
+    out, j, cur, started = [], 0, None, False
+    for d in master:
+        while j < len(pairs) and pairs[j][0] <= d:
+            cur, started = pairs[j][1], True
+            j += 1
+        out.append(cur if started else None)
+    return out
 
 
 def _leaf_records(conn, leaf):
@@ -59,7 +87,7 @@ def _leaf_records(conn, leaf):
 
 
 def _rental_type_series(rows, node, master):
-    """Build the chart series + master-aligned met bitstring for one index tier."""
+    """Build the master-aligned value line + met bitstring for one index tier."""
     dates = [r["date"] for r in rows]
     values = [r["usd_hr"] for r in rows]
     sources = [r["source"] for r in rows]
@@ -80,9 +108,23 @@ def _rental_type_series(rows, node, master):
 
     last_met = next((dates[i] for i in range(len(met_native) - 1, -1, -1) if met_native[i]), None)
     return {
-        "chartDates": dates, "chartValues": values, "chartMet": met_native,
+        "values": _align_series(list(zip(dates, values)), master),   # null before first reading
         "current": values[-1], "currentDate": dates[-1], "source": sources[-1],
         "inst": "".join(str(x) for x in inst), "lastMet": last_met,
+    }
+
+
+def _market_json(conn, master):
+    """The market's own daily YES-probability, aligned to the master axis."""
+    rows = db.load_polymarket(conn)
+    if not rows:
+        return None
+    pairs = [(r["date"], round(r["yes_prob"], 4)) for r in rows]
+    prob = _align_series(pairs, master)
+    current = next((v for v in reversed(prob) if v is not None), None)
+    return {
+        "key": "market_price", "label": "Polymarket implied probability (YES)",
+        "type": "market", "prob": prob, "current": current, "start": pairs[0][0],
     }
 
 
@@ -111,13 +153,11 @@ def _rental_json(conn, node, master):
 def build_payload(conn):
     leaves = drawdown_leaves()
     leaf_recs = {}
-    all_dates = set()
     for leaf in leaves:
         recs, last_inst = _leaf_records(conn, leaf)
         leaf_recs[leaf["key"]] = (recs, last_inst)
-        all_dates.update(recs.keys())
 
-    master = sorted(all_dates)
+    master = _calendar_spine()
     display_start = next((i for i, d in enumerate(master) if d >= CHART_START), 0)
 
     # Align each leaf onto the master axis, forward-filling gaps.
@@ -172,6 +212,7 @@ def build_payload(conn):
         "windowDays": 90,
         "dateAxis": master,
         "displayStart": display_start,
+        "market": _market_json(conn, master),
         "tree": node_json(CONTRACT),
     }
 

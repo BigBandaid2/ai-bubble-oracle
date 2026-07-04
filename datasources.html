@@ -231,10 +231,11 @@
 </div>
 
 <script>
-const DATA = {"updated":"2026-07-04T21:09:10+00:00","prices":{"columns":[{"name":"ticker","type":"TEXT"},{"name":"date","type":"TEXT"},{"name":"open","type":"REAL"},{"name":"high","type":"REAL"},{"name":"low","type":"REAL"},{"name":"close","type":"REAL"}],"byTicker":[{"ticker":"ANET","rows":3036,"first":"2014-06-06","last":"2026-07-02"},{"ticker":"ASML","rows":7877,"first":"1995-03-15","last":"2026-07-02"},{"ticker":"AVGO","rows":4252,"first":"2009-08-06","last":"2026-07-02"},{"ticker":"NVDA","rows":6903,"first":"1999-01-22","last":"2026-07-02"},{"ticker":"SMCI","rows":4846,"first":"2007-03-29","last":"2026-07-02"},{"ticker":"SOXX","rows":6279,"first":"2001-07-13","last":"2026-07-02"},{"ticker":"TSM","rows":7226,"first":"1997-10-09","last":"2026-07-02"}],"total":40419},"events":{"columns":[{"name":"condition_key","type":"TEXT"},{"name":"ticker","type":"TEXT"},{"name":"basis","type":"TEXT"},{"name":"date","type":"TEXT"},{"name":"kind","type":"TEXT"},{"name":"drawdown","type":"REAL"},{"name":"price","type":"REAL"},{"name":"ath","type":"REAL"}],"total":826},"example":{"ticker":"SMCI","condition":"smci_down_50","date":"2026-07-02","open":28.05,"high":29.22,"low":26.7,"close":27.22,"skey":"83feabfe1e94","athClose":118.81,"athIntraday":122.9,"ddClose":0.7709,"ddIntraday":0.7785,"triggerClose":59.4,"triggerIntraday":61.45,"threshold":0.5,"metInstant":1,"metInstantIntraday":1,"metTrailing":1,"lastBreach":"2025-07-31","supplierHits":["SMCI"],"supplierCount":1,"supplierTotal":5,"supplierMinMet":1},"h100":{"neocloud":{"date":"2026-07-04","usd_hr":2.105,"low":1.734,"n":20,"source":"vast_proxy","rows":4},"hyperscaler":{"date":"2026-04-20","usd_hr":7.48,"low":null,"n":null,"source":"silicondata_published","rows":4},"rowsAll":8}};
+const DATA = {"updated":"2026-07-04T22:09:30+00:00","prices":{"columns":[{"name":"ticker","type":"TEXT"},{"name":"date","type":"TEXT"},{"name":"open","type":"REAL"},{"name":"high","type":"REAL"},{"name":"low","type":"REAL"},{"name":"close","type":"REAL"}],"byTicker":[{"ticker":"ANET","rows":3036,"first":"2014-06-06","last":"2026-07-02"},{"ticker":"ASML","rows":7877,"first":"1995-03-15","last":"2026-07-02"},{"ticker":"AVGO","rows":4252,"first":"2009-08-06","last":"2026-07-02"},{"ticker":"NVDA","rows":6903,"first":"1999-01-22","last":"2026-07-02"},{"ticker":"SMCI","rows":4846,"first":"2007-03-29","last":"2026-07-02"},{"ticker":"SOXX","rows":6279,"first":"2001-07-13","last":"2026-07-02"},{"ticker":"TSM","rows":7226,"first":"1997-10-09","last":"2026-07-02"}],"total":40419},"events":{"columns":[{"name":"condition_key","type":"TEXT"},{"name":"ticker","type":"TEXT"},{"name":"basis","type":"TEXT"},{"name":"date","type":"TEXT"},{"name":"kind","type":"TEXT"},{"name":"drawdown","type":"REAL"},{"name":"price","type":"REAL"},{"name":"ath","type":"REAL"}],"total":826},"example":{"ticker":"SMCI","condition":"smci_down_50","date":"2026-07-02","open":28.05,"high":29.22,"low":26.7,"close":27.22,"skey":"83feabfe1e94","athClose":118.81,"athIntraday":122.9,"ddClose":0.7709,"ddIntraday":0.7785,"triggerClose":59.4,"triggerIntraday":61.45,"threshold":0.5,"metInstant":1,"metInstantIntraday":1,"metTrailing":1,"lastBreach":"2025-07-31","supplierHits":["SMCI"],"supplierCount":1,"supplierTotal":5,"supplierMinMet":1},"h100":{"neocloud":{"date":"2026-07-04","usd_hr":2.201,"low":1.734,"n":22,"source":"vast_proxy","rows":4},"hyperscaler":{"date":"2026-04-20","usd_hr":7.48,"low":null,"n":null,"source":"silicondata_published","rows":4},"rowsAll":8},"polymarket":{"date":"2026-07-04","yes_prob":0.166,"first":"2025-11-21","count":223}};
 const E = DATA.example || {};
 const E100 = (DATA.h100 && DATA.h100.neocloud) || {};   // neocloud tier for static asset examples
 const H100_ROWS_ALL = (DATA.h100 && DATA.h100.rowsAll) || 8;
+const E_PM = DATA.polymarket || {};
 document.getElementById("topsub").textContent = "Last update: " + (DATA.updated || "never") + " UTC";
 
 const money = v => "$" + (v >= 100 ? v.toFixed(0) : v.toFixed(2));
@@ -650,6 +651,61 @@ const ASSETS = [
     cardinality: "one JSON block; the H100 pipeline's terminal node.",
   },
 
+  /* -------- Polymarket (live) -------- */
+  {
+    id: "raw.polymarket_history", group: "polymarket", layer: "source", status: "live",
+    name: "raw.polymarket_history", mat: "API response (JSON)", cadence: "daily",
+    dagster: "polymarket/history", dbt: "source('polymarket','prices_history')",
+    grain: "one JSON document (array of timestamped prices)",
+    why: "The market's own implied probability — the headline chart, plotted alongside the conditions it aggregates.",
+    desc: "Polymarket's public CLOB prices-history endpoint for the YES token of “AI bubble burst in 2026?”. interval=max returns the full history since the market opened (2025-11-20), fidelity=1440 gives daily resolution.",
+    upstream: [],
+    json: `GET clob.polymarket.com/prices-history
+  ?market=<YES token id>&interval=max&fidelity=1440
+→ { "history": [ { "t": 1763683200, "p": 0.425 }, …,
+                 { "t": …, "p": ${E_PM.yes_prob != null ? E_PM.yes_prob : 0.17} } ] }`,
+    transforms: [{ tag: "extract", text: "HTTP GET; a Python tap converts epoch→UTC date and keeps the last price per day." }],
+    cardinality: `≈${E_PM.count || 220} daily points since ${E_PM.first || "2025-11-21"}.`,
+  },
+  {
+    id: "polymarket_prices", group: "polymarket", layer: "raw", status: "live",
+    name: "polymarket_prices", mat: "table · daily upsert", cadence: "daily",
+    dagster: "polymarket/polymarket_prices", dbt: "—  (landed by the tap)",
+    grain: "one row per UTC date",
+    why: "The persisted daily probability series. Re-fetchable, but cached in a committed CSV so a stalled API doesn't blank the chart.",
+    desc: "The daily YES-probability of the contract resolving true. Falls from ~42% at open (Nov 2025) toward the mid-teens as conditions failed to trigger.",
+    upstream: ["raw.polymarket_history"],
+    schema: [
+      { col: "date", type: "TEXT", kind: "key", ex: E_PM.date || "2026-07-04" },
+      { col: "yes_prob", type: "REAL", kind: "pass", ex: E_PM.yes_prob != null ? E_PM.yes_prob : 0.17, note: "0–1, the market's YES price" },
+    ],
+    transforms: [
+      { tag: "aggregate", text: "last price per UTC date" },
+      { tag: "incremental", text: "upsert on date; cached to data/polymarket_history.csv" },
+    ],
+    tests: ["not_null: yes_prob", "dbt_utils.accepted_range: yes_prob ∈ [0, 1]"],
+    cardinality: `${E_PM.count || 220} daily rows (${E_PM.first || "2025-11-21"} → ${E_PM.date || "today"}).`,
+  },
+  {
+    id: "exposure.market_series", group: "polymarket", layer: "serve", status: "live",
+    name: "exposure: market_series", mat: "exposure (JSON)", cadence: "on generate",
+    dagster: "dashboard (market slice)", dbt: "exposure: market_series",
+    grain: "the market block in dashboard.html",
+    why: "Serves the probability line, aligned to the shared calendar axis (null before the market opened).",
+    desc: "The daily probabilities are aligned onto the same master date axis as every other chart — null before 2025-11-21, so the line simply starts where the market did. Rendered as the headline card above the conditions.",
+    upstream: ["polymarket_prices"],
+    json: `"market": {
+  "type": "market", "label": "Polymarket implied probability (YES)",
+  "prob": [ null, …, ${E_PM.yes_prob != null ? E_PM.yes_prob : 0.17} ],  <span class="cm">// aligned to the shared axis</span>
+  "current": ${E_PM.yes_prob != null ? E_PM.yes_prob : 0.17}, "start": "${E_PM.first || "2025-11-21"}"
+}`,
+    transforms: [
+      { tag: "align", text: "forward-fill onto the shared calendar axis; null before the first reading" },
+      { tag: "reverse-etl", text: "→ the market block of the static JSON", macro: "dbt exposure" },
+    ],
+    cardinality: "one JSON block; drives the headline chart.",
+  },
+
   /* -------- CourtListener (planned) -------- */
   {
     id: "court_dockets", group: "courtlistener", layer: "raw", status: "planned",
@@ -734,6 +790,7 @@ const ASSETS = [
 const GROUPS = [
   { id: "yahoo", name: "Yahoo Finance", status: "live" },
   { id: "h100", name: "H100 rental (proxy)", status: "live" },
+  { id: "polymarket", name: "Polymarket", status: "live" },
   { id: "courtlistener", name: "CourtListener", status: "planned" },
   { id: "gdelt", name: "GDELT news", status: "planned" },
 ];
@@ -795,6 +852,16 @@ const GRAPHS = {
       ["int_h100_runlength", "fct_h100_rental"], ["fct_h100_rental", "exposure.h100_series"],
     ],
     curves: ["M398,118 C 360,152 360,196 318,196"],   // silicondata (future) → runlength
+  },
+  polymarket: {
+    viewBox: "0 0 460 300",
+    nodes: [
+      { id: "raw.polymarket_history", cx: MX, cy: 46 },
+      { id: "polymarket_prices", cx: MX, cy: 142 },
+      { id: "exposure.market_series", cx: MX, cy: 238, short: "exposure: market_series" },
+    ],
+    spine: [["raw.polymarket_history", "polymarket_prices"], ["polymarket_prices", "exposure.market_series"]],
+    curves: [],
   },
   courtlistener: {
     viewBox: "0 0 460 210",
@@ -1032,6 +1099,20 @@ const SOURCE_INFO = {
       { asset: "int_h100_runlength", count: "≈1,200 × 2", meaning: "The met flag is forward-filled onto the ~1,200-day master trading axis, for 2 tiers — this is where H100 rows explode to line up with the equity leaves." },
       { asset: "fct_h100_rental", count: "tier × day", meaning: "The H100 leaf fact — one presentation row per tier per day (value, ≤$1 flag, run flag)." },
       { asset: "exposure.h100_series", count: "1 block", meaning: "The H100 slice of the served JSON; the browser adds its met flag to the 3-of-6 count." },
+    ],
+  },
+  polymarket: {
+    blurb: "The market's own implied probability of resolving YES, from Polymarket's public CLOB API — the headline chart, plotted on the same time axis as the conditions it aggregates.",
+    options: [],
+    ambiguities: [],
+    caveats: [
+      { t: "Not a condition", d: "This is the market's price, not one of the six resolution conditions. It reflects traders' collective view, which can lead, lag, or diverge from the underlying data — useful context, not an input to the 3-of-6 count." },
+      { t: "Starts at market open", d: "History only exists from 2025-11-20 (when the market opened), so on the shared axis the line is empty before then. Full history is re-fetchable each run; a committed CSV is kept as a fallback." },
+    ],
+    cardinality: [
+      { asset: "raw.polymarket_history", count: "1 doc", meaning: "One JSON document — the full daily price history since the market opened." },
+      { asset: "polymarket_prices", count: String(E_PM.count || 220), meaning: "One row per UTC date (last price of the day)." },
+      { asset: "exposure.market_series", count: "1 block", meaning: "Aligned to the shared axis (null before open) and served as the headline chart." },
     ],
   },
   courtlistener: {

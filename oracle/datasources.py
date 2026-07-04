@@ -132,12 +132,24 @@ def build_payload(conn):
         "rowsAll": conn.execute("SELECT COUNT(*) n FROM h100_prices").fetchone()["n"],
     }
 
+    pm_last = conn.execute(
+        "SELECT date, yes_prob FROM polymarket_prices ORDER BY date DESC LIMIT 1"
+    ).fetchone()
+    polymarket = None
+    if pm_last:
+        polymarket = {
+            "date": pm_last["date"], "yes_prob": pm_last["yes_prob"],
+            "first": conn.execute("SELECT MIN(date) d FROM polymarket_prices").fetchone()["d"],
+            "count": conn.execute("SELECT COUNT(*) n FROM polymarket_prices").fetchone()["n"],
+        }
+
     return {
         "updated": db.get_meta(conn, "last_update"),
         "prices": {"columns": _columns(conn, "prices"), "byTicker": by_ticker, "total": prices_total},
         "events": {"columns": _columns(conn, "events"), "total": events_total},
         "example": _example(conn),
         "h100": h100,
+        "polymarket": polymarket,
     }
 
 

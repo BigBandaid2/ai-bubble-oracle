@@ -47,6 +47,13 @@ CREATE TABLE IF NOT EXISTS h100_prices (
     n          INTEGER,
     PRIMARY KEY (date, index_type)
 );
+
+-- Daily YES-probability of the Polymarket market itself (the contract's own
+-- implied chance of resolving YES), one row per UTC date.
+CREATE TABLE IF NOT EXISTS polymarket_prices (
+    date     TEXT PRIMARY KEY,
+    yes_prob REAL NOT NULL
+);
 """
 
 
@@ -116,6 +123,19 @@ def load_h100(conn, index_type=None):
         "SELECT date, index_type, source, usd_hr, low, n FROM h100_prices"
         " WHERE index_type = ? ORDER BY date",
         (index_type,),
+    ).fetchall()
+
+
+def upsert_polymarket(conn, rows):
+    conn.executemany(
+        "INSERT OR REPLACE INTO polymarket_prices (date, yes_prob) VALUES (?, ?)", rows
+    )
+    conn.commit()
+
+
+def load_polymarket(conn):
+    return conn.execute(
+        "SELECT date, yes_prob FROM polymarket_prices ORDER BY date"
     ).fetchall()
 
 

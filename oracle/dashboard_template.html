@@ -70,6 +70,7 @@
   .chip.met { background: rgba(244,52,55,.14); color: var(--met); }
   .chip.not_met { background: rgba(43,174,76,.14); color: var(--notmet-text); }
   .chip.unknown { background: rgba(107,110,122,.16); color: var(--muted); }
+  .chip.market { background: rgba(0,147,253,.15); color: var(--accent); }
 
   .optchips { display: flex; gap: 6px; margin: 8px 0 2px; flex-wrap: wrap; }
   .optchip {
@@ -144,6 +145,7 @@
   .dot.met_hollow { background: transparent; border: 2px solid var(--met-strong); }
   .dot.not_met { background: var(--notmet); }
   .dot.unknown { background: transparent; border: 2px solid var(--unknown); }
+  .dot.market { background: var(--accent); }
   .slabel { flex: 1; min-width: 0; font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .sdate { color: var(--muted); font-size: 10.5px; flex-shrink: 0; text-align: right; line-height: 1.25; font-family: var(--mono); font-variant-numeric: tabular-nums; }
   .sdate .lbl { display: block; font-size: 8.5px; text-transform: uppercase; letter-spacing: .6px; font-family: var(--font); }
@@ -203,6 +205,16 @@ const $ = (s, el) => (el || document).querySelector(s);
 /* ---------------- option state ---------------- */
 
 const OPTIONS = {
+  range: {
+    label: "Date range",
+    help: "How far back every chart shows, always ending today. All graphs — including Polymarket and H100 — share this window.",
+    values: [
+      { val: "1m", t: "1 month", d: "last ~31 days" },
+      { val: "1q", t: "1 quarter", d: "last ~3 months" },
+      { val: "1y", t: "1 year", d: "last 12 months" },
+      { val: "3y", t: "3 years", d: "last 36 months" },
+    ],
+  },
   basis: {
     label: "All-time-high basis",
     help: "The rules say “all-time high” but not whether it means the highest close or the highest intraday price. Intraday triggers more easily.",
@@ -221,7 +233,7 @@ const OPTIONS = {
   },
 };
 // window is fixed to the clarified rolling-90-day rule (no longer a toggle).
-const state = { basis: "close", window: "trailing", h100index: "neocloud" };
+const state = { range: "1y", basis: "close", window: "trailing", h100index: "neocloud" };
 const OPT_TEXT = {
   basis: { close: "End-of-day ATH", intraday: "Intraday ATH" },
   h100index: { neocloud: "Neocloud", hyperscaler: "Hyperscaler" },
@@ -236,6 +248,16 @@ const LAST = N - 1;
 const DISP = DATA.displayStart;
 const WINMS = DATA.windowDays * 86400000;
 const strToArr = s => Uint8Array.from(s, c => c === "1" ? 1 : 0);
+
+// Visible x-window: the date-range option, ending today. All charts share it.
+const RANGE_DAYS = { "1m": 31, "1q": 92, "1y": 365, "3y": 1096 };
+let SLICE = DISP;
+function sliceStart() {
+  const cutoff = AXT[LAST] - RANGE_DAYS[state.range] * 86400000;
+  let i = 0;
+  while (i < LAST && AXT[i] < cutoff) i++;
+  return i;
+}
 const daysBetween = (a, b) => Math.round((Date.parse(b + "T00:00:00Z") - Date.parse(a + "T00:00:00Z")) / 86400000);
 
 function trailingArr(inst) {
@@ -440,9 +462,33 @@ function chartLegend(node) {
   return el;
 }
 
+function marketCard() {
+  const m = DATA.market;
+  const sec = document.createElement("section");
+  sec.className = "chartcard"; sec.id = "card-market_price";
+  const cur = m.current != null ? (m.current * 100).toFixed(0) + "%" : "–";
+  const h = document.createElement("h2");
+  h.innerHTML = `${m.label} <span class="chip market">${cur} YES</span> <span class="depthtag">the market's own price</span>`;
+  sec.appendChild(h);
+  const meta = document.createElement("div");
+  meta.className = "meta";
+  meta.innerHTML = `Polymarket's implied chance this market resolves YES, over time (from ${m.start}). ` +
+    `Not one of the six conditions — shown for context, on the same time axis.`;
+  sec.appendChild(meta);
+  const c = document.createElement("canvas");
+  sec.appendChild(c);
+  requestAnimationFrame(() => drawMarket(c, m));
+  const leg = document.createElement("div");
+  leg.className = "legend";
+  leg.innerHTML = `<span><i style="background:var(--price)"></i>YES probability</span>`;
+  sec.appendChild(leg);
+  return sec;
+}
+
 function renderCards() {
   const grid = $("#cardgrid");
   grid.innerHTML = "";
+  if (DATA.market) grid.appendChild(marketCard());
   (function walk(node, depth, parentLabel) {
     grid.appendChild(nodeCard(node, depth, parentLabel));
     orderedChildren(node).forEach(c => walk(c, depth + 1, node.label));
@@ -538,14 +584,15 @@ function stepline(ctx, arr, n, w, y2px, color, width) {
 function drawPrice(canvas, res) {
   const node = res.node;
   const { ctx, w, h } = setupCanvas(canvas);
-  const dates = AX.slice(DISP);
-  const close = node.px.slice(DISP);
-  const ath = node.bases[state.basis].ath.slice(DISP);
-  const trig = node.bases[state.basis].trigger.slice(DISP);
-  const inst = Array.from(res.inst).slice(DISP);
-  const met = Array.from(res.met).slice(DISP);
+  const dates = AX.slice(SLICE);
+  const close = node.px.slice(SLICE);
+  const ath = node.bases[state.basis].ath.slice(SLICE);
+  const trig = node.bases[state.basis].trigger.slice(SLICE);
+  const inst = Array.from(res.inst).slice(SLICE);
+  const met = Array.from(res.met).slice(SLICE);
   const n = dates.length;
   const nums = close.concat(ath, trig).filter(v => v != null);
+  if (!nums.length) return;
   const yMin = Math.min(...nums) * 0.95, yMax = Math.max(...nums) * 1.03;
   const y2px = drawFrame(ctx, w, h, dates, yMin, yMax, v => "$" + fmt$(v));
   if (state.window === "trailing")
@@ -560,10 +607,10 @@ function drawPrice(canvas, res) {
 function drawCount(canvas, res) {
   const node = res.node;
   const { ctx, w, h } = setupCanvas(canvas);
-  const dates = AX.slice(DISP);
-  const count = Array.from(res.count).slice(DISP);
-  const countInst = Array.from(res.countInst).slice(DISP);
-  const met = Array.from(res.met).slice(DISP);
+  const dates = AX.slice(SLICE);
+  const count = Array.from(res.count).slice(SLICE);
+  const countInst = Array.from(res.countInst).slice(SLICE);
+  const met = Array.from(res.met).slice(SLICE);
   const n = dates.length;
   const yMax = Math.max(res.total, node.minMet) + 0.5;
   const y2px = drawFrame(ctx, w, h, dates, 0, yMax, v => Number.isInteger(v) ? String(v) : "");
@@ -581,25 +628,33 @@ function drawCount(canvas, res) {
 function drawRental(canvas, res) {
   const node = res.node;
   const { ctx, w, h } = setupCanvas(canvas);
-  // The rental series has its own (sparse) dates, not the master stock axis.
-  const dates = res.tier.chartDates, vals = res.tier.chartValues, metN = res.tier.chartMet;
+  // Aligned to the shared master axis; null (empty) before the first reading.
+  const dates = AX.slice(SLICE);
+  const vals = res.tier.values.slice(SLICE);
+  const met = Array.from(res.met).slice(SLICE);
   const n = dates.length;
-  const nums = vals.concat([node.threshold]).filter(v => v != null);
+  const nums = vals.filter(v => v != null).concat([node.threshold]);
+  if (!nums.length) return;
   const yMax = Math.max(...nums) * 1.15;
   const y2px = drawFrame(ctx, w, h, dates, 0, yMax, v => "$" + v.toFixed(2));
-  shade(ctx, w, h, metN, n, "rgba(244,52,55,.24)");
+  shade(ctx, w, h, met, n, "rgba(244,52,55,.24)");
   const css = getComputedStyle(document.documentElement);
-  // trigger line at the $1.00 threshold
   ctx.strokeStyle = css.getPropertyValue("--trigger"); ctx.lineWidth = 1.2; ctx.setLineDash([2, 3]);
   ctx.beginPath(); ctx.moveTo(PAD.l, y2px(node.threshold)); ctx.lineTo(w - PAD.r, y2px(node.threshold)); ctx.stroke();
   ctx.setLineDash([]);
-  // value line + a marker per reading (points are sparse, so show them)
   polyline(ctx, vals, n, w, y2px, css.getPropertyValue("--price"), 1.6);
-  ctx.fillStyle = css.getPropertyValue("--price");
-  vals.forEach((v, i) => {
-    if (v == null) return;
-    ctx.beginPath(); ctx.arc(xScale(i, n, w), y2px(v), 2.6, 0, 6.2832); ctx.fill();
-  });
+}
+
+function drawMarket(canvas, m) {
+  const { ctx, w, h } = setupCanvas(canvas);
+  const dates = AX.slice(SLICE);
+  const prob = m.prob.slice(SLICE).map(v => v == null ? null : v * 100);
+  const n = dates.length;
+  const nums = prob.filter(v => v != null);
+  if (!nums.length) return;
+  const yMax = Math.min(100, Math.max(...nums) * 1.25);
+  const y2px = drawFrame(ctx, w, h, dates, 0, Math.max(yMax, 5), v => v.toFixed(0) + "%");
+  polyline(ctx, prob, n, w, y2px, getComputedStyle(document.documentElement).getPropertyValue("--price"), 1.8);
 }
 
 /* ---------------- sidebar: options ---------------- */
@@ -607,7 +662,7 @@ function drawRental(canvas, res) {
 function renderOptions() {
   const host = $("#options");
   host.innerHTML = "";
-  for (const key of ["basis", "h100index"]) {
+  for (const key of ["range", "basis", "h100index"]) {
     const cfg = OPTIONS[key];
     const g = document.createElement("div");
     g.className = "optgroup";
@@ -691,9 +746,30 @@ function sidebarNode(node) {
   return wrap;
 }
 
+function marketSidebar() {
+  const m = DATA.market;
+  const wrap = document.createElement("div");
+  wrap.className = "snode";
+  const row = document.createElement("div");
+  row.className = "srow";
+  const cur = m.current != null ? (m.current * 100).toFixed(0) + "%" : "–";
+  row.innerHTML = `<span class="caret leafpad"></span><span class="dot market"></span>` +
+    `<span class="slabel">Market probability</span>` +
+    `<span class="sdate"><span class="lbl">YES now</span>${cur}</span>`;
+  row.addEventListener("click", () => {
+    const card = document.getElementById("card-market_price");
+    card.scrollIntoView({ behavior: "smooth", block: "start" });
+    card.classList.remove("flash");
+    requestAnimationFrame(() => card.classList.add("flash"));
+  });
+  wrap.appendChild(row);
+  return wrap;
+}
+
 function renderSidebarTree() {
   const host = $("#tree");
   host.innerHTML = "";
+  if (DATA.market) host.appendChild(marketSidebar());
   host.appendChild(sidebarNode(DATA.tree));
 }
 
@@ -702,12 +778,14 @@ function renderSidebarTree() {
 function rerender() {
   const main = document.getElementById("charts");
   const y = main.scrollTop;
+  SLICE = sliceStart();
   computeAll();
   renderOptions();
   renderCards();
   renderSidebarTree();
   main.scrollTop = y;
 }
+SLICE = sliceStart();
 computeAll();
 renderOptions();
 renderCards();
