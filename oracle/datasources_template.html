@@ -803,12 +803,12 @@ const ASSETS = [
     dagster: "recap/gdelt_news", dbt: "source('gdelt','timelinevol')",
     grain: "one timeline document per (entity, refresh)",
     why: "The news half of the bankruptcy-buzz coefficient — how loud the bankruptcy narrative is, daily, back to 2022.",
-    desc: "GDELT's free DOC API in timelinevol mode: the share of ALL global news coverage where a distress term appears WITHIN ~30 words of the entity name, per day. The proximity operator (near30) is deliberate — plain co-occurrence matched digest pages that mention the entity in one bullet and an unrelated bankruptcy in another; requiring nearness kills that noise. Backfilled from 2022, refreshed on a rolling 3-month window. Keyless; 1 request / 5 s.",
+    desc: "GDELT's free DOC API in timelinevol mode: the share of ALL global news coverage where a financial-distress term appears WITHIN ~30 words of the entity name, per day. The proximity operator (near30) is deliberate — plain co-occurrence matched digest pages that mention the entity in one bullet and an unrelated bankruptcy in another; requiring nearness kills that noise. The distress vocabulary is broad (bankruptcy, insolvency, losses, layoffs, restructuring, bailout, cash-strapped…) so real trouble is caught early; the LLM pass downstream keeps the markers precise. Backfilled from 2022, refreshed on a rolling 3-month window. Keyless; 1 request / 5 s.",
     upstream: [],
     json: `GET api.gdeltproject.org/api/v2/doc/doc
-  ?query=(near30:"openai bankruptcy" OR near30:"openai insolvency"
-          OR near30:"openai bankrupt" OR near30:"openai insolvent"
-          OR near30:"openai liquidation")
+  ?query=(near30:"openai bankruptcy" OR near30:"openai losses"
+          OR near30:"openai layoffs" OR near30:"openai restructuring"
+          OR near30:"openai insolvency" OR … )
   &mode=timelinevol&format=json
 → { "timeline": [ { "data": [ { "date": "20231120T000000Z", "value": 0.011 }, … ] } ] }`,
     transforms: [{ tag: "extract", text: "proximity-filtered daily volume-share per entity; stored in buzz_signals, cached to data/buzz_history.csv" }],
@@ -820,7 +820,7 @@ const ASSETS = [
     dagster: "recap/int_buzz_events", dbt: "int_buzz_events",
     grain: "one row per notable news-volume spike (≤ 15 across both entities)",
     why: "The clickable news item behind each spike marker — with a relevance judgment, so co-occurrence noise is labeled, not linked.",
-    desc: "For each notable spike, up to 25 candidate articles are pulled (artlist, that day, proximity query), then the on-topic one is chosen in two stages: (1) heuristic scoring — reward a headline that names the entity and uses a distress word, penalize known aggregators and “Top Headlines” digests; (2) an LLM pass (Claude Haiku) picks the single genuinely-on-topic headline or answers NONE. NONE (or a weak heuristic) sets related=0, and the marker/legend render muted and unlinked. Cached in data/buzz_events.csv; only new spikes trigger a fetch.",
+    desc: "For each notable spike, up to 25 candidate articles are pulled (artlist, that day, proximity query), then the on-topic one is chosen in two stages: (1) heuristic scoring — reward a headline that names the entity and uses a distress word, penalize known aggregators and “Top Headlines” digests; (2) an LLM pass (Claude Haiku) picks the single headline genuinely about the entity's own financial trouble — losses, cash burn, funding difficulty, layoffs, restructuring, or bankruptcy risk — or answers NONE (rejecting passing mentions, purely positive news, and unrelated bankruptcies). NONE (or a weak heuristic) sets related=0, and the marker/legend render muted and unlinked. Cached in data/buzz_events.csv; only new spikes trigger a fetch.",
     upstream: ["raw.gdelt_news"],
     schema: [
       { col: "entity", type: "STRING", kind: "key", ex: "OpenAI" },

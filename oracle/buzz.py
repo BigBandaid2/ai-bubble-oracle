@@ -43,8 +43,9 @@ BUZZ_META = PROJECT_DIR / "data" / "buzz_meta.json"
 NEWS_BACKFILL_START = "20220101000000"
 
 # Bump to force a one-time re-backfill + recalibration when the query changes.
-# v2: proximity operators (below) replaced loose keyword co-occurrence.
-NEWS_QUERY_VERSION = 2
+# v2: proximity operators replaced loose keyword co-occurrence.
+# v3: broadened from bankruptcy-only to general financial distress.
+NEWS_QUERY_VERSION = 3
 
 # Calibration. K_NEWS is a fallback; after each backfill an adaptive value is
 # fit to the data (see _calibrate_k) and frozen in buzz_meta.json, so the
@@ -56,12 +57,17 @@ DECAY = 0.02          # slow release: max drop per day
 DOCKET_FLOOR = 0.90   # while candidates are pending human review
 CAP = 0.99
 
-# Distress terms that must appear *near* the entity name (GDELT proximity
-# operator) — this is what kills digest-page co-occurrence: a "Top Headlines"
-# roundup with OpenAI in one bullet and a bankruptcy in another no longer
-# matches, because the two aren't within NEAR words of each other.
+# Financial-distress terms that must appear *near* the entity name (GDELT
+# proximity operator) — the nearness requirement kills digest-page
+# co-occurrence (a "Top Headlines" roundup with the entity in one bullet and an
+# unrelated bankruptcy in another no longer matches). Broadened beyond literal
+# bankruptcy to the wider distress narrative (losses, layoffs, funding
+# trouble); the LLM pass then filters markers down to genuine trouble, so the
+# net can be wide without the markers becoming noisy.
 NEAR = 30
-DISTRESS_NEAR = ("bankruptcy", "insolvency", "bankrupt", "insolvent", "liquidation")
+DISTRESS_NEAR = ("bankruptcy", "insolvency", "bankrupt", "insolvent", "liquidation",
+                 "losses", "layoffs", "unprofitable", "restructuring", "bailout",
+                 "collapse", "cash-strapped", "downturn")
 
 
 def _gdelt_query(entity):
@@ -306,7 +312,9 @@ DIGEST_MARKERS = ("top company headlines", "headlines at", "briefing", "wrap-up"
                   "week ahead", "recap", "at a glance", "in brief")
 DISTRESS_WORDS = ("bankrupt", "insolven", "chapter 11", "restructur", "liquidat",
                   "collapse", "shut down", "shutting", "wind down", "winding down",
-                  "default", "distress", "out of cash", "running out of money", "going under")
+                  "default", "distress", "out of cash", "running out of money", "going under",
+                  "losses", "loss", "layoff", "unprofitable", "cash burn", "burning cash",
+                  "down round", "funding crunch", "bailout", "cash-strapped", "struggl")
 
 
 def score_candidate(entity, c):
@@ -354,14 +362,16 @@ def classify_with_llm(entity, date, cands):
     listing = "\n".join(f"{i}. [{c.get('domain', '')}] {c.get('title', '')}"
                         for i, c in enumerate(cands))
     prompt = (
-        f"On this day there was a spike in news matching \"{entity}\" near bankruptcy-related "
-        f"terms. {entity} is the AI company. Which ONE of the headlines below, if any, is "
-        f"genuinely reporting on {entity} itself facing bankruptcy, insolvency, financial "
-        f"distress, or a serious funding/cash crisis? Ignore headlines that merely mention "
-        f"{entity} in passing next to some unrelated company's bankruptcy, and ignore news "
-        f"digests that bundle many unrelated stories. Reply with ONLY the number of the best "
-        f"headline, or the single word NONE if none are actually about {entity}'s own financial "
-        f"trouble.\n\n{listing}"
+        f"On this day there was a spike in news mentioning \"{entity}\" (the AI company) near "
+        f"financial-distress terms. Which ONE of the headlines below, if any, is genuinely "
+        f"about {entity}'s OWN financial situation in a troubling light — heavy or mounting "
+        f"losses, cash burn, funding difficulty or a down round, layoffs, restructuring, "
+        f"insolvency, or bankruptcy risk? Accept substantive coverage of {entity}'s finances "
+        f"or viability even if it is not literal bankruptcy. REJECT (answer NONE) headlines "
+        f"that only mention {entity} in passing beside some other company's trouble, that are "
+        f"purely positive (e.g. a big funding round with no distress angle), or that are news "
+        f"digests bundling unrelated stories. Reply with ONLY the number of the best headline, "
+        f"or the single word NONE.\n\n{listing}"
     )
     body = json.dumps({
         "model": LLM_MODEL, "max_tokens": 16,
@@ -417,6 +427,15 @@ def update_buzz_events(conn):
     if not all_backfilled():
         print("Buzz events: skipped (news backfill still in progress)")
         return None, None
+    # Invalidate the whole event cache when the query/classification scheme
+    # changes, so every spike is re-selected + re-classified under it (also
+    # drops rows cached before the classifier existed).
+    meta = _read_meta()
+    if meta.get("events_version") != NEWS_QUERY_VERSION:
+        cleared = db.clear_buzz_events(conn)
+        meta["events_version"] = NEWS_QUERY_VERSION
+        _write_meta(meta)
+        print(f"Buzz events: cleared {cleared} rows for query v{NEWS_QUERY_VERSION}")
     spikes, threshold = find_notable_spikes(conn)
     pruned = db.delete_buzz_events_not_in(conn, {(e, d) for e, d, _ in spikes})
     cached = {(r["entity"], r["date"]) for r in db.load_buzz_events(conn) if r["url"]}

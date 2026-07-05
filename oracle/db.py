@@ -247,6 +247,13 @@ def load_buzz_events(conn):
     ).fetchall()
 
 
+def clear_buzz_events(conn):
+    n = conn.execute("SELECT COUNT(*) c FROM buzz_events").fetchone()["c"]
+    conn.execute("DELETE FROM buzz_events")
+    conn.commit()
+    return n
+
+
 def delete_buzz_events_not_in(conn, keep):
     """Prune cached spike articles no longer among the current notable spikes.
     keep is an iterable of (entity, date) tuples."""
