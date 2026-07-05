@@ -104,6 +104,15 @@
   .ambifoot a { color: var(--accent); text-decoration: none; }
   .ambifoot a:hover { text-decoration: underline; }
 
+  /* S&P 500 key-events legend */
+  .evlegend { list-style: none; padding: 0; margin: 10px 0 0; columns: 2; column-gap: 26px; font-size: 11.5px; color: var(--muted); }
+  .evlegend li { margin: 3px 0; break-inside: avoid; display: flex; align-items: baseline; gap: 7px; }
+  .evnum { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 50%;
+    background: rgba(0,147,253,.14); color: var(--accent); font-size: 9.5px; font-weight: 700; flex-shrink: 0; align-self: center; }
+  .evlegend .evdate { color: var(--muted2); font-family: var(--mono); font-size: 10.5px; white-space: nowrap; }
+  .evmore { font-size: 11px; color: var(--muted2); margin-top: 8px; }
+  @media (max-width: 700px) { .evlegend { columns: 1; } }
+
   #cardgrid { display: grid; grid-template-columns: 1fr; gap: 16px; align-items: start; }
   /* Two graphs per row once the main area is wide enough (sidebar is 344px). */
   @media (min-width: 1240px) { #cardgrid { grid-template-columns: 1fr 1fr; } }
@@ -562,11 +571,47 @@ function metRank(node) {
   return res && statusOf(res) === "met" ? 0 : 1;
 }
 
+function sp500Card() {
+  const s = DATA.sp500;
+  const sec = document.createElement("section");
+  sec.className = "chartcard"; sec.id = "card-sp500";
+  const cur = s.current != null ? Math.round(s.current).toLocaleString() : "–";
+  const h = document.createElement("h2");
+  h.innerHTML = `S&amp;P 500 &amp; key AI-era events <span class="chip market">${cur}</span> <span class="depthtag">context</span>`;
+  sec.appendChild(h);
+  const meta = document.createElement("div");
+  meta.className = "meta";
+  meta.innerHTML = `The broad market with the era's milestones marked — context for reading the conditions below. Not part of the contract.`;
+  sec.appendChild(meta);
+  const c = document.createElement("canvas");
+  sec.appendChild(c);
+  requestAnimationFrame(() => drawSP500(c, s));
+  const visible = s.events.filter(e => e.i >= SLICE);
+  const leg = document.createElement("ol");
+  leg.className = "evlegend";
+  leg.innerHTML = visible.map(e => {
+    const n = s.events.indexOf(e) + 1;
+    const d = new Date(e.date + "T00:00:00Z");
+    const ds = d.toLocaleDateString("en-US", { month: "short", year: "2-digit", timeZone: "UTC" }).replace(" ", " ’");
+    return `<li><span class="evnum">${n}</span><span>${e.label}</span> <span class="evdate">${ds}</span></li>`;
+  }).join("");
+  sec.appendChild(leg);
+  const hidden = s.events.length - visible.length;
+  if (hidden > 0) {
+    const more = document.createElement("div");
+    more.className = "evmore";
+    more.textContent = `${hidden} earlier event${hidden === 1 ? "" : "s"} outside this range — switch Range to All.`;
+    sec.appendChild(more);
+  }
+  return sec;
+}
+
 function renderCards() {
   const grid = $("#cardgrid");
   grid.innerHTML = "";
-  // 1) Polymarket, 2) the root contract — always first.
+  // 1) Polymarket, 2) S&P 500 context, 3) the root contract — always first.
   if (DATA.market) grid.appendChild(marketCard());
+  if (DATA.sp500) grid.appendChild(sp500Card());
   const flat = [];
   (function walk(node, depth, parentLabel) {
     flat.push({ node, depth, parentLabel });
@@ -742,6 +787,39 @@ function drawMarket(canvas, m) {
   polyline(ctx, prob, n, w, y2px, getComputedStyle(document.documentElement).getPropertyValue("--price"), 1.8);
 }
 
+function drawSP500(canvas, s) {
+  const { ctx, w, h } = setupCanvas(canvas);
+  const dates = AX.slice(SLICE);
+  const close = s.close.slice(SLICE);
+  const n = dates.length;
+  const nums = close.filter(v => v != null);
+  if (!nums.length) return;
+  const yMin = Math.min(...nums) * 0.97, yMax = Math.max(...nums) * 1.05;
+  const y2px = drawFrame(ctx, w, h, dates, yMin, yMax, v => Math.round(v).toLocaleString());
+  const css = getComputedStyle(document.documentElement);
+  // event markers: dashed vertical line + numbered badge at the top.
+  // Badges that would overlap the previous one drop to a second row.
+  let lastX = -Infinity, lastY = 0;
+  s.events.forEach((e, k) => {
+    if (e.i < SLICE) return;
+    const x = xScale(e.i - SLICE, n, w);
+    const by = (x - lastX < 18 && lastY === PAD.t + 8) ? PAD.t + 26 : PAD.t + 8;
+    lastX = x; lastY = by;
+    ctx.strokeStyle = "#3a4453"; ctx.lineWidth = 1; ctx.setLineDash([3, 4]);
+    ctx.beginPath(); ctx.moveTo(x, by + 10); ctx.lineTo(x, h - PAD.b); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = "#12202e";
+    ctx.beginPath(); ctx.arc(x, by, 8, 0, 6.2832); ctx.fill();
+    ctx.strokeStyle = css.getPropertyValue("--accent"); ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(x, by, 8, 0, 6.2832); ctx.stroke();
+    ctx.fillStyle = css.getPropertyValue("--accent");
+    ctx.font = "700 9px 'Segoe UI', sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText(String(k + 1), x, by + 0.5);
+    ctx.textBaseline = "alphabetic";
+  });
+  polyline(ctx, close, n, w, y2px, css.getPropertyValue("--price"), 1.6);
+}
+
 /* ---------------- sidebar: options ---------------- */
 
 function renderOptions() {
@@ -851,10 +929,31 @@ function marketSidebar() {
   return wrap;
 }
 
+function sp500Sidebar() {
+  const s = DATA.sp500;
+  const wrap = document.createElement("div");
+  wrap.className = "snode";
+  const row = document.createElement("div");
+  row.className = "srow";
+  const cur = s.current != null ? Math.round(s.current).toLocaleString() : "–";
+  row.innerHTML = `<span class="caret leafpad"></span><span class="dot market"></span>` +
+    `<span class="slabel">S&amp;P 500 &amp; key events</span>` +
+    `<span class="sdate"><span class="lbl">now</span>${cur}</span>`;
+  row.addEventListener("click", () => {
+    const card = document.getElementById("card-sp500");
+    card.scrollIntoView({ behavior: "smooth", block: "start" });
+    card.classList.remove("flash");
+    requestAnimationFrame(() => card.classList.add("flash"));
+  });
+  wrap.appendChild(row);
+  return wrap;
+}
+
 function renderSidebarTree() {
   const host = $("#tree");
   host.innerHTML = "";
   if (DATA.market) host.appendChild(marketSidebar());
+  if (DATA.sp500) host.appendChild(sp500Sidebar());
   host.appendChild(sidebarNode(DATA.tree));
 }
 

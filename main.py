@@ -16,7 +16,7 @@ import time
 from datetime import datetime, timezone
 
 from oracle import db
-from oracle.config import TICKERS
+from oracle.config import SP500_TICKER, TICKERS
 from oracle.dashboard import write_dashboard
 from oracle.datasources import write_datasources
 from oracle.h100 import fetch_h100_proxy, SEED_POINTS, import_h100_csv, export_h100_csv
@@ -27,7 +27,8 @@ from oracle.yahoo import fetch_history, YahooError
 
 
 def cmd_update(conn):
-    for ticker in TICKERS:
+    # Condition tickers plus the S&P 500 context series (not a condition).
+    for ticker in TICKERS + [SP500_TICKER]:
         days = 90 if db.has_prices(conn, ticker) else None
         try:
             bars = fetch_history(ticker, days)

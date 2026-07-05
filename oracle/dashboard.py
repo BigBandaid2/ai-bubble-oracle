@@ -20,7 +20,7 @@ import json
 from datetime import date, datetime, timedelta, timezone
 
 from .config import (BASES, CHART_START, CONTRACT, DASHBOARD_PATH, DEADLINE,
-                     MARKET_URL, drawdown_leaves)
+                     KEY_EVENTS, MARKET_URL, SP500_TICKER, drawdown_leaves)
 from . import db
 from .tracker import compute_series
 
@@ -151,6 +151,20 @@ def _rental_json(conn, node, master):
     }
 
 
+def _sp500_json(conn, master):
+    """S&P 500 closes aligned to the master axis, plus the key-event markers."""
+    rows = db.load_prices(conn, SP500_TICKER)
+    if not rows:
+        return None
+    pairs = [(r["date"], round(r["close"], 2)) for r in rows]
+    close = _align_series(pairs, master)
+    idx = {d: i for i, d in enumerate(master)}
+    events = [{"date": d, "label": lbl, "i": idx[d]}
+              for d, lbl in KEY_EVENTS if d in idx]
+    current = next((v for v in reversed(close) if v is not None), None)
+    return {"close": close, "events": events, "current": current}
+
+
 def build_payload(conn):
     leaves = drawdown_leaves()
     leaf_recs = {}
@@ -215,6 +229,7 @@ def build_payload(conn):
         "displayStart": display_start,
         "marketUrl": MARKET_URL,
         "market": _market_json(conn, master),
+        "sp500": _sp500_json(conn, master),
         "tree": node_json(CONTRACT),
     }
 

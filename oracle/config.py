@@ -14,6 +14,25 @@ DEADLINE = "2026-12-31"
 # The Polymarket market page this oracle tracks.
 MARKET_URL = "https://polymarket.com/event/ai-bubble-burst-by"
 
+# Broad-market context series (not a condition): the S&P 500 index.
+SP500_TICKER = "^GSPC"
+
+# Key AI-era / macro events overlaid on the S&P 500 context chart.
+# Editable list: (date, short label). Keep labels tight — they render as a
+# numbered legend under the chart.
+KEY_EVENTS = [
+    ("2022-11-30", "ChatGPT released"),
+    ("2023-03-10", "SVB collapses"),
+    ("2023-05-24", "Nvidia's blowout AI guidance"),
+    ("2024-06-05", "Nvidia passes Apple at ~$3T"),
+    ("2024-08-05", "Yen carry-trade unwind"),
+    ("2025-01-27", "DeepSeek shock: NVDA −17%"),
+    ("2025-02-24", "Claude Code released"),
+    ("2025-04-02", "“Liberation Day” tariffs"),
+    ("2025-06-13", "Israel–Iran war begins"),
+    ("2025-08-07", "GPT-5 released"),
+]
+
 # The contract as a condition tree, from the Polymarket "AI bubble burst in
 # 2026?" market (condition id 0x857398c4...). Node types:
 #   drawdown — met while `ticker` closes at least `threshold` below its

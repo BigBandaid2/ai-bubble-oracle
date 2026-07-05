@@ -10,6 +10,7 @@ against quoted prices.
 import json
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
 
@@ -52,7 +53,9 @@ def fetch_history(ticker, days=None):
     """
     now = int(time.time())
     period1 = 0 if days is None else now - days * 86400
-    data = _get(CHART_URL.format(ticker=ticker, period1=period1, period2=now))
+    # quote() so index symbols like ^GSPC form a valid URL
+    data = _get(CHART_URL.format(ticker=urllib.parse.quote(ticker, safe=""),
+                                 period1=period1, period2=now))
     result = data.get("chart", {}).get("result")
     if not result:
         raise YahooError(f"empty chart result for {ticker}: {data.get('chart', {}).get('error')}")
