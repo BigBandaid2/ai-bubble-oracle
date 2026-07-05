@@ -1,16 +1,16 @@
-"""Generate datasources.html — documentation of every data source feeding the
+"""Generate datasources.html, documentation of every data source feeding the
 oracle, and the normalization pipeline that turns raw pulls into the numbers on
 the dashboard.
 
 The page is a master-detail explorer: a right sidebar lists each source and its
 ordered ETL "assets" (Dagster's term for a materialized table/view handed from
-one step to the next); the main area shows one asset in full — schema, the
+one step to the next); the main area shows one asset in full, schema, the
 transforms applied, lineage, and a concrete EXAMPLE ROW so the shape and state
 of the data at that step is legible.
 
 This module injects the live warehouse shape (real schemas, row counts) plus a
-real worked example — one ticker (SMCI) traced through every stage with actual
-numbers — so the example rows are authentic, not hand-waved.
+real worked example, one ticker (SMCI) traced through every stage with actual
+numbers, so the example rows are authentic, not hand-waved.
 """
 
 import hashlib
@@ -33,7 +33,7 @@ THRESHOLD = 0.50
 
 
 def _columns(conn, table):
-    return [{"name": r["name"], "type": r["type"] or "—"}
+    return [{"name": r["name"], "type": r["type"] or "-"}
             for r in conn.execute(f"PRAGMA table_info({table})").fetchall()]
 
 
@@ -58,7 +58,7 @@ def _example(conn):
     intra_day = _last(compute_series(rows, "intraday"))
     date = raw["date"]
     # Drawdown as a positive magnitude (fraction below the ATH); met when it
-    # reaches the threshold — same sign on both sides of the comparison.
+    # reaches the threshold, same sign on both sides of the comparison.
     dd_close = 1 - close_day["close"] / close_day["ath"]
     trigger_close = round(close_day["ath"] * (1 - THRESHOLD), 2)
     dd_intraday = 1 - close_day["close"] / intra_day["ath"]

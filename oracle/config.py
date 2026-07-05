@@ -24,9 +24,9 @@ CONFIRMED_BANKRUPTCIES = {}
 SP500_TICKER = "^GSPC"
 
 # Key AI-era / macro events overlaid on the S&P 500 context chart.
-# Editable list: (date, short label). Keep labels tight — they render as a
+# Editable list: (date, short label). Keep labels tight, they render as a
 # numbered legend under the chart.
-# (date, label, url) — url is a hand-curated article link (prefer
+# (date, label, url), url is a hand-curated article link (prefer
 # Reuters/Bloomberg/FT/The Register), or None if no solid source. Curated, not
 # automated: edit these directly.
 KEY_EVENTS = [
@@ -54,10 +54,10 @@ KEY_EVENTS = [
 
 # The contract as a condition tree, from the Polymarket "AI bubble burst in
 # 2026?" market (condition id 0x857398c4...). Node types:
-#   drawdown — met while `ticker` closes at least `threshold` below its
+#   drawdown, met while `ticker` closes at least `threshold` below its
 #              running all-time closing high
-#   count    — met while at least `min_met` of its children are met
-#   manual   — no automated data source yet (Phase 3/4); status is unknown
+#   count, met while at least `min_met` of its children are met
+#   manual, no automated data source yet (Phase 3/4); status is unknown
 # Any node may nest count-parents to arbitrary depth.
 CONTRACT = {
     "key": "ai_bubble_2026",
@@ -100,7 +100,7 @@ CONTRACT = {
             "threshold": 1.00,   # met while the index is at or below this ($/GPU/hr)
             "days": 5,           # ... for this many consecutive readings
             "note": "Proxy: Vast.ai verified on-demand H100 SXM median. Authoritative "
-                    "index (SiliconData SDH100RT) is Bloomberg/enterprise — future plan.",
+                    "index (SiliconData SDH100RT) is Bloomberg/enterprise, future plan.",
         },
         {
             "key": "supplier_down_50",

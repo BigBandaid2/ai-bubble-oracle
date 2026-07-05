@@ -35,7 +35,7 @@ BUFFER_DAYS = 110
 def _calendar_spine():
     """Daily calendar dates from the buffer start through today (UTC).
 
-    Every graph — equities, H100, Polymarket — shares this one axis, so their
+    Every graph, equities, H100, Polymarket, shares this one axis, so their
     time scales line up. Equity closes forward-fill across weekends; sparse
     series (H100, Polymarket) are null before their first reading.
     """
@@ -93,7 +93,7 @@ def _rental_type_series(rows, node, master):
     values = [r["usd_hr"] for r in rows]
     sources = [r["source"] for r in rows]
 
-    # "<= threshold for `days` consecutive readings" — run length over the series.
+    # "<= threshold for `days` consecutive readings", run length over the series.
     run, met_native = 0, []
     for v in values:
         run = run + 1 if v <= node["threshold"] else 0
@@ -120,8 +120,7 @@ def _docket_json(conn, node, master, spikes=None):
 
     Ships the buzz-coefficient series (news + litigation + docket floor, with
     slow release), the candidate counts, and a met bitstring that is all-zero
-    unless the entity has a human-confirmed filing in CONFIRMED_BANKRUPTCIES —
-    neither buzz nor a scan hit ever flips it.
+    unless the entity has a human-confirmed filing in CONFIRMED_BANKRUPTCIES, neither buzz nor a scan hit ever flips it.
     """
     from .buzz import compute_buzz, get_news_k
     rows = db.load_bankruptcy(conn, node["entity"])

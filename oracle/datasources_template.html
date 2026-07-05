@@ -3,18 +3,18 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>AI Bubble Oracle — Data Sources</title>
-<meta name="description" content="How the AI Bubble Oracle turns public data into the numbers on the dashboard — every source, the processing pipeline, and the rules ambiguities.">
+<title>AI Bubble Oracle, Data Sources</title>
+<meta name="description" content="How the AI Bubble Oracle turns public data into the numbers on the dashboard, every source, the processing pipeline, and the rules ambiguities.">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="AI Bubble Oracle">
-<meta property="og:title" content="AI Bubble Oracle — Data Sources & pipeline">
+<meta property="og:title" content="AI Bubble Oracle, Data Sources & pipeline">
 <meta property="og:description" content="Every data feed and processing step behind the AI bubble scoreboard, made inspectable.">
 <meta property="og:url" content="https://ai-bubble-oracle.vercel.app/datasources.html">
 <meta property="og:image" content="https://ai-bubble-oracle.vercel.app/og-image.jpg">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="AI Bubble Oracle — Data Sources & pipeline">
+<meta name="twitter:title" content="AI Bubble Oracle, Data Sources & pipeline">
 <meta name="twitter:description" content="Every data feed and processing step behind the AI bubble scoreboard, made inspectable.">
 <meta name="twitter:image" content="https://ai-bubble-oracle.vercel.app/og-image.jpg">
 <style>
@@ -76,7 +76,7 @@
   .navitem.active { background: var(--panel); }
   .navitem.active .nlabel { color: var(--text); font-weight: 600; }
   .navitem .nlabel { flex: 1; color: var(--muted); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono); font-size: 12px; }
-  /* Uniform neutral marker — asset type is shown by name + position, not colour
+  /* Uniform neutral marker, asset type is shown by name + position, not colour
      (schema-column origin owns the colour system). */
   .ldot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; background: var(--muted2); }
   .navgroup { margin: 6px 6px 16px; }
@@ -154,7 +154,7 @@
   .note b { color: var(--text); }
   code { font-family: var(--mono); background: var(--panel2); padding: 1px 5px; border-radius: 4px; font-size: 12.5px; }
 
-  /* overview asset graph — vertical, connected, scales to width (no h-scroll) */
+  /* overview asset graph, vertical, connected, scales to width (no h-scroll) */
   svg.graph { width: 100%; max-width: 640px; height: auto; display: block; margin: 8px auto 6px; }
   .gedge { fill: none; stroke: #55606f; stroke-width: 1.4; marker-end: url(#arw); }
   .gnode { cursor: pointer; }
@@ -286,7 +286,7 @@ const ASSETS = [
     dagster: "yahoo/chart", dbt: "source('yahoo','chart')",
     grain: "one JSON document per ticker (arrays of daily bars)",
     why: "The raw pull. A Python tap GETs the chart endpoint; nothing is reshaped yet.",
-    desc: "Semi-structured JSON: parallel arrays of epoch timestamps and OHLC values under indicators.quote[0]. Split-adjusted. This is the boundary of the pipeline — everything after is normalization.",
+    desc: "Semi-structured JSON: parallel arrays of epoch timestamps and OHLC values under indicators.quote[0]. Split-adjusted. This is the boundary of the pipeline, everything after is normalization.",
     upstream: [],
     json: `{
   "chart": { "result": [ {
@@ -306,10 +306,10 @@ const ASSETS = [
   {
     id: "prices", group: "yahoo", layer: "raw", status: "live",
     name: "prices", mat: "table · incremental upsert", cadence: "daily after US close",
-    dagster: "yahoo/prices", dbt: "—  (landed by the tap)",
+    dagster: "yahoo/prices", dbt: ", (landed by the tap)",
     grain: "one row per (ticker, trading date)",
     why: "The raw arrays flattened into rows and persisted. This is what actually lives in oracle.db today.",
-    desc: "The JSON arrays are zipped into tabular rows and upserted with INSERT OR REPLACE keyed on (ticker, date) — i.e. an incremental load with unique_key=['ticker','date']. Holiday/halt padding (null close) is dropped on the way in.",
+    desc: "The JSON arrays are zipped into tabular rows and upserted with INSERT OR REPLACE keyed on (ticker, date), i.e. an incremental load with unique_key=['ticker','date']. Holiday/halt padding (null close) is dropped on the way in.",
     upstream: ["raw.yahoo_chart"],
     schema: [
       { col: "ticker", type: "TEXT", kind: "key", ex: E.ticker, note: "part of the primary key" },
@@ -321,7 +321,7 @@ const ASSETS = [
     ],
     transforms: [
       { tag: "flatten", text: "zip the parallel timestamp/OHLC arrays into rows" },
-      { tag: "incremental", text: "upsert on (ticker, date) — re-pulled bars overwrite rather than duplicate" },
+      { tag: "incremental", text: "upsert on (ticker, date), re-pulled bars overwrite rather than duplicate" },
     ],
     tests: ["unique (ticker, date)", "not_null: ticker, date, close"],
     cardinality: `${(DATA.prices.total).toLocaleString()} rows total across 7 tickers (live count from oracle.db).`,
@@ -346,7 +346,7 @@ const ASSETS = [
     ],
     transforms: [
       { tag: "rename + cast", text: "map raw fields to typed columns" },
-      { tag: "filter", text: "where close is not null — drop holiday/halt padding" },
+      { tag: "filter", text: "where close is not null, drop holiday/halt padding" },
       { tag: "dedupe", macro: "dbt_utils.deduplicate(partition_by='ticker, date', order_by='_loaded_at desc')" },
       { tag: "surrogate key", macro: "dbt_utils.generate_surrogate_key(['ticker','date'])" },
     ],
@@ -365,8 +365,8 @@ const ASSETS = [
     name: "int_prices_aths", mat: "table", cadence: "full rebuild",
     dagster: "yahoo/int_prices_aths", dbt: "int_prices_aths",
     grain: "one row per (ticker, date), enriched",
-    why: "Adds the running all-time high and drawdown — the core numbers every drawdown condition reads.",
-    desc: "A window function accumulates the all-time high per ticker (both close and intraday bases), then drawdown = 1 − price / ATH is derived — a positive magnitude for how far below the peak the price sits. This is where the raw price becomes “how far below its peak.”",
+    why: "Adds the running all-time high and drawdown, the core numbers every drawdown condition reads.",
+    desc: "A window function accumulates the all-time high per ticker (both close and intraday bases), then drawdown = 1 − price / ATH is derived, a positive magnitude for how far below the peak the price sits. This is where the raw price becomes “how far below its peak.”",
     upstream: ["stg_yahoo__prices"],
     schema: [
       { col: "price_key", type: "TEXT", kind: "key", ex: E.skey + "…" },
@@ -374,7 +374,7 @@ const ASSETS = [
       { col: "date", type: "DATE", kind: "pass", ex: E.date },
       { col: "close", type: "NUMERIC", kind: "pass", ex: E.close },
       { col: "ath_close", type: "NUMERIC", kind: "derived", ex: E.athClose, note: "max(close) over (partition by ticker order by date rows unbounded preceding)" },
-      { col: "ath_intraday", type: "NUMERIC", kind: "derived", ex: E.athIntraday, note: "max(high) over (…) — the other ATH basis" },
+      { col: "ath_intraday", type: "NUMERIC", kind: "derived", ex: E.athIntraday, note: "max(high) over (…), the other ATH basis" },
       { col: "drawdown_close", type: "NUMERIC", kind: "derived", ex: E.ddClose, note: "1 − close / ath_close  (positive = fraction below the peak)" },
     ],
     transforms: [
@@ -388,14 +388,14 @@ const ASSETS = [
   1 - close / ath_close <span class="kw">as</span> drawdown_close
 <span class="kw">from</span> <span class="fn">{{ ref('stg_yahoo__prices') }}</span>`,
     tests: ["not_null: ath_close", "dbt_utils.accepted_range: drawdown_close between 0 and 1"],
-    cardinality: "1:1 with staging — enrichment only, no fan-out yet.",
+    cardinality: "1:1 with staging, enrichment only, no fan-out yet.",
   },
   {
     id: "condition_thresholds", group: "yahoo", layer: "seed", status: "live",
     name: "condition_thresholds", mat: "seed · csv", cadence: "on change",
     dagster: "seeds/condition_thresholds", dbt: "condition_thresholds",
     grain: "one row per condition (the contract tree, as data)",
-    why: "The contract itself — which conditions exist, their thresholds, and the parent/child hierarchy. Config, not observed data.",
+    why: "The contract itself, which conditions exist, their thresholds, and the parent/child hierarchy. Config, not observed data.",
     desc: "A hand-maintained seed defining every node of the condition tree. The parent_key column makes it self-referencing, so it doubles as dim_conditions, the hierarchy dimension that fct_contract_resolution rolls up.",
     upstream: [],
     schema: [
@@ -417,7 +417,7 @@ const ASSETS = [
     dagster: "yahoo/int_condition_flags", dbt: "int_condition_flags",
     grain: "one row per (condition, basis, date)",
     why: "Turns prices into per-condition booleans, and is where the data fans out: one price row → several condition rows.",
-    desc: "Joins enriched prices to the thresholds seed on ticker (fanning each price row out to every condition that references it), unpivots the two ATH bases into a basis column, and derives the instant boolean met_instant = drawdown ≥ threshold — both positive, so the comparison reads directly (0.77 ≥ 0.50).",
+    desc: "Joins enriched prices to the thresholds seed on ticker (fanning each price row out to every condition that references it), unpivots the two ATH bases into a basis column, and derives the instant boolean met_instant = drawdown ≥ threshold, both positive, so the comparison reads directly (0.77 ≥ 0.50).",
     upstream: ["int_prices_aths", "condition_thresholds"],
     schema: [
       { col: "condition_key", type: "STRING", kind: "key", ex: E.condition },
@@ -433,7 +433,7 @@ const ASSETS = [
       { tag: "case", text: "met_instant = drawdown ≥ threshold  (both positive)" },
     ],
     tests: ["not_null: met_instant", "relationships: condition_key → condition_thresholds"],
-    cardinality: "≈ price rows × (conditions per ticker) × 2 bases — the first real fan-out.",
+    cardinality: "≈ price rows × (conditions per ticker) × 2 bases, the first real fan-out.",
   },
   {
     id: "int_condition_windows", group: "yahoo", layer: "intermediate", status: "live",
@@ -441,7 +441,7 @@ const ASSETS = [
     dagster: "yahoo/int_condition_windows", dbt: "int_condition_windows",
     grain: "one row per (condition, basis, date)",
     why: "Applies the clarified 90-day rule: a condition stays met for 90 days after it crosses.",
-    desc: "A range window computes the rolling-90-day met flag — the condition is met on any day within 90 days of a crossing. This is the interpretation fixed by the Nov 20, 2025 clarification (three events within one 90-day window). The threshold-crossing events table is derived here too, from state transitions.",
+    desc: "A range window computes the rolling-90-day met flag, the condition is met on any day within 90 days of a crossing. This is the interpretation fixed by the Nov 20, 2025 clarification (three events within one 90-day window). The threshold-crossing events table is derived here too, from state transitions.",
     upstream: ["int_condition_flags"],
     schema: [
       { col: "condition_key", type: "STRING", kind: "key", ex: E.condition },
@@ -483,7 +483,7 @@ const ASSETS = [
       { tag: "forward-fill", text: "coalesce(met, last_value(met ignore nulls) over (order by date))" },
     ],
     tests: ["not_null: met", "unique (condition_key, basis, date)"],
-    cardinality: "conditions × 2 bases × |spine days| — dense and rectangular.",
+    cardinality: "conditions × 2 bases × |spine days|, dense and rectangular.",
   },
   {
     id: "fct_condition_daily", group: "yahoo", layer: "mart", status: "live",
@@ -491,7 +491,7 @@ const ASSETS = [
     dagster: "marts/fct_condition_daily", dbt: "fct_condition_daily",
     grain: "one row per (condition_key, basis, date)",
     why: "The leaf fact the dashboard reads. One row is exactly one point on one chart under one basis setting.",
-    desc: "The presentation-ready fact for the equity-drawdown leaves: met state plus the price/ATH/trigger needed to draw each chart. The dashboard slices this by the active basis. (The H100 rental has its own parallel mart — see the H100 source.)",
+    desc: "The presentation-ready fact for the equity-drawdown leaves: met state plus the price/ATH/trigger needed to draw each chart. The dashboard slices this by the active basis. (The H100 rental has its own parallel mart, see the H100 source.)",
     upstream: ["int_conditions_aligned", "int_prices_aths"],
     schema: [
       { col: "condition_key", type: "STRING", kind: "key", ex: E.condition },
@@ -516,7 +516,7 @@ const ASSETS = [
     dagster: "marts/fct_contract_resolution", dbt: "fct_contract_resolution",
     grain: "one row per (parent condition_key, basis, date)",
     why: "The rollup: every parent (incl. the root “≥3 of 6”) resolved from how many children are met within the rolling 90-day window.",
-    desc: "A recursive rollup over dim_conditions. For each count node it sums the children's rolling-90-day met flags per day and compares to min_met. Because each child stays met for 90 days after it crosses, a parent is met when the required number of children have crossed within one 90-day span — the clarified rule. The example shows the 'supplier' parent: 1 of 5 children met (only SMCI), min_met 1 → MET.",
+    desc: "A recursive rollup over dim_conditions. For each count node it sums the children's rolling-90-day met flags per day and compares to min_met. Because each child stays met for 90 days after it crosses, a parent is met when the required number of children have crossed within one 90-day span, the clarified rule. The example shows the 'supplier' parent: 1 of 5 children met (only SMCI), min_met 1 → MET.",
     upstream: ["fct_condition_daily", "condition_thresholds"],
     schema: [
       { col: "condition_key", type: "STRING", kind: "key", ex: E.parent || "supplier_down_50" },
@@ -545,7 +545,7 @@ const ASSETS = [
     name: "exposure: ai_bubble_dashboard", mat: "exposure (JSON)", cadence: "on generate",
     dagster: "dashboard (asset check / exposure)", dbt: "exposure: ai_bubble_dashboard",
     grain: "one JSON payload embedded in dashboard.html",
-    why: "The consumer. Marts are serialized to the compact JSON the dashboard reads — reverse-ETL to a static file.",
+    why: "The consumer. Marts are serialized to the compact JSON the dashboard reads, reverse-ETL to a static file.",
     desc: "Serializes the marts to the JSON embedded in dashboard.html: a master date axis, and per-leaf bitstrings of met state for each basis. Pre-computing all toggle slices here is why the browser filters instead of recomputing.",
     upstream: ["fct_condition_daily", "fct_contract_resolution"],
     json: `{
@@ -584,7 +584,7 @@ const ASSETS = [
   {
     id: "h100_prices", group: "h100", layer: "raw", status: "live",
     name: "h100_prices", mat: "table · daily upsert", cadence: "daily",
-    dagster: "h100/h100_prices", dbt: "—  (landed by the tap)",
+    dagster: "h100/h100_prices", dbt: ", (landed by the tap)",
     grain: "one row per date",
     why: "The persisted daily index reading. This is what actually lives in oracle.db today.",
     desc: "One reading per day, upserted on date. The Vast.ai median is the proxy index; a few real SDH100RT values quoted in public SiliconData posts are seeded (source='silicondata_published') for historical context, since the proxy only accumulates going forward.",
@@ -598,7 +598,7 @@ const ASSETS = [
     ],
     transforms: [
       { tag: "aggregate", text: "usd_hr = median(dph_total / num_gpus) over the verified on-demand offers" },
-      { tag: "incremental", text: "upsert on date — one reading per day" },
+      { tag: "incremental", text: "upsert on date, one reading per day" },
     ],
     tests: ["not_null: usd_hr", "accepted_values: source in (vast_proxy, silicondata_published)"],
     cardinality: `${H100_ROWS_ALL} readings so far (published seeds + daily proxy, both tiers, accumulating).`,
@@ -630,11 +630,11 @@ const ASSETS = [
     name: "raw.silicondata_index", mat: "feed (planned)", cadence: "daily",
     dagster: "h100/silicondata_index", dbt: "source('silicondata','sdh100rt')",
     grain: "one row per date (authoritative)",
-    why: "The ACTUAL resolution source named in the rules — replaces the proxy once access exists.",
-    desc: "SiliconData's Silicon Index SDH100RT, published via Bloomberg / Refinitiv / enterprise API. Paywalled, so deferred to a future plan. When wired, it becomes the upstream of int_h100_runlength in place of the Vast.ai proxy — same downstream logic, authoritative input.",
+    why: "The ACTUAL resolution source named in the rules, replaces the proxy once access exists.",
+    desc: "SiliconData's Silicon Index SDH100RT, published via Bloomberg / Refinitiv / enterprise API. Paywalled, so deferred to a future plan. When wired, it becomes the upstream of int_h100_runlength in place of the Vast.ai proxy, same downstream logic, authoritative input.",
     upstream: [],
     schema: [
-      { col: "date", type: "DATE", kind: "key", ex: "—" },
+      { col: "date", type: "DATE", kind: "key", ex: ", " },
       { col: "sdh100rt", type: "NUMERIC", kind: "pass", ex: "2.16", note: "published index $/hr" },
     ],
     transforms: [{ tag: "extract", text: "Bloomberg / Refinitiv / SiliconData enterprise API (requires paid access)" }],
@@ -645,8 +645,8 @@ const ASSETS = [
     name: "fct_h100_rental", mat: "table", cadence: "on rebuild",
     dagster: "marts/fct_h100_rental", dbt: "fct_h100_rental",
     grain: "one row per (index_tier, date)",
-    why: "The H100 rental's own leaf fact — the presentation-ready table the H100 chart reads. Its own columns, not the equity fact's.",
-    desc: "The H100 analogue of fct_condition_daily, but with rental-specific columns: the index value, the ≤ $1 flag, and the 5-day run flag, per tier. Distinct grain and schema from the equity mart — this is where the H100 pipeline reaches presentation.",
+    why: "The H100 rental's own leaf fact, the presentation-ready table the H100 chart reads. Its own columns, not the equity fact's.",
+    desc: "The H100 analogue of fct_condition_daily, but with rental-specific columns: the index value, the ≤ $1 flag, and the 5-day run flag, per tier. Distinct grain and schema from the equity mart, this is where the H100 pipeline reaches presentation.",
     upstream: ["int_h100_runlength"],
     schema: [
       { col: "index_tier", type: "STRING", kind: "key", ex: "neocloud", note: "neocloud | hyperscaler" },
@@ -668,7 +668,7 @@ const ASSETS = [
     name: "exposure: h100_series", mat: "exposure (JSON)", cadence: "on generate",
     dagster: "dashboard (h100 slice)", dbt: "exposure: h100_series",
     grain: "the H100 block embedded in dashboard.html",
-    why: "The H100 pipeline's own conclusion — its slice of the served payload, from which the browser draws the chart and adds the met flag to the 3-of-6 count.",
+    why: "The H100 pipeline's own conclusion, its slice of the served payload, from which the browser draws the chart and adds the met flag to the 3-of-6 count.",
     desc: "The H100 analogue of exposure.dashboard: both tiers' sparse series plus the master-aligned met bitstring, serialized into the dashboard JSON. The browser combines this slice with the equity leaves' slices to compute the contract count client-side.",
     upstream: ["fct_h100_rental"],
     json: `"h100_rental_dollar": {
@@ -690,7 +690,7 @@ const ASSETS = [
     name: "raw.polymarket_history", mat: "API response (JSON)", cadence: "daily",
     dagster: "polymarket/history", dbt: "source('polymarket','prices_history')",
     grain: "one JSON document (array of timestamped prices)",
-    why: "The market's own implied probability — the headline chart, plotted alongside the conditions it aggregates.",
+    why: "The market's own implied probability, the headline chart, plotted alongside the conditions it aggregates.",
     desc: "Polymarket's public CLOB prices-history endpoint for the YES token of “AI bubble burst in 2026?”. interval=max returns the full history since the market opened (2025-11-20), fidelity=1440 gives daily resolution.",
     upstream: [],
     json: `GET clob.polymarket.com/prices-history
@@ -703,7 +703,7 @@ const ASSETS = [
   {
     id: "polymarket_prices", group: "polymarket", layer: "raw", status: "live",
     name: "polymarket_prices", mat: "table · daily upsert", cadence: "daily",
-    dagster: "polymarket/polymarket_prices", dbt: "—  (landed by the tap)",
+    dagster: "polymarket/polymarket_prices", dbt: ", (landed by the tap)",
     grain: "one row per UTC date",
     why: "The persisted daily probability series. Re-fetchable, but cached in a committed CSV so a stalled API doesn't blank the chart.",
     desc: "The daily YES-probability of the contract resolving true. Falls from ~42% at open (Nov 2025) toward the mid-teens as conditions failed to trigger.",
@@ -725,7 +725,7 @@ const ASSETS = [
     dagster: "dashboard (market slice)", dbt: "exposure: market_series",
     grain: "the market block in dashboard.html",
     why: "Serves the probability line, aligned to the shared calendar axis (null before the market opened).",
-    desc: "The daily probabilities are aligned onto the same master date axis as every other chart — null before 2025-11-21, so the line simply starts where the market did. Rendered as the headline card above the conditions.",
+    desc: "The daily probabilities are aligned onto the same master date axis as every other chart, null before 2025-11-21, so the line simply starts where the market did. Rendered as the headline card above the conditions.",
     upstream: ["polymarket_prices"],
     json: `"market": {
   "type": "market", "label": "Polymarket implied probability (YES)",
@@ -757,10 +757,10 @@ const ASSETS = [
   {
     id: "bankruptcy_checks", group: "courtlistener", layer: "raw", status: "live",
     name: "bankruptcy_checks", mat: "table · daily upsert", cadence: "daily",
-    dagster: "recap/bankruptcy_checks", dbt: "—  (landed by the tap)",
+    dagster: "recap/bankruptcy_checks", dbt: ", (landed by the tap)",
     grain: "one row per (date, entity)",
-    why: "The persisted daily scan result — candidate counts per entity, accumulating a monitoring history.",
-    desc: "Candidates = Chapter 7/11 dockets whose case name actually contains the entity name. The exact-substring gate matters: the search engine stems, so a personal Chapter 7 by one “Chad Michael Anthrop” matches the Anthropic query — and is filtered out here.",
+    why: "The persisted daily scan result, candidate counts per entity, accumulating a monitoring history.",
+    desc: "Candidates = Chapter 7/11 dockets whose case name actually contains the entity name. The exact-substring gate matters: the search engine stems, so a personal Chapter 7 by one “Chad Michael Anthrop” matches the Anthropic query, and is filtered out here.",
     upstream: ["raw.courtlistener_search"],
     schema: [
       { col: "date", type: "TEXT", kind: "key", ex: E_BK.lastChecked || "2026-07-05" },
@@ -769,7 +769,7 @@ const ASSETS = [
     ],
     transforms: [
       { tag: "filter", text: "chapter ∈ {7, 11} (from the fielded query)" },
-      { tag: "entity match", text: "case name must contain the entity as an exact substring — removes stemming noise" },
+      { tag: "entity match", text: "case name must contain the entity as an exact substring, removes stemming noise" },
       { tag: "incremental", text: "upsert on (date, entity); cached to data/bankruptcy_history.csv" },
     ],
     tests: ["not_null: candidates", "accepted_values: entity in (OpenAI, Anthropic)"],
@@ -780,8 +780,8 @@ const ASSETS = [
     name: "int_bankruptcy_state", mat: "table", cadence: "on rebuild",
     dagster: "recap/int_bankruptcy_state", dbt: "int_bankruptcy_state",
     grain: "one row per (entity, master-axis date)",
-    why: "Applies the HUMAN-CONFIRM GATE — the reason a scan hit can never flip the condition by itself.",
-    desc: "A candidate docket (subsidiary, adversary proceeding, name collision) needs a human read. The met flag comes only from CONFIRMED_BANKRUPTCIES in config — set after review — and is then aligned to the master date axis from the confirmed filing date onward. Candidates are surfaced on the dashboard so a nonzero day is impossible to miss.",
+    why: "Applies the HUMAN-CONFIRM GATE, the reason a scan hit can never flip the condition by itself.",
+    desc: "A candidate docket (subsidiary, adversary proceeding, name collision) needs a human read. The met flag comes only from CONFIRMED_BANKRUPTCIES in config, set after review, and is then aligned to the master date axis from the confirmed filing date onward. Candidates are surfaced on the dashboard so a nonzero day is impossible to miss.",
     upstream: ["bankruptcy_checks"],
     schema: [
       { col: "entity", type: "STRING", kind: "key", ex: "OpenAI" },
@@ -802,8 +802,8 @@ const ASSETS = [
     name: "raw.gdelt_news", mat: "API response (JSON)", cadence: "daily · backfilled from 2022",
     dagster: "recap/gdelt_news", dbt: "source('gdelt','timelinevol')",
     grain: "one timeline document per (entity, refresh)",
-    why: "The news half of the bankruptcy-buzz coefficient — how loud the bankruptcy narrative is, daily, back to 2022.",
-    desc: "GDELT's free DOC API in timelinevol mode: the share of ALL global news coverage where a financial-distress term appears WITHIN ~30 words of the entity name, per day. The proximity operator (near30) is deliberate — plain co-occurrence matched digest pages that mention the entity in one bullet and an unrelated bankruptcy in another; requiring nearness kills that noise. The distress vocabulary is broad (bankruptcy, insolvency, losses, layoffs, restructuring, bailout, cash-strapped…) so real trouble is caught early; the LLM pass downstream keeps the markers precise. Backfilled from 2022, refreshed on a rolling 3-month window. Keyless; 1 request / 5 s.",
+    why: "The news half of the bankruptcy-buzz coefficient, how loud the bankruptcy narrative is, daily, back to 2022.",
+    desc: "GDELT's free DOC API in timelinevol mode: the share of ALL global news coverage where a financial-distress term appears WITHIN ~30 words of the entity name, per day. The proximity operator (near30) is deliberate, plain co-occurrence matched digest pages that mention the entity in one bullet and an unrelated bankruptcy in another; requiring nearness kills that noise. The distress vocabulary is broad (bankruptcy, insolvency, losses, layoffs, restructuring, bailout, cash-strapped…) so real trouble is caught early; the LLM pass downstream keeps the markers precise. Backfilled from 2022, refreshed on a rolling 3-month window. Keyless; 1 request / 5 s.",
     upstream: [],
     json: `GET api.gdeltproject.org/api/v2/doc/doc
   ?query=(near30:"openai bankruptcy" OR near30:"openai losses"
@@ -819,8 +819,8 @@ const ASSETS = [
     name: "int_buzz_events", mat: "table · cached per spike", cadence: "on new spike",
     dagster: "recap/int_buzz_events", dbt: "int_buzz_events",
     grain: "one row per notable news-volume spike (≤ 15 across both entities)",
-    why: "The clickable news item behind each spike marker — with a relevance judgment, so co-occurrence noise is labeled, not linked.",
-    desc: "For each notable spike, up to 25 candidate articles are pulled (artlist, that day, proximity query), then the on-topic one is chosen in two stages: (1) heuristic scoring — reward a headline that names the entity and uses a distress word, penalize known aggregators and “Top Headlines” digests; (2) an LLM pass (Claude Haiku) picks the single headline genuinely about the entity's own financial trouble — losses, cash burn, funding difficulty, layoffs, restructuring, or bankruptcy risk — or answers NONE (rejecting passing mentions, purely positive news, and unrelated bankruptcies). NONE (or a weak heuristic) sets related=0, and the marker/legend render muted and unlinked. Cached in data/buzz_events.csv; only new spikes trigger a fetch.",
+    why: "The clickable news item behind each spike marker, with a relevance judgment, so co-occurrence noise is labeled, not linked.",
+    desc: "For each notable spike, up to 25 candidate articles are pulled (artlist, that day, proximity query), then the on-topic one is chosen in two stages: (1) heuristic scoring, reward a headline that names the entity and uses a distress word, penalize known aggregators and “Top Headlines” digests; (2) an LLM pass (Claude Haiku) picks the single headline genuinely about the entity's own financial trouble, losses, cash burn, funding difficulty, layoffs, restructuring, or bankruptcy risk, or answers NONE (rejecting passing mentions, purely positive news, and unrelated bankruptcies). NONE (or a weak heuristic) sets related=0, and the marker/legend render muted and unlinked. Cached in data/buzz_events.csv; only new spikes trigger a fetch.",
     upstream: ["raw.gdelt_news"],
     schema: [
       { col: "entity", type: "STRING", kind: "key", ex: "OpenAI" },
@@ -842,8 +842,8 @@ const ASSETS = [
     name: "int_bankruptcy_buzz", mat: "computed at generation", cadence: "on rebuild",
     dagster: "recap/int_bankruptcy_buzz", dbt: "int_bankruptcy_buzz",
     grain: "one buzz value per (entity, master-axis date)",
-    why: "The 0–1 “bankruptcy buzz” coefficient that makes the charts informative between filings — capped at 0.99 unless a human confirms.",
-    desc: "Noisy-OR of independent evidence with a slow-release ratchet: raw = 1 − (1 − 0.70·sat(news)) · (1 − 0.10·sat(litigation)); buzz = min(0.99, max(raw, prev − 0.02/day)); floored at 0.90 while docket candidates await review; exactly 1.00 only from a human-confirmed filing date. sat(v) = v/(v+k). Calibrated on the 2022–26 backfill (calm ≈ 0.04, historical peak ≈ 0.54). Buzz is context and early warning only — it never feeds the contract count.",
+    why: "The 0–1 “bankruptcy buzz” coefficient that makes the charts informative between filings, capped at 0.99 unless a human confirms.",
+    desc: "Noisy-OR of independent evidence with a slow-release ratchet: raw = 1 − (1 − 0.70·sat(news)) · (1 − 0.10·sat(litigation)); buzz = min(0.99, max(raw, prev − 0.02/day)); floored at 0.90 while docket candidates await review; exactly 1.00 only from a human-confirmed filing date. sat(v) = v/(v+k). Calibrated on the 2022–26 backfill (calm ≈ 0.04, historical peak ≈ 0.54). Buzz is context and early warning only, it never feeds the contract count.",
     upstream: ["raw.gdelt_news", "bankruptcy_checks", "int_bankruptcy_state"],
     schema: [
       { col: "entity", type: "STRING", kind: "key", ex: "OpenAI" },
@@ -858,14 +858,14 @@ const ASSETS = [
       { tag: "human gate", text: "0.90–0.99 = docket pending review; 1.00 requires config confirmation" },
     ],
     tests: ["dbt_utils.accepted_range: buzz ∈ [0, 1]", "buzz = 1.0 only where confirmed"],
-    cardinality: "2 entities × master-axis days from 2022 — the series behind each bankruptcy chart.",
+    cardinality: "2 entities × master-axis days from 2022, the series behind each bankruptcy chart.",
   },
   {
     id: "exposure.bankruptcy_state", group: "courtlistener", layer: "serve", status: "live",
     name: "exposure: bankruptcy_state", mat: "exposure (JSON)", cadence: "on generate",
     dagster: "dashboard (bankruptcy slice)", dbt: "exposure: bankruptcy_state",
     grain: "one block per entity in dashboard.html",
-    why: "The bankruptcy pipeline's conclusion — its slice of the served payload, feeding the 1-of-2 parent and the 3-of-6 root.",
+    why: "The bankruptcy pipeline's conclusion, its slice of the served payload, feeding the 1-of-2 parent and the 3-of-6 root.",
     desc: "Per entity: the buzz-coefficient series (drawn as the chart line), the notable-spike markers with their selected articles, the candidate counts, and the confirmed-met bitstring, master-aligned. The browser counts the met flag into the contract exactly like the equity and H100 leaves; buzz and spikes are display-only.",
     upstream: ["int_bankruptcy_state", "int_bankruptcy_buzz", "int_buzz_events"],
     json: `"openai_bankruptcy": {
@@ -883,14 +883,14 @@ const ASSETS = [
   {
     id: "news_articles", group: "gdelt", layer: "raw", status: "planned",
     name: "news_articles", mat: "table (planned)", cadence: "15-min poll",
-    dagster: "gdelt/news_articles", dbt: "—",
+    dagster: "gdelt/news_articles", dbt: ", ",
     grain: "one row per article URL",
-    why: "Feeds “OpenAI is acquired” — no structured source exists, so this is news + LLM classification.",
+    why: "Feeds “OpenAI is acquired”, no structured source exists, so this is news + LLM classification.",
     desc: "GDELT 2.0 Doc API plus curated RSS.",
     upstream: [],
     schema: [
       { col: "url", type: "STRING", kind: "key", ex: "https://…" },
-      { col: "seendate", type: "TIMESTAMP", kind: "pass", ex: "—" },
+      { col: "seendate", type: "TIMESTAMP", kind: "pass", ex: ", " },
       { col: "title", type: "STRING", kind: "pass", ex: "…" },
       { col: "domain", type: "STRING", kind: "pass", ex: "reuters.com" },
     ],
@@ -906,7 +906,7 @@ const ASSETS = [
     desc: "Dedupe by URL, run an LLM classifier (a dbt Python model / external UDF), then aggregate to a daily consensus signal with a human-confirm gate.",
     upstream: ["news_articles"],
     schema: [
-      { col: "date", type: "DATE", kind: "key", ex: "—" },
+      { col: "date", type: "DATE", kind: "key", ex: ", " },
       { col: "signal", type: "NUMERIC", kind: "derived", ex: "0.0", note: "consensus above confidence threshold" },
       { col: "met", type: "BOOLEAN", kind: "derived", ex: "0" },
     ],
@@ -1105,7 +1105,7 @@ function renderNav() {
   });
 }
 
-/* Option toggles live in the slide-out drawer — the options are explained on
+/* Option toggles live in the slide-out drawer, the options are explained on
    these pages, and they re-render the reactive worked examples. */
 const OPTIONS = {
   basis: { label: "All-time-high basis", values: [
@@ -1153,7 +1153,7 @@ function schemaTable(a) {
 }
 
 function detailHtml(a) {
-  const up = (a.upstream && a.upstream.length) ? a.upstream.map(id => pill(id)).join("") : `<span class="pill none">source — no inputs</span>`;
+  const up = (a.upstream && a.upstream.length) ? a.upstream.map(id => pill(id)).join("") : `<span class="pill none">source, no inputs</span>`;
   const down = (DOWNSTREAM[a.id] || []);
   const downHtml = down.length ? down.map(id => pill(id)).join("") : `<span class="pill none">terminal</span>`;
   const statusCls = a.status === "live" ? "st live" : "st planned";
@@ -1204,7 +1204,7 @@ function detailHtml(a) {
 const H100_ROWS = H100_ROWS_ALL;
 const SOURCE_INFO = {
   yahoo: {
-    blurb: "Split-adjusted daily prices from Yahoo Finance drive the four equity-drawdown conditions — NVIDIA, the SOXX semiconductor ETF, and any of the five hardware suppliers falling far enough from their all-time highs.",
+    blurb: "Split-adjusted daily prices from Yahoo Finance drive the four equity-drawdown conditions, NVIDIA, the SOXX semiconductor ETF, and any of the five hardware suppliers falling far enough from their all-time highs.",
     options: [
       { t: "All-time-high basis", d: "End-of-day vs. intraday. Sets which peak a drawdown is measured from; intraday highs are higher, so they trigger more easily." },
     ],
@@ -1220,65 +1220,65 @@ const SOURCE_INFO = {
       { t: "Drawdown sign", d: "Stored as a positive magnitude (1 − price/ATH); a condition is met when it reaches the threshold." },
     ],
     cardinality: [
-      { asset: "prices", count: "≈" + DATA.prices.total.toLocaleString(), meaning: "One row per (ticker, trading day) across the 7 tickers — the raw input volume." },
+      { asset: "prices", count: "≈" + DATA.prices.total.toLocaleString(), meaning: "One row per (ticker, trading day) across the 7 tickers, the raw input volume." },
       { asset: "int_condition_flags", count: "× conditions", meaning: "The join to the thresholds seed fans each price row out to every condition that uses that ticker (a ticker used by two conditions doubles its rows)." },
-      { asset: "int_condition_windows", count: "1:1", meaning: "Adds the rolling-90-day met flag — a condition stays met for 90 days after it crosses. No fan-out." },
-      { asset: "int_conditions_aligned", count: "widest", meaning: "conditions × 2 bases × spine days — forward-filled onto a gap-free calendar. The widest point in the pipeline." },
-      { asset: "fct_contract_resolution", count: "rollup ↓", meaning: "Parents aggregate children to one row per parent per day (the 3-of-6 count) — rows collapse." },
+      { asset: "int_condition_windows", count: "1:1", meaning: "Adds the rolling-90-day met flag, a condition stays met for 90 days after it crosses. No fan-out." },
+      { asset: "int_conditions_aligned", count: "widest", meaning: "conditions × 2 bases × spine days, forward-filled onto a gap-free calendar. The widest point in the pipeline." },
+      { asset: "fct_contract_resolution", count: "rollup ↓", meaning: "Parents aggregate children to one row per parent per day (the 3-of-6 count), rows collapse." },
       { asset: "exposure.dashboard", count: "1 doc", meaning: "Everything collapses to a single JSON embedded in dashboard.html." },
     ],
   },
   h100: {
-    blurb: "The H100 rental condition (index ≤ $1.00/hr for five straight days) resolves on SiliconData's index, which is paywalled — so this source is a free public approximation.",
+    blurb: "The H100 rental condition (index ≤ $1.00/hr for five straight days) resolves on SiliconData's index, which is paywalled, so this source is a free public approximation.",
     options: [
-      { t: "Index tier — Neocloud vs. Hyperscaler", d: "SiliconData publishes two H100 indices and the rules name neither. <b>Neocloud (SDH100RT)</b> is the spot-like marketplace tier — neoclouds and providers like Vast.ai selling on-demand capacity; competitive, price-sensitive, ~$2/hr, and volatile (>20× the hyperscaler's daily variation). It's what our Vast.ai proxy measures. <b>Hyperscaler</b> is AWS/GCP/Azure/Oracle capacity priced via committed-use discounts, multi-year deals, and reserved instances — a ~3× premium (~$7.5/hr) and very stable (0.47% coefficient of variation). Because they differ ~3×, the choice is material: a fall to $1 is a plausible ~50% crash against neocloud but near-impossible against hyperscaler. The $1.00 trigger only makes sense for neocloud, which is the default." },
+      { t: "Index tier, Neocloud vs. Hyperscaler", d: "SiliconData publishes two H100 indices and the rules name neither. <b>Neocloud (SDH100RT)</b> is the spot-like marketplace tier, neoclouds and providers like Vast.ai selling on-demand capacity; competitive, price-sensitive, ~$2/hr, and volatile (>20× the hyperscaler's daily variation). It's what our Vast.ai proxy measures. <b>Hyperscaler</b> is AWS/GCP/Azure/Oracle capacity priced via committed-use discounts, multi-year deals, and reserved instances, a ~3× premium (~$7.5/hr) and very stable (0.47% coefficient of variation). Because they differ ~3×, the choice is material: a fall to $1 is a plausible ~50% crash against neocloud but near-impossible against hyperscaler. The $1.00 trigger only makes sense for neocloud, which is the default." },
     ],
     ambiguities: [
-      { t: "Which index?", d: "Neocloud (~$2) vs. hyperscaler (~$7.5) — the tier option above. It's the dominant ambiguity here, and it swings whether the condition is even reachable." },
+      { t: "Which index?", d: "Neocloud (~$2) vs. hyperscaler (~$7.5), the tier option above. It's the dominant ambiguity here, and it swings whether the condition is even reachable." },
       { t: "Proxy vs. authoritative", d: "Our neocloud value is the Vast.ai on-demand median, not the actual SDH100RT (which needs Bloomberg/enterprise access). It tracks the published index within a few cents but isn't the resolution source." },
     ],
     caveats: [
-      { t: "It's an approximation", d: "The neocloud series is the Vast.ai median (proxy); the hyperscaler series is a handful of values quoted in public SiliconData posts (no live feed). Neither is the paywalled SDH100RT the rules name — that's a future plan." },
+      { t: "It's an approximation", d: "The neocloud series is the Vast.ai median (proxy); the hyperscaler series is a handful of values quoted in public SiliconData posts (no live feed). Neither is the paywalled SDH100RT the rules name, that's a future plan." },
       { t: "Sparse, forward-only history", d: "Vast.ai exposes only current offers, so daily history accumulates going forward. The “5 consecutive days” test needs daily data to be meaningful; today the index (~$2.2) sits far above $1, so it is never met." },
     ],
     cardinality: [
       { asset: "raw.vast_offers", count: "~27", meaning: "Verified on-demand H100 offers pulled per run." },
-      { asset: "h100_prices", count: String(H100_ROWS), meaning: "One reading per day per tier — seeded published points plus the daily proxy." },
-      { asset: "int_h100_runlength", count: "≈1,200 × 2", meaning: "The met flag is forward-filled onto the ~1,200-day master trading axis, for 2 tiers — this is where H100 rows explode to line up with the equity leaves." },
-      { asset: "fct_h100_rental", count: "tier × day", meaning: "The H100 leaf fact — one presentation row per tier per day (value, ≤$1 flag, run flag)." },
+      { asset: "h100_prices", count: String(H100_ROWS), meaning: "One reading per day per tier, seeded published points plus the daily proxy." },
+      { asset: "int_h100_runlength", count: "≈1,200 × 2", meaning: "The met flag is forward-filled onto the ~1,200-day master trading axis, for 2 tiers, this is where H100 rows explode to line up with the equity leaves." },
+      { asset: "fct_h100_rental", count: "tier × day", meaning: "The H100 leaf fact, one presentation row per tier per day (value, ≤$1 flag, run flag)." },
       { asset: "exposure.h100_series", count: "1 block", meaning: "The H100 slice of the served JSON; the browser adds its met flag to the 3-of-6 count." },
     ],
   },
   polymarket: {
-    blurb: "The market's own implied probability of resolving YES, from Polymarket's public CLOB API — the headline chart, plotted on the same time axis as the conditions it aggregates.",
+    blurb: "The market's own implied probability of resolving YES, from Polymarket's public CLOB API, the headline chart, plotted on the same time axis as the conditions it aggregates.",
     options: [],
     ambiguities: [],
     caveats: [
-      { t: "Not a condition", d: "This is the market's price, not one of the six resolution conditions. It reflects traders' collective view, which can lead, lag, or diverge from the underlying data — useful context, not an input to the 3-of-6 count." },
+      { t: "Not a condition", d: "This is the market's price, not one of the six resolution conditions. It reflects traders' collective view, which can lead, lag, or diverge from the underlying data, useful context, not an input to the 3-of-6 count." },
       { t: "Starts at market open", d: "History only exists from 2025-11-20 (when the market opened), so on the shared axis the line is empty before then. Full history is re-fetchable each run; a committed CSV is kept as a fallback." },
     ],
     cardinality: [
-      { asset: "raw.polymarket_history", count: "1 doc", meaning: "One JSON document — the full daily price history since the market opened." },
+      { asset: "raw.polymarket_history", count: "1 doc", meaning: "One JSON document, the full daily price history since the market opened." },
       { asset: "polymarket_prices", count: String(E_PM.count || 220), meaning: "One row per UTC date (last price of the day)." },
       { asset: "exposure.market_series", count: "1 block", meaning: "Aligned to the shared axis (null before open) and served as the headline chart." },
     ],
   },
   courtlistener: {
-    blurb: "Daily scans of federal Chapter 7/11 dockets (CourtListener/RECAP) drive the OpenAI and Anthropic bankruptcy conditions — live monitoring with a human-confirm gate before any filing counts.",
+    blurb: "Daily scans of federal Chapter 7/11 dockets (CourtListener/RECAP) drive the OpenAI and Anthropic bankruptcy conditions, live monitoring with a human-confirm gate before any filing counts.",
     options: [],
     ambiguities: [
-      { t: "What counts as “bankruptcy”?", d: "A parent-company Chapter 7/11 petition, versus a subsidiary filing, an adversary proceeding, or a restructuring rumor. That judgment is exactly why the human gate exists — the scan surfaces candidates; a person confirms." },
+      { t: "What counts as “bankruptcy”?", d: "A parent-company Chapter 7/11 petition, versus a subsidiary filing, an adversary proceeding, or a restructuring rumor. That judgment is exactly why the human gate exists, the scan surfaces candidates; a person confirms." },
     ],
     caveats: [
-      { t: "Scan, don't trust blindly", d: "The search engine stems names (a personal Chapter 7 by “Chad Michael Anthrop” matches the Anthropic query), so an exact-substring name gate filters candidates — and even a passing candidate never flips the condition without confirmation in config." },
+      { t: "Scan, don't trust blindly", d: "The search engine stems names (a personal Chapter 7 by “Chad Michael Anthrop” matches the Anthropic query), so an exact-substring name gate filters candidates, and even a passing candidate never flips the condition without confirmation in config." },
       { t: "Query validated on FTX", d: "The same query against FTX returns its 29 real Chapter 11 filings from Nov 2022, so a genuine OpenAI/Anthropic petition would be caught." },
     ],
     cardinality: [
       { asset: "raw.courtlistener_search", count: "2/day", meaning: "One docket search per entity per day; result lists near-empty in the normal case." },
-      { asset: "raw.gdelt_news", count: "≈1,625×2", meaning: "Daily news-volume shares per entity, backfilled to 2022 — the buzz coefficient's history." },
-      { asset: "bankruptcy_checks", count: "2/day ↑", meaning: "One row per (date, entity) — candidate counts accumulating into a monitoring history." },
+      { asset: "raw.gdelt_news", count: "≈1,625×2", meaning: "Daily news-volume shares per entity, backfilled to 2022, the buzz coefficient's history." },
+      { asset: "bankruptcy_checks", count: "2/day ↑", meaning: "One row per (date, entity), candidate counts accumulating into a monitoring history." },
       { asset: "int_bankruptcy_state", count: "×~1,200", meaning: "The confirmed-met flag is aligned onto the master date axis so the 1-of-2 parent can count it daily." },
-      { asset: "int_bankruptcy_buzz", count: "×~1,650", meaning: "The 0–1 buzz coefficient per entity per day — display-only; never feeds the contract count." },
+      { asset: "int_bankruptcy_buzz", count: "×~1,650", meaning: "The 0–1 buzz coefficient per entity per day, display-only; never feeds the contract count." },
       { asset: "exposure.bankruptcy_state", count: "2 blocks", meaning: "One JSON block per entity (buzz line + met flag), served into the dashboard." },
     ],
   },
@@ -1311,7 +1311,7 @@ function landingHtml() {
   return `
     <div class="crumb">Data Source Intro</div>
     <h1 class="asset" style="font-family:var(--font)">Data Source Intro</h1>
-    <p class="why">This section documents the data sources and processing logic behind the oracle — how raw external
+    <p class="why">This section documents the data sources and processing logic behind the oracle, how raw external
       data is pulled and normalized to produce the graphs, evaluate the contract's conditions, and surface the
       ambiguities and options each condition carries. Every source is a chain of Dagster-style <b>assets</b>
       (materialized tables/views handed step to step). Pick a source to see its options, lineage, and per-asset detail.</p>
@@ -1329,7 +1329,7 @@ function landingHtml() {
       <li><span class="xf">origin</span> every schema column is tagged
         <span class="kind key">key</span> <span class="kind pass">pass</span>
         <span class="kind cast">cast</span> <span class="kind derived">derived</span>
-        <span class="kind seed">seed</span> <span class="kind meta">meta</span> — so you can see what each step adds vs. carries through.</li>
+        <span class="kind seed">seed</span> <span class="kind meta">meta</span>, so you can see what each step adds vs. carries through.</li>
       <li><span class="xf">example</span> a real row is traced through every stage, so you can watch the shape and values change.</li>
     </ul>
   `;
@@ -1341,7 +1341,7 @@ function sourceOverviewHtml(gid) {
   const kind = { opt: "option", clr: "clarified", amb: "ambiguity", cav: "caveat" };
   const section = (title, cls, items) => items.length
     ? `<h5>${title}</h5><ul class="infolist">${items.map(i =>
-        `<li class="${cls}"><span class="tag2">${kind[cls]}</span><b>${i.t}</b> — ${i.d}</li>`).join("")}</ul>` : "";
+        `<li class="${cls}"><span class="tag2">${kind[cls]}</span><b>${i.t}</b>, ${i.d}</li>`).join("")}</ul>` : "";
   // cardinality stages map to graph assets, so the table and the graph line up
   const cardRows = info.cardinality.map(r => {
     const stage = r.asset ? `<span class="pill" data-goto="${r.asset}">${BY_ID[r.asset].name}</span>` : `<b>${r.stage}</b>`;
@@ -1352,7 +1352,7 @@ function sourceOverviewHtml(gid) {
   if (gid === "h100") {
     const tier = DATA.h100[state.h100index];
     extra = `<p class="desc">Current ${state.h100index} reading: <b>$${tier.usd_hr.toFixed(2)}/hr</b>
-      (${tier.date}, ${tier.source}) — far above the $1.00 trigger. Switch the tier in the sidebar options.</p>`;
+      (${tier.date}, ${tier.source}), far above the $1.00 trigger. Switch the tier in the sidebar options.</p>`;
   }
 
   let worked = "";
@@ -1362,9 +1362,9 @@ function sourceOverviewHtml(gid) {
     const dd = close ? E.ddClose : E.ddIntraday;
     const trig = close ? E.triggerClose : E.triggerIntraday;
     const bn = close ? "end-of-day" : "intraday";
-    worked = `<h4>The worked example — ${E.ticker}, ${E.date} (${bn} basis)</h4>
+    worked = `<h4>The worked example, ${E.ticker}, ${E.date} (${bn} basis)</h4>
        <p class="desc">Follow one condition end to end: ${E.ticker} closed at <b>${money(E.close)}</b>, against its
-       ${bn} all-time high of <b>${money(ath)}</b> — a drawdown of <b>${(dd * 100).toFixed(1)}%</b>, at or past the
+       ${bn} all-time high of <b>${money(ath)}</b>, a drawdown of <b>${(dd * 100).toFixed(1)}%</b>, at or past the
        50% threshold (trigger <b>${money(trig)}</b>), so <code>met = 1</code>. It is 1 of ${E.supplierTotal} hardware
        suppliers past threshold, which (needing just 1) makes the parent “supplier collapse” condition MET.
        Switch the basis in the sidebar options to see the numbers change.</p>`;
@@ -1388,10 +1388,10 @@ function sourceOverviewHtml(gid) {
     <h4>Asset graph (top → bottom; click any asset)</h4>
     ${buildGraph(gid)}
 
-    <h4>Cardinality — rows at each stage</h4>
+    <h4>Cardinality, rows at each stage</h4>
     <p class="desc">Cardinality is how many rows a stage holds. Each row below is a stage in the graph above, so you
       can see where the pipeline <b>fans out</b> (a join multiplies rows) and where it <b>collapses</b>
-      (aggregation) — the shape and cost of the transform, ending in one compact served document.</p>
+      (aggregation), the shape and cost of the transform, ending in one compact served document.</p>
     <div class="rowcard"><table class="card2">
       <thead><tr><th>Rows</th><th>Stage (asset)</th><th>What it means</th></tr></thead>
       <tbody>${cardRows}</tbody></table></div>

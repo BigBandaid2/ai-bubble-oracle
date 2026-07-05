@@ -4,18 +4,18 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>AI Bubble Oracle</title>
-<meta name="description" content="A live, open-source scoreboard for the Polymarket 'AI bubble burst in 2026?' market — every condition tracked from public data, with the rules ambiguities laid bare.">
+<meta name="description" content="A live, open-source scoreboard for the Polymarket 'AI bubble burst in 2026?' market, every condition tracked from public data, with the rules ambiguities laid bare.">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="AI Bubble Oracle">
-<meta property="og:title" content="AI Bubble Oracle — is the AI bubble bursting?">
-<meta property="og:description" content="A live, open-source scoreboard for the Polymarket 'AI bubble burst in 2026?' market — every condition tracked from public data.">
+<meta property="og:title" content="AI Bubble Oracle, is the AI bubble bursting?">
+<meta property="og:description" content="A live, open-source scoreboard for the Polymarket 'AI bubble burst in 2026?' market, every condition tracked from public data.">
 <meta property="og:url" content="https://ai-bubble-oracle.vercel.app/">
 <meta property="og:image" content="https://ai-bubble-oracle.vercel.app/og-image.jpg">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="AI Bubble Oracle — is the AI bubble bursting?">
-<meta name="twitter:description" content="A live, open-source scoreboard for the Polymarket 'AI bubble burst in 2026?' market — every condition tracked from public data.">
+<meta name="twitter:title" content="AI Bubble Oracle, is the AI bubble bursting?">
+<meta name="twitter:description" content="A live, open-source scoreboard for the Polymarket 'AI bubble burst in 2026?' market, every condition tracked from public data.">
 <meta name="twitter:image" content="https://ai-bubble-oracle.vercel.app/og-image.jpg">
 <style>
   /* Palette lifted from polymarket.com dark theme design tokens */
@@ -82,7 +82,7 @@
   .rangechip:hover { color: var(--text); background: var(--panel2); }
   .rangechip.active { background: var(--accent); color: #fff; font-weight: 600; }
 
-  /* "open questions" ambiguities callout — collapsed to a single line by default */
+  /* "open questions" ambiguities callout, collapsed to a single line by default */
   .ambibox { background: var(--panel); border: 1px solid var(--border); border-left: 3px solid #e0bf3e;
     border-radius: 12px; padding: 0 18px; margin: 0 0 16px; scroll-margin-top: 72px; }
   .ambibox.flash { animation: flash 1.8s ease-out; }
@@ -219,7 +219,7 @@
   .snode { margin: 1px 0; }
   .srow { display: flex; align-items: center; gap: 8px; padding: 8px 8px; border-radius: 8px; cursor: pointer; }
   .srow:hover { background: var(--panel2); }
-  .srow.off .slabel, .srow.off .sdate { opacity: .45; }
+  .srow.off .slabel.srow.off .sdate { opacity: .45; }
   .sidehead { display: flex; align-items: center; justify-content: space-between; margin: 4px 8px 10px; }
   .sidehead h3 { margin: 0; }
   .hideall { font-size: 10.5px; font-weight: 600; letter-spacing: .3px; color: var(--muted);
@@ -300,8 +300,8 @@
 
     <h3 class="mt">Indicator legend</h3>
     <div class="siglegend" id="siglegend">
-      <div class="row"><span class="dot met_solid"></span> Met now &mdash; currently past threshold</div>
-      <div class="row"><span class="dot met_hollow"></span> Met via 90-day window &mdash; crossed recently, since recovered</div>
+      <div class="row"><span class="dot met_solid"></span> Met now, currently past threshold</div>
+      <div class="row"><span class="dot met_hollow"></span> Met via 90-day window, crossed recently, since recovered</div>
       <div class="row"><span class="dot not_met"></span> Not met</div>
       <div class="row"><span class="dot unknown"></span> No automated data source yet</div>
     </div>
@@ -566,18 +566,18 @@ function metaHtml(res) {
     return `<b>${tierName}</b> &middot; ${src} <b>$${t.current.toFixed(2)}/hr</b> (${t.currentDate}) &middot; ` +
       `trigger: &le; $${node.threshold.toFixed(2)}/hr for ${node.days} straight days &middot; ` +
       `last at/below: <b>${t.lastMet || "never"}</b> &middot; ` +
-      `<span style="color:var(--muted2)">approximation — authoritative index is SiliconData's paywalled feed</span>`;
+      `<span style="color:var(--muted2)">approximation, authoritative index is SiliconData's paywalled feed</span>`;
   }
   if (node.type === "docket") {
     const cand = node.candidates;
     const candTxt = cand > 0
-      ? `<b style="color:var(--met)">${cand} candidate filing${cand === 1 ? "" : "s"} — pending human review</b>`
+      ? `<b style="color:var(--met)">${cand} candidate filing${cand === 1 ? "" : "s"}, pending human review</b>`
       : `<b>0</b> candidate filings`;
     const b = node.currentBuzz;
     const bTxt = b != null ? `buzz coefficient <b>${b.toFixed(2)}</b> (${buzzTier(b)}) &middot; ` : "";
     return `${bTxt}daily GDELT news scan + federal Ch.7/11 docket scan for <b>${node.entity}</b> &middot; ` +
       `${candTxt} &middot; confirmed: <b>${node.confirmed || "none"}</b> &middot; last checked <b>${node.lastChecked}</b> &middot; ` +
-      `<span style="color:var(--muted2)">buzz is context only — the condition needs a docket plus human confirmation</span>`;
+      `<span style="color:var(--muted2)">buzz is context only, the condition needs a docket plus human confirmation</span>`;
   }
   return "No automated data source yet &middot; tracked manually until Phase 3.";
 }
@@ -640,7 +640,7 @@ function nodeCard(node, depth, parentLabel) {
       if (off > 0) {
         const more = document.createElement("div");
         more.className = "evmore";
-        more.textContent = `${off} earlier event${off === 1 ? "" : "s"} outside this range — switch Range to All.`;
+        more.textContent = `${off} earlier event${off === 1 ? "" : "s"} outside this range, switch Range to All.`;
         sec.appendChild(more);
       }
     }
@@ -667,8 +667,8 @@ function chartLegend(node) {
   } else if (node.type === "docket") {
     el.innerHTML =
       `<span><i style="background:var(--price)"></i>bankruptcy-buzz coefficient (news + dockets)</span>
-       <span><i style="background:var(--ath)"></i>0.90 — docket found</span>
-       <span><i style="background:var(--trigger)"></i>1.00 — confirmed</span>
+       <span><i style="background:var(--ath)"></i>0.90, docket found</span>
+       <span><i style="background:var(--trigger)"></i>1.00, confirmed</span>
        <span><i class="sw" style="background:rgba(244,52,55,.24)"></i>confirmed bankruptcy</span>`;
   } else {
     el.innerHTML =
@@ -692,7 +692,7 @@ function marketCard() {
   const meta = document.createElement("div");
   meta.className = "meta";
   meta.innerHTML = `Polymarket's implied chance this market resolves YES, over time (from ${m.start}). ` +
-    `Not one of the six conditions — shown for context, on the same time axis.`;
+    `Not one of the six conditions, shown for context, on the same time axis.`;
   sec.appendChild(meta);
   const c = chartCanvas(sec);
   requestAnimationFrame(() => drawMarket(c, m));
@@ -703,7 +703,7 @@ function marketCard() {
   return sec;
 }
 
-// A condition is "dramatic" (surface it high) if it's met now — solid OR via
+// A condition is "dramatic" (surface it high) if it's met now, solid OR via
 // the 90-day trailing window. Both have res.met[LAST] set, i.e. status "met".
 function metRank(node) {
   const res = RESULTS[node.key];
@@ -721,7 +721,7 @@ function sp500Card() {
   sec.appendChild(hideBtn("sp500"));
   const meta = document.createElement("div");
   meta.className = "meta";
-  meta.innerHTML = `The broad market with the era's milestones marked — context for reading the conditions below. Not part of the contract.`;
+  meta.innerHTML = `The broad market with the era's milestones marked, context for reading the conditions below. Not part of the contract.`;
   sec.appendChild(meta);
   const c = chartCanvas(sec);
   requestAnimationFrame(() => drawSP500(c, s));
@@ -748,7 +748,7 @@ function sp500Card() {
   if (hidden > 0) {
     const more = document.createElement("div");
     more.className = "evmore";
-    more.textContent = `${hidden} earlier event${hidden === 1 ? "" : "s"} outside this range — switch Range to All.`;
+    more.textContent = `${hidden} earlier event${hidden === 1 ? "" : "s"} outside this range, switch Range to All.`;
     sec.appendChild(more);
   }
   return sec;
@@ -759,7 +759,7 @@ function renderCards() {
   grid.innerHTML = "";
   XHAIRS = [];   // overlays are recreated with the cards
   const show = key => !hidden.has(key);
-  // 1) Polymarket, 2) S&P 500 context, 3) the root contract — always first.
+  // 1) Polymarket, 2) S&P 500 context, 3) the root contract, always first.
   if (DATA.market && show("market_price")) grid.appendChild(marketCard());
   if (DATA.sp500 && show("sp500")) grid.appendChild(sp500Card());
   const flat = [];
@@ -774,7 +774,7 @@ function renderCards() {
   flat.sort((a, b) => metRank(a.node) - metRank(b.node));
   flat.forEach(e => { if (show(e.node.key)) grid.appendChild(nodeCard(e.node, e.depth, e.parentLabel)); });
   if (!grid.children.length) {
-    grid.innerHTML = `<div id="cardgrid-empty">All graphs are hidden — use the checkboxes in the sidebar (or “Show all”) to bring them back.</div>`;
+    grid.innerHTML = `<div id="cardgrid-empty">All graphs are hidden, use the checkboxes in the sidebar (or “Show all”) to bring them back.</div>`;
   }
 }
 
@@ -992,7 +992,7 @@ function relevantEvents(node) { return (node.events || []).filter(e => e.url); }
 function buzzTier(b) {
   if (b == null) return "–";
   if (b >= 1) return "CONFIRMED";
-  if (b >= 0.9) return "docket found — pending review";
+  if (b >= 0.9) return "docket found, pending review";
   if (b >= 0.7) return "heavy corroborated coverage";
   if (b >= 0.4) return "widespread distress narrative";
   if (b >= 0.1) return "elevated chatter";
@@ -1017,7 +1017,7 @@ function drawDocket(canvas, res) {
   ctx.strokeStyle = css.getPropertyValue("--trigger");
   ctx.beginPath(); ctx.moveTo(PAD.l, y2px(1.0)); ctx.lineTo(w - PAD.r, y2px(1.0)); ctx.stroke();
   ctx.setLineDash([]);
-  // notable-spike markers — ONLY for spikes that turned up a relevant article
+  // notable-spike markers, ONLY for spikes that turned up a relevant article
   // (e.url set). Noise/no-article spikes stay in the data but off the chart.
   node._badges = [];
   const rowX = [-Infinity, -Infinity, -Infinity];
@@ -1120,7 +1120,7 @@ function renderOptions() {
   }
   host.insertAdjacentHTML("beforeend", `
     <div class="clarified">
-      <div class="clarified-h">90-day window — clarified rule</div>
+      <div class="clarified-h">90-day window, clarified rule</div>
       The three qualifying events must fall within a <b>single 90-day window that ends no later than the
       Dec 31, 2026 deadline</b> (clarification added Nov 20, 2025). For example, crossings on Jan 10, Feb 5 and
       Mar 3, 2026 qualify (one 90-day span), but Jan 10, Apr 20 and Nov 1, 2026 do not (more than 90 days apart).
@@ -1237,11 +1237,11 @@ function renderVerdict() {
   const prob = DATA.market && DATA.market.current != null
     ? `The market prices a <b class="v-prob">${(DATA.market.current * 100).toFixed(0)}% chance</b>.` : "";
   $("#verdict").innerHTML =
-    `Right now: <b class="v-met">${met} of ${total}</b> conditions met — ` +
+    `Right now: <b class="v-met">${met} of ${total}</b> conditions met, ` +
     `<b>${need}</b> at once would resolve YES. ${prob}`;
 }
 
-// Collapsed by default — traders arriving via the #ambiguities deep link get
+// Collapsed by default, traders arriving via the #ambiguities deep link get
 // it expanded; everyone else sees a one-line hint.
 let ambiOpen = location.hash === "#ambiguities";
 
@@ -1251,12 +1251,12 @@ function renderAmbiguities() {
     <div class="ambibox${ambiOpen ? "" : " collapsed"}" id="ambibox">
       <div class="ambihead" id="ambitoggle">
         <span class="ambicaret">${ambiOpen ? "▼" : "▶"}</span>
-        &#9888;&#65039; Two rules the market doesn't pin down — and they can move the odds
+        &#9888;&#65039; Two rules the market doesn't pin down, and they can move the odds
         <span class="ambihint">${ambiOpen ? "collapse" : "expand"}</span>
       </div>
       <div class="ambibody">
         <div class="ambirow">
-          <div class="ambiq"><b>“All-time high” — end-of-day close or intraday high?</b> Intraday highs sit higher, so a stock reaches its −50% mark sooner. Decisive for any condition hovering near its threshold.</div>
+          <div class="ambiq"><b>“All-time high”, end-of-day close or intraday high?</b> Intraday highs sit higher, so a stock reaches its −50% mark sooner. Decisive for any condition hovering near its threshold.</div>
           ${ambiSeg("basis", [{ val: "close", t: "End-of-day" }, { val: "intraday", t: "Intraday" }])}
         </div>
         <div class="ambirow">
