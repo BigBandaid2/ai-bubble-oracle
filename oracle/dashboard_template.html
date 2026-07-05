@@ -144,6 +144,14 @@
   canvas { width: 100%; height: 240px; display: block; }
   .chartwrap { position: relative; }
   .chartwrap canvas.xhair { position: absolute; left: 0; top: 0; pointer-events: none; }
+  /* When the Polymarket and S&P cards share a row, both stretch to the row
+     height and the shorter card's chart grows to fill — no gap, no dead space
+     (the S&P events legend usually sets the height). */
+  @media (min-width: 1240px) {
+    #card-market_price, #card-sp500 { align-self: stretch; display: flex; flex-direction: column; }
+    #card-market_price .chartwrap, #card-sp500 .chartwrap { flex: 1 1 auto; min-height: 240px; }
+    #card-market_price .chartwrap canvas, #card-sp500 .chartwrap canvas { height: 100%; }
+  }
   .nodata {
     height: 120px; display: flex; align-items: center; justify-content: center; text-align: center;
     color: var(--muted); background: var(--bg); border: 1px dashed var(--border);
