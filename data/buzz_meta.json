@@ -1,8 +1,8 @@
 {
   "backfilled": {
     "OpenAI": 3,
-    "Anthropic": 2
+    "Anthropic": 3
   },
   "news_query_version": 3,
-  "news_k": 0.002
+  "news_k": 0.0256
 }
