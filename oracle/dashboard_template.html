@@ -138,6 +138,11 @@
   }
   .optchip b { color: var(--text); font-weight: 600; }
   .optchip .k { color: var(--muted2); text-transform: uppercase; letter-spacing: .5px; font-size: 9px; }
+  .optchip[data-opt] { cursor: pointer; }
+  .optchip[data-opt]:hover { border-color: var(--accent); }
+  .optchip[data-opt]:hover b { color: var(--accent); }
+  @keyframes optpulse { 0% { background: rgba(0,147,253,.20); } 100% { background: transparent; } }
+  .optgroup.pulse { animation: optpulse 1.4s ease-out; border-radius: 10px; }
 
   .meta { color: var(--muted); font-size: 12.5px; margin: 8px 0 12px; }
   .meta b { color: var(--text); font-weight: 600; font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 12px; }
@@ -451,13 +456,14 @@ const pct = v => (v > 0 ? "+" : "") + (v * 100).toFixed(1) + "%";
 
 function optChips(node) {
   const chips = [];
-  const chip = (k, v) => `<span class="optchip"><span class="k">${k}</span><b>${v}</b></span>`;
+  // opt-backed chips carry data-opt and open the options drawer on click
+  const chip = (k, v, opt) => `<span class="optchip"${opt ? ` data-opt="${opt}" title="Change in options"` : ""}><span class="k">${k}</span><b>${v}</b></span>`;
   if (node.type === "drawdown") {
-    chips.push(chip("ATH", OPT_TEXT.basis[state.basis]));
+    chips.push(chip("ATH", OPT_TEXT.basis[state.basis], "basis"));
   } else if (node.type === "count") {
-    chips.push(chip("ATH", OPT_TEXT.basis[state.basis]));
+    chips.push(chip("ATH", OPT_TEXT.basis[state.basis], "basis"));
   } else if (node.type === "rental") {
-    chips.push(chip("Tier", OPT_TEXT.h100index[state.h100index]));
+    chips.push(chip("Tier", OPT_TEXT.h100index[state.h100index], "h100index"));
   } else if (node.type === "docket") {
     chips.push(chip("Source", "CourtListener"));
   }
@@ -954,6 +960,7 @@ function renderOptions() {
     const cfg = OPTIONS[key];
     const g = document.createElement("div");
     g.className = "optgroup";
+    g.id = "og-" + key;
     g.innerHTML = `<div class="optlabel">${cfg.label}</div>`;
     const seg = document.createElement("div");
     seg.className = "seg";
@@ -1197,7 +1204,24 @@ if (location.hash === "#ambiguities") {
 const drawer = document.getElementById("drawer");
 const scrim = document.getElementById("drawer-scrim");
 const closeDrawer = () => { drawer.classList.remove("open"); scrim.classList.remove("open"); };
-document.getElementById("opts-btn").onclick = () => { drawer.classList.add("open"); scrim.classList.add("open"); };
+function openDrawer(targetOpt) {
+  drawer.classList.add("open"); scrim.classList.add("open");
+  if (targetOpt) {
+    const g = document.getElementById("og-" + targetOpt);
+    if (g) {
+      g.scrollIntoView({ block: "nearest" });
+      g.classList.remove("pulse");
+      void g.offsetWidth;   // restart the animation synchronously
+      g.classList.add("pulse");
+    }
+  }
+}
+document.getElementById("opts-btn").onclick = () => openDrawer();
+// clicking an option-backed chip on any card opens the drawer at that option
+$("#cardgrid").addEventListener("click", e => {
+  const c = e.target.closest(".optchip[data-opt]");
+  if (c) openDrawer(c.getAttribute("data-opt"));
+});
 document.getElementById("drawer-close").onclick = closeDrawer;
 scrim.onclick = closeDrawer;
 document.addEventListener("keydown", e => { if (e.key === "Escape") closeDrawer(); });

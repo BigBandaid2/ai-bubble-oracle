@@ -48,9 +48,24 @@ The bankruptcy scan queries `caseName:(<entity>) AND chapter:(7 OR 11)` daily
 (validated against FTX's 2022 Chapter 11 wave), applies an exact-substring name
 gate against stemming noise, and records candidate counts to
 `data/bankruptcy_history.csv`. A candidate **never** flips the condition by
-itself — it counts only after human review confirms it in
-`CONFIRMED_BANKRUPTCIES` (`oracle/config.py`). Only the OpenAI-acquisition
+itself — it counts only after human review. Only the OpenAI-acquisition
 condition still awaits a data source (news monitoring).
+
+**How you're notified of a candidate:** the daily Action opens a GitHub issue
+titled "⚠️ Bankruptcy candidate pending review" (repo watchers get an
+email/app notification; deduped while one is open). The dashboard card also
+shows the candidate count in red and the buzz coefficient jumps to ≥ 0.90.
+
+**How to confirm (the human gate):**
+1. Review the docket on courtlistener.com — is it a genuine parent-company
+   Chapter 7/11 petition (not a subsidiary, adversary proceeding, or name
+   collision)?
+2. If genuine: add it to `CONFIRMED_BANKRUPTCIES` in `oracle/config.py`, e.g.
+   `{"OpenAI": "2026-08-14"}` (the filing date it counts from), and commit.
+3. Run the **Daily data update** workflow (Actions tab → Run workflow) — it
+   regenerates the site with the condition MET (buzz = 1.00) and the push
+   auto-deploys.
+4. False positive? Just close the issue; the scan keeps running daily.
 
 - Data: Yahoo Finance public chart API (split-adjusted daily OHLC) + Vast.ai
   public bundles API — neither needs a key

@@ -9,6 +9,7 @@ on:
 
 permissions:
   contents: write
+  issues: write   # candidate-filing alerts
 
 concurrency:
   group: daily-update
@@ -38,3 +39,26 @@ jobs:
             git commit -m "chore: daily data update ($(date -u +%Y-%m-%d))"
             git push
           fi
+
+      # If today's docket scan found any Chapter 7/11 candidates, open a GitHub
+      # issue (repo watchers get notified by email/app). Deduped: no new issue
+      # while one is already open.
+      - name: Alert on pending bankruptcy candidates
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          today=$(date -u +%Y-%m-%d)
+          pending=$(awk -F, -v d="$today" 'NR>1 && $1==d && ($3+0)>0 {print $2" ("$3")"}' data/bankruptcy_history.csv | paste -sd ', ' -)
+          if [ -z "$pending" ]; then
+            echo "No pending candidates."
+            exit 0
+          fi
+          open=$(gh issue list --state open --search "Bankruptcy candidate pending review in:title" --json number --jq 'length' || echo 0)
+          if [ "$open" != "0" ]; then
+            echo "Alert issue already open; not duplicating."
+            exit 0
+          fi
+          gh issue create \
+            --title "⚠️ Bankruptcy candidate pending review: $pending" \
+            --body "$(printf 'The daily CourtListener scan found candidate Chapter 7/11 filing(s): **%s**\n\nTo review and confirm:\n1. Check the dashboard card (it shows the candidate count) and the docket on courtlistener.com.\n2. If it is a genuine parent-company bankruptcy, add it to CONFIRMED_BANKRUPTCIES in oracle/config.py, e.g. {"OpenAI": "2026-08-14"} (the filing date).\n3. Commit, then run the "Daily data update" workflow (Actions tab, Run workflow) to regenerate and deploy.\n\nIf it is a false positive (subsidiary, adversary proceeding, name collision), just close this issue - the scan keeps running daily.' "$pending")"
+          echo "Alert issue created."
