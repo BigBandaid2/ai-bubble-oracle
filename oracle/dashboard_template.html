@@ -863,13 +863,15 @@ function drawSP500(canvas, s) {
   const y2px = drawFrame(ctx, w, h, dates, yMin, yMax, v => Math.round(v).toLocaleString());
   const css = getComputedStyle(document.documentElement);
   // event markers: dashed vertical line + numbered badge at the top.
-  // Badges that would overlap the previous one drop to a second row.
-  let lastX = -Infinity, lastY = 0;
+  // Clustered badges cascade to lower rows (up to 3) so none overlap.
+  const rowX = [-Infinity, -Infinity, -Infinity];
   s.events.forEach((e, k) => {
     if (e.i < SLICE) return;
     const x = xScale(e.i - SLICE, n, w);
-    const by = (x - lastX < 18 && lastY === PAD.t + 8) ? PAD.t + 26 : PAD.t + 8;
-    lastX = x; lastY = by;
+    let row = rowX.findIndex(rx => x - rx >= 18);
+    if (row === -1) row = 0;
+    rowX[row] = x;
+    const by = PAD.t + 8 + row * 18;
     ctx.strokeStyle = "#3a4453"; ctx.lineWidth = 1; ctx.setLineDash([3, 4]);
     ctx.beginPath(); ctx.moveTo(x, by + 10); ctx.lineTo(x, h - PAD.b); ctx.stroke();
     ctx.setLineDash([]);

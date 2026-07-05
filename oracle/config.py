@@ -22,19 +22,15 @@ SP500_TICKER = "^GSPC"
 # numbered legend under the chart.
 KEY_EVENTS = [
     ("2022-11-30", "ChatGPT released"),
-    ("2023-03-10", "SVB collapses"),
-    ("2023-05-24", "Nvidia's blowout AI guidance"),
-    ("2024-06-05", "Nvidia passes Apple at ~$3T"),
+    ("2023-05-24", "Nvidia blowout AI guidance"),
+    ("2024-06-05", "Nvidia ~$3T, overtakes Apple #2"),
     ("2024-08-05", "Yen carry-trade unwind"),
-    ("2025-01-27", "DeepSeek shock: NVDA −17%"),
-    ("2025-04-02", "“Liberation Day” tariffs"),
-    # DATE UNVERIFIED: set to the first US B-2 strikes in my records — correct
-    # if the Khamenei strike came later.
-    ("2025-06-21", "US strikes Iran; Khamenei killed"),
-    # DATE UNVERIFIED (post-knowledge-cutoff) — correct as needed.
-    ("2026-02-11", "US blocks Claude Mythos release"),
-    # DATE UNVERIFIED (post-knowledge-cutoff) — correct as needed.
-    ("2026-04-15", "SpaceX/xAI IPO"),
+    ("2025-01-27", "DeepSeek triggers NVDA −17% record drop"),
+    ("2025-04-02", "“Liberation Day” tariffs announced"),
+    ("2026-02-28", "US/Israel strike kills Khamenei"),
+    ("2026-06-08", "OpenAI files for $1T+ IPO"),
+    ("2026-06-12", "US export controls disable Anthropic Mythos 5/Fable 5"),
+    ("2026-06-12", "SpaceX largest-ever IPO"),
 ]
 
 # The contract as a condition tree, from the Polymarket "AI bubble burst in
