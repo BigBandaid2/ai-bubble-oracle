@@ -33,7 +33,7 @@ KEY_EVENTS = [
     ("2024-08-05", "Yen carry-trade unwind sparks selloff"),
     ("2025-01-27", "DeepSeek triggers NVDA −17% record drop"),
     ("2025-04-02", "“Liberation Day” tariffs announced"),
-    ("2025-11-04", "SMCI Q1 FY2026 earnings disappoint; stock drops ~40%"),
+    ("2025-11-04", "SMCI earnings disappoint, analyst downgrade"),
     ("2026-02-28", "US/Israel strike kills Khamenei"),
     ("2026-05-28", "Anthropic hits $965B valuation, overtakes OpenAI"),
     ("2026-06-08", "OpenAI confidentially files for IPO"),
