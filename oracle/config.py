@@ -27,10 +27,14 @@ KEY_EVENTS = [
     ("2024-06-05", "Nvidia passes Apple at ~$3T"),
     ("2024-08-05", "Yen carry-trade unwind"),
     ("2025-01-27", "DeepSeek shock: NVDA −17%"),
-    ("2025-02-24", "Claude Code released"),
     ("2025-04-02", "“Liberation Day” tariffs"),
-    ("2025-06-13", "Israel–Iran war begins"),
-    ("2025-08-07", "GPT-5 released"),
+    # DATE UNVERIFIED: set to the first US B-2 strikes in my records — correct
+    # if the Khamenei strike came later.
+    ("2025-06-21", "US strikes Iran; Khamenei killed"),
+    # DATE UNVERIFIED (post-knowledge-cutoff) — correct as needed.
+    ("2026-02-11", "US blocks Claude Mythos release"),
+    # DATE UNVERIFIED (post-knowledge-cutoff) — correct as needed.
+    ("2026-04-15", "SpaceX/xAI IPO"),
 ]
 
 # The contract as a condition tree, from the Polymarket "AI bubble burst in

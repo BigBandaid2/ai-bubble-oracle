@@ -142,6 +142,8 @@
   .meta { color: var(--muted); font-size: 12.5px; margin: 8px 0 12px; }
   .meta b { color: var(--text); font-weight: 600; font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 12px; }
   canvas { width: 100%; height: 240px; display: block; }
+  .chartwrap { position: relative; }
+  .chartwrap canvas.xhair { position: absolute; left: 0; top: 0; pointer-events: none; }
   .nodata {
     height: 120px; display: flex; align-items: center; justify-content: center; text-align: center;
     color: var(--muted); background: var(--bg); border: 1px dashed var(--border);
@@ -506,8 +508,7 @@ function nodeCard(node, depth, parentLabel) {
       : "No data feed connected. Planned: court-docket + news monitoring (Phase 3), GPU rental price feed (Phase 4).";
     sec.appendChild(d);
   } else {
-    const c = document.createElement("canvas");
-    sec.appendChild(c);
+    const c = chartCanvas(sec);
     requestAnimationFrame(() => node.type === "drawdown" ? drawPrice(c, res)
       : node.type === "rental" ? drawRental(c, res) : drawCount(c, res));
     sec.appendChild(chartLegend(node));
@@ -554,8 +555,7 @@ function marketCard() {
   meta.innerHTML = `Polymarket's implied chance this market resolves YES, over time (from ${m.start}). ` +
     `Not one of the six conditions — shown for context, on the same time axis.`;
   sec.appendChild(meta);
-  const c = document.createElement("canvas");
-  sec.appendChild(c);
+  const c = chartCanvas(sec);
   requestAnimationFrame(() => drawMarket(c, m));
   const leg = document.createElement("div");
   leg.className = "legend";
@@ -583,8 +583,7 @@ function sp500Card() {
   meta.className = "meta";
   meta.innerHTML = `The broad market with the era's milestones marked — context for reading the conditions below. Not part of the contract.`;
   sec.appendChild(meta);
-  const c = document.createElement("canvas");
-  sec.appendChild(c);
+  const c = chartCanvas(sec);
   requestAnimationFrame(() => drawSP500(c, s));
   const visible = s.events.filter(e => e.i >= SLICE);
   const leg = document.createElement("ol");
@@ -609,6 +608,7 @@ function sp500Card() {
 function renderCards() {
   const grid = $("#cardgrid");
   grid.innerHTML = "";
+  XHAIRS = [];   // overlays are recreated with the cards
   // 1) Polymarket, 2) S&P 500 context, 3) the root contract — always first.
   if (DATA.market) grid.appendChild(marketCard());
   if (DATA.sp500) grid.appendChild(sp500Card());
@@ -634,6 +634,63 @@ function setupCanvas(canvas) {
   const ctx = canvas.getContext("2d");
   ctx.scale(dpr, dpr);
   return { ctx, w, h };
+}
+
+/* Synchronized crosshair: hovering any chart draws a vertical line + date on
+   EVERY chart at the same date (all charts share the master axis + SLICE). */
+let XHAIRS = [];   // overlay canvases, rebuilt with the cards
+
+function chartCanvas(sec) {
+  const wrap = document.createElement("div");
+  wrap.className = "chartwrap";
+  const c = document.createElement("canvas");
+  const o = document.createElement("canvas");
+  o.className = "xhair";
+  wrap.appendChild(c); wrap.appendChild(o);
+  sec.appendChild(wrap);
+  XHAIRS.push(o);
+  wrap.addEventListener("mousemove", ev => {
+    const r = wrap.getBoundingClientRect();
+    const n = N - SLICE;
+    const frac = (ev.clientX - r.left - PAD.l) / (r.width - PAD.l - PAD.r);
+    const i = Math.max(0, Math.min(n - 1, Math.round(frac * (n - 1))));
+    drawHover(i);
+  });
+  wrap.addEventListener("mouseleave", clearHover);
+  return c;
+}
+
+function drawHover(i) {
+  const dateStr = AX[SLICE + i];
+  const n = N - SLICE;
+  XHAIRS.forEach(o => {
+    const dpr = window.devicePixelRatio || 1;
+    const w = o.clientWidth, h = o.clientHeight;
+    if (o.width !== Math.round(w * dpr)) { o.width = Math.round(w * dpr); o.height = Math.round(h * dpr); }
+    const x2 = o.getContext("2d");
+    x2.setTransform(dpr, 0, 0, dpr, 0, 0);
+    x2.clearRect(0, 0, w, h);
+    const px = xScale(i, n, w);
+    x2.strokeStyle = "rgba(244,244,246,.35)"; x2.lineWidth = 1;
+    x2.beginPath(); x2.moveTo(px, PAD.t); x2.lineTo(px, h - PAD.b); x2.stroke();
+    x2.font = "10.5px 'Geist Mono', Consolas, monospace";
+    const tw = x2.measureText(dateStr).width + 12;
+    const bx = (px + 8 + tw > w - PAD.r) ? px - tw - 8 : px + 8;
+    x2.fillStyle = "#242b32";
+    x2.beginPath(); x2.roundRect(bx, PAD.t, tw, 17, 4); x2.fill();
+    x2.strokeStyle = "#3a4453"; x2.stroke();
+    x2.fillStyle = "#f4f4f6"; x2.textAlign = "left"; x2.textBaseline = "middle";
+    x2.fillText(dateStr, bx + 6, PAD.t + 9);
+    x2.textBaseline = "alphabetic";
+  });
+}
+
+function clearHover() {
+  XHAIRS.forEach(o => {
+    const x2 = o.getContext("2d");
+    x2.setTransform(1, 0, 0, 1, 0, 0);
+    x2.clearRect(0, 0, o.width, o.height);
+  });
 }
 const PAD = { l: 52, r: 12, t: 10, b: 22 };
 function xScale(i, n, w) { return PAD.l + (w - PAD.l - PAD.r) * (n <= 1 ? 0 : i / (n - 1)); }
