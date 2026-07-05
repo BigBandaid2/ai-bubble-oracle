@@ -68,3 +68,30 @@ jobs:
             --title "⚠️ Bankruptcy candidate pending review: $pending" \
             --body "$(printf 'The daily CourtListener scan found candidate Chapter 7/11 filing(s): **%s**\n\nTo review and confirm:\n1. Check the dashboard card (it shows the candidate count) and the docket on courtlistener.com.\n2. If it is a genuine parent-company bankruptcy, add it to CONFIRMED_BANKRUPTCIES in oracle/config.py, e.g. {"OpenAI": "2026-08-14"} (the filing date).\n3. Commit, then run the "Daily data update" workflow (Actions tab, Run workflow) to regenerate and deploy.\n\nIf it is a false positive (subsidiary, adversary proceeding, name collision), just close this issue - the scan keeps running daily.' "$pending")"
           echo "Alert issue created."
+
+      # A tripped GDELT circuit breaker is a GREEN run, so GitHub's failure email
+      # never fires. Alert (via a deduped Issue → email) only on a SUSTAINED
+      # throttle; auto-close the issue once GDELT recovers. Never fails the job.
+      - name: Alert on sustained GDELT throttling
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          THRESHOLD=3
+          streak=$(python -c "import json;print(json.load(open('data/buzz_meta.json')).get('gdelt_throttle_streak',0))" 2>/dev/null || echo 0)
+          echo "GDELT consecutive-throttle streak: $streak (alert at $THRESHOLD)"
+          num=$(gh issue list --state open --search "GDELT news feed throttled in:title" --json number --jq '.[0].number // empty' || echo "")
+          if [ "$streak" -ge "$THRESHOLD" ]; then
+            if [ -z "$num" ]; then
+              gh issue create \
+                --title "⚠️ GDELT news feed throttled ($streak+ days)" \
+                --body "$(printf 'The daily update has been unable to reach GDELT for **%s consecutive runs** — the rate-limit circuit breaker keeps tripping. Runs still succeed (all other data updates); only the bankruptcy-buzz news signal is stale.\n\nThis is usually GitHub Actions runner IPs (datacenter ranges) being throttled by GDELT. Options:\n- Wait: transient throttling often clears on its own; this issue auto-closes once a run gets through.\n- If it persists for many days, consider running the GDELT fetch from a non-datacenter host (or a proxy) and committing data/buzz_history.csv + data/buzz_events.csv.\n\nTo investigate: open the latest \"Daily data update\" run logs and search for \"GDELT unavailable\" / \"tripping breaker\".' "$streak")" || echo "issue create failed (non-fatal)"
+              echo "Opened GDELT-throttle issue."
+            else
+              gh issue comment "$num" --body "Still throttled — streak now $streak runs ($(date -u +%Y-%m-%d))." || true
+            fi
+          elif [ "$streak" = "0" ] && [ -n "$num" ]; then
+            gh issue comment "$num" --body "GDELT reachable again — auto-closing." || true
+            gh issue close "$num" || true
+          fi
+          exit 0

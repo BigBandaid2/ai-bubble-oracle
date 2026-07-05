@@ -165,6 +165,18 @@ def get_news_k():
     return _read_meta().get("news_k") or K_NEWS
 
 
+def record_gdelt_health():
+    """Persist a consecutive-throttled-run streak in buzz_meta.json, so the
+    scheduled workflow can alert only on a SUSTAINED GDELT outage (a tripped
+    breaker is a green run, invisible to GitHub's failure email). Increments
+    when GDELT was throttled this run, resets to 0 otherwise. Returns the streak."""
+    meta = _read_meta()
+    streak = meta.get("gdelt_throttle_streak", 0) + 1 if gdelt_blocked() else 0
+    meta["gdelt_throttle_streak"] = streak
+    _write_meta(meta)
+    return streak
+
+
 def _calibrate_k(conn):
     """Set k so a *notable* spike reads as clearly elevated buzz.
 

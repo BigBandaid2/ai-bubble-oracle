@@ -23,7 +23,8 @@ from oracle.h100 import fetch_h100_proxy, SEED_POINTS, import_h100_csv, export_h
 from oracle.polymarket import fetch_market_history, import_polymarket_csv, export_polymarket_csv
 from oracle.bankruptcy import scan_all, import_bankruptcy_csv, export_bankruptcy_csv
 from oracle.buzz import (update_signals, import_buzz_csv, export_buzz_csv,
-                         update_buzz_events, import_buzz_events_csv, export_buzz_events_csv)
+                         update_buzz_events, import_buzz_events_csv, export_buzz_events_csv,
+                         record_gdelt_health)
 from oracle.report import status_report
 from oracle.tracker import rebuild_events
 from oracle.yahoo import fetch_history, YahooError
@@ -100,6 +101,12 @@ def cmd_update(conn):
         update_buzz_events(conn)
     ev_kept = export_buzz_events_csv(conn)
     print(f"Buzz events: {ev_kept} cached articles in data/buzz_events.csv")
+
+    # Record GDELT health so the workflow can alert on a *sustained* throttle
+    # (a tripped breaker is a green run, so GitHub's failure email won't fire).
+    streak = record_gdelt_health()
+    print(f"GDELT health: {'THROTTLED' if streak else 'ok'}"
+          + (f" — {streak} consecutive throttled run(s)" if streak else ""))
 
     db.set_meta(conn, "last_update", datetime.now(timezone.utc).isoformat(timespec="seconds"))
 
