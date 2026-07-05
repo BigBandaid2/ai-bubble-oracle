@@ -321,7 +321,7 @@ const ASSETS = [
     ],
     transforms: [
       { tag: "flatten", text: "zip the parallel timestamp/OHLC arrays into rows" },
-      { tag: "incremental", text: "upsert on (ticker, date), re-pulled bars overwrite rather than duplicate" },
+      { tag: "incremental", text: "upsert on (ticker, date), re-pulled bars overwrite the existing row" },
     ],
     tests: ["unique (ticker, date)", "not_null: ticker, date, close"],
     cardinality: `${(DATA.prices.total).toLocaleString()} rows total across 7 tickers (live count from oracle.db).`,
@@ -366,7 +366,7 @@ const ASSETS = [
     dagster: "yahoo/int_prices_aths", dbt: "int_prices_aths",
     grain: "one row per (ticker, date), enriched",
     why: "Adds the running all-time high and drawdown, the core numbers every drawdown condition reads.",
-    desc: "A window function accumulates the all-time high per ticker (both close and intraday bases), then drawdown = 1 − price / ATH is derived, a positive magnitude for how far below the peak the price sits. This is where the raw price becomes “how far below its peak.”",
+    desc: "A window function accumulates the all-time high per ticker (both close and intraday bases), then drawdown = 1 − price / ATH is derived, a positive magnitude for how far below the peak the price sits. This is where the raw price becomes 'how far below its peak.'",
     upstream: ["stg_yahoo__prices"],
     schema: [
       { col: "price_key", type: "TEXT", kind: "key", ex: E.skey + "…" },
@@ -515,7 +515,7 @@ const ASSETS = [
     name: "fct_contract_resolution", mat: "table", cadence: "full rebuild",
     dagster: "marts/fct_contract_resolution", dbt: "fct_contract_resolution",
     grain: "one row per (parent condition_key, basis, date)",
-    why: "The rollup: every parent (incl. the root “≥3 of 6”) resolved from how many children are met within the rolling 90-day window.",
+    why: "The rollup: every parent (incl. the root '≥3 of 6') resolved from how many children are met within the rolling 90-day window.",
     desc: "A recursive rollup over dim_conditions. For each count node it sums the children's rolling-90-day met flags per day and compares to min_met. Because each child stays met for 90 days after it crosses, a parent is met when the required number of children have crossed within one 90-day span, the clarified rule. The example shows the 'supplier' parent: 1 of 5 children met (only SMCI), min_met 1 → MET.",
     upstream: ["fct_condition_daily", "condition_thresholds"],
     schema: [
@@ -608,7 +608,7 @@ const ASSETS = [
     name: "int_h100_runlength", mat: "table", cadence: "on rebuild",
     dagster: "h100/int_h100_runlength", dbt: "int_h100_runlength",
     grain: "one row per date, plus a met flag aligned to the master axis",
-    why: "Implements the “≤ $1.00 for five consecutive days” rule as a run-length window, and aligns the met flag to the contract's master date axis.",
+    why: "Implements the '≤ $1.00 for five consecutive days' rule as a run-length window, and aligns the met flag to the contract's master date axis.",
     desc: "Flags days at/below $1.00, tests for a 5-reading run, then forward-fills that met flag onto the master date axis so it lines up with the equity leaves (and obeys the same rolling 90-day rule). Feeds the H100-specific mart.",
     upstream: ["h100_prices"],
     schema: [
@@ -622,7 +622,7 @@ const ASSETS = [
       { tag: "range window", text: "min(below) over (order by date rows between 4 preceding and current row) = 1 → run of five" },
       { tag: "forward-fill", text: "align met onto the master date axis so count parents can sum it" },
     ],
-    tests: ["not_null: met", "source freshness (a stalled feed must not read as ‘not triggered’)"],
+    tests: ["not_null: met", "source freshness (a stalled feed must not read as 'not triggered')"],
     cardinality: "1:1 with h100_prices; met is all-false today (index ~$2.2, far above $1).",
   },
   {
@@ -691,7 +691,7 @@ const ASSETS = [
     dagster: "polymarket/history", dbt: "source('polymarket','prices_history')",
     grain: "one JSON document (array of timestamped prices)",
     why: "The market's own implied probability, the headline chart, plotted alongside the conditions it aggregates.",
-    desc: "Polymarket's public CLOB prices-history endpoint for the YES token of “AI bubble burst in 2026?”. interval=max returns the full history since the market opened (2025-11-20), fidelity=1440 gives daily resolution.",
+    desc: "Polymarket's public CLOB prices-history endpoint for the YES token of 'AI bubble burst in 2026?'. interval=max returns the full history since the market opened (2025-11-20), fidelity=1440 gives daily resolution.",
     upstream: [],
     json: `GET clob.polymarket.com/prices-history
   ?market=<YES token id>&interval=max&fidelity=1440
@@ -760,7 +760,7 @@ const ASSETS = [
     dagster: "recap/bankruptcy_checks", dbt: ", (landed by the tap)",
     grain: "one row per (date, entity)",
     why: "The persisted daily scan result, candidate counts per entity, accumulating a monitoring history.",
-    desc: "Candidates = Chapter 7/11 dockets whose case name actually contains the entity name. The exact-substring gate matters: the search engine stems, so a personal Chapter 7 by one “Chad Michael Anthrop” matches the Anthropic query, and is filtered out here.",
+    desc: "Candidates = Chapter 7/11 dockets whose case name actually contains the entity name. The exact-substring gate matters: the search engine stems, so a personal Chapter 7 by one 'Chad Michael Anthrop' matches the Anthropic query, and is filtered out here.",
     upstream: ["raw.courtlistener_search"],
     schema: [
       { col: "date", type: "TEXT", kind: "key", ex: E_BK.lastChecked || "2026-07-05" },
@@ -794,7 +794,7 @@ const ASSETS = [
       { tag: "human gate", text: "met = date ≥ confirmed filing date (config), NOT candidates > 0" },
       { tag: "forward-fill", text: "align onto the master date axis so the 1-of-2 parent can count it" },
     ],
-    tests: ["not_null: met", "source freshness (a stalled scan must not read as ‘no filings’)"],
+    tests: ["not_null: met", "source freshness (a stalled scan must not read as 'no filings')"],
     cardinality: "2 entities × master-axis days from the first scan onward.",
   },
   {
@@ -820,7 +820,7 @@ const ASSETS = [
     dagster: "recap/int_buzz_events", dbt: "int_buzz_events",
     grain: "one row per notable news-volume spike (≤ 15 across both entities)",
     why: "The clickable news item behind each spike marker, with a relevance judgment, so co-occurrence noise is labeled, not linked.",
-    desc: "For each notable spike, up to 25 candidate articles are pulled (artlist, that day, proximity query), then the on-topic one is chosen in two stages: (1) heuristic scoring, reward a headline that names the entity and uses a distress word, penalize known aggregators and “Top Headlines” digests; (2) an LLM pass (Claude Haiku) picks the single headline genuinely about the entity's own financial trouble, losses, cash burn, funding difficulty, layoffs, restructuring, or bankruptcy risk, or answers NONE (rejecting passing mentions, purely positive news, and unrelated bankruptcies). NONE (or a weak heuristic) sets related=0, and the marker/legend render muted and unlinked. Cached in data/buzz_events.csv; only new spikes trigger a fetch.",
+    desc: "For each notable spike, up to 25 candidate articles are pulled (artlist, that day, proximity query), then the on-topic one is chosen in two stages: (1) heuristic scoring, reward a headline that names the entity and uses a distress word, penalize known aggregators and 'Top Headlines' digests; (2) an LLM pass (Claude Haiku) picks the single headline genuinely about the entity's own financial trouble, losses, cash burn, funding difficulty, layoffs, restructuring, or bankruptcy risk, or answers NONE (rejecting passing mentions, purely positive news, and unrelated bankruptcies). NONE (or a weak heuristic) sets related=0, and the marker/legend render muted and unlinked. Cached in data/buzz_events.csv; only new spikes trigger a fetch.",
     upstream: ["raw.gdelt_news"],
     schema: [
       { col: "entity", type: "STRING", kind: "key", ex: "OpenAI" },
@@ -842,7 +842,7 @@ const ASSETS = [
     name: "int_bankruptcy_buzz", mat: "computed at generation", cadence: "on rebuild",
     dagster: "recap/int_bankruptcy_buzz", dbt: "int_bankruptcy_buzz",
     grain: "one buzz value per (entity, master-axis date)",
-    why: "The 0–1 “bankruptcy buzz” coefficient that makes the charts informative between filings, capped at 0.99 unless a human confirms.",
+    why: "The 0–1 'bankruptcy buzz' coefficient that makes the charts informative between filings, capped at 0.99 unless a human confirms.",
     desc: "Noisy-OR of independent evidence with a slow-release ratchet: raw = 1 − (1 − 0.70·sat(news)) · (1 − 0.10·sat(litigation)); buzz = min(0.99, max(raw, prev − 0.02/day)); floored at 0.90 while docket candidates await review; exactly 1.00 only from a human-confirmed filing date. sat(v) = v/(v+k). Calibrated on the 2022–26 backfill (calm ≈ 0.04, historical peak ≈ 0.54). Buzz is context and early warning only, it never feeds the contract count.",
     upstream: ["raw.gdelt_news", "bankruptcy_checks", "int_bankruptcy_state"],
     schema: [
@@ -885,7 +885,7 @@ const ASSETS = [
     name: "news_articles", mat: "table (planned)", cadence: "15-min poll",
     dagster: "gdelt/news_articles", dbt: ", ",
     grain: "one row per article URL",
-    why: "Feeds “OpenAI is acquired”, no structured source exists, so this is news + LLM classification.",
+    why: "Feeds 'OpenAI is acquired', no structured source exists, so this is news + LLM classification.",
     desc: "GDELT 2.0 Doc API plus curated RSS.",
     upstream: [],
     schema: [
@@ -1194,7 +1194,7 @@ function detailHtml(a) {
 
     ${a.sql ? `<h4>Logic</h4><pre class="sql">${a.sql}</pre>` : ""}
 
-    ${a.tests ? `<h4>Tests</h4><div class="tests">${a.tests.map(t => `<span class="t">✓ ${t}</span>`).join("")}</div>` : ""}
+    ${a.tests ? `<h4>Tests</h4><div class="tests">${a.tests.map(t => `<span class="t">${t}</span>`).join("")}</div>` : ""}
 
     ${a.cardinality ? `<h4>Cardinality</h4><p class="desc">${a.cardinality}</p>` : ""}
   `;
@@ -1209,11 +1209,11 @@ const SOURCE_INFO = {
       { t: "All-time-high basis", d: "End-of-day vs. intraday. Sets which peak a drawdown is measured from; intraday highs are higher, so they trigger more easily." },
     ],
     clarified: [
-      { t: "90-day window (clarified Nov 20, 2025)", d: "The three qualifying events must fall within a <b>single 90-day window that ends no later than the Dec 31, 2026 deadline</b>. Example: crossings on Jan 10, Feb 5 and Mar 3, 2026 qualify (one 90-day span); Jan 10, Apr 20 and Nov 1, 2026 do not (more than 90 days apart). The oracle uses this rolling-window rule, so a condition counts for 90 days after it crosses. The earlier “must be simultaneous” reading is ruled out and is no longer a selectable option." },
+      { t: "90-day window (clarified Nov 20, 2025)", d: "The three qualifying events must fall within a single 90-day window that ends no later than the Dec 31, 2026 deadline. Example: crossings on Jan 10, Feb 5 and Mar 3, 2026 qualify (one 90-day span); Jan 10, Apr 20 and Nov 1, 2026 do not (more than 90 days apart). The oracle uses this rolling-window rule, so a condition counts for 90 days after it crosses. The earlier 'must be simultaneous' reading is ruled out and is no longer a selectable option." },
     ],
     ambiguities: [
-      { t: "Which “all-time high”?", d: "The rules don't say closing or intraday high. We compute both and expose the choice as an option." },
-      { t: "Pre-existing drawdowns", d: "SMCI has been >50% below its 2024 peak since before the market opened. Whether a drawdown that predates the market counts is a judgment call resolvers have so far answered “no.”" },
+      { t: "Which 'all-time high'?", d: "The rules don't say closing or intraday high. We compute both and expose the choice as an option." },
+      { t: "Pre-existing drawdowns", d: "SMCI has been >50% below its 2024 peak since before the market opened. Whether a drawdown that predates the market counts is a judgment call resolvers have so far answered 'no.'" },
     ],
     caveats: [
       { t: "Unofficial feed", d: "Yahoo's public chart API, not an exchange feed. Prices are split-adjusted (not dividend-adjusted), matching how they're quoted." },
@@ -1231,7 +1231,7 @@ const SOURCE_INFO = {
   h100: {
     blurb: "The H100 rental condition (index ≤ $1.00/hr for five straight days) resolves on SiliconData's index, which is paywalled, so this source is a free public approximation.",
     options: [
-      { t: "Index tier, Neocloud vs. Hyperscaler", d: "SiliconData publishes two H100 indices and the rules name neither. <b>Neocloud (SDH100RT)</b> is the spot-like marketplace tier, neoclouds and providers like Vast.ai selling on-demand capacity; competitive, price-sensitive, ~$2/hr, and volatile (>20× the hyperscaler's daily variation). It's what our Vast.ai proxy measures. <b>Hyperscaler</b> is AWS/GCP/Azure/Oracle capacity priced via committed-use discounts, multi-year deals, and reserved instances, a ~3× premium (~$7.5/hr) and very stable (0.47% coefficient of variation). Because they differ ~3×, the choice is material: a fall to $1 is a plausible ~50% crash against neocloud but near-impossible against hyperscaler. The $1.00 trigger only makes sense for neocloud, which is the default." },
+      { t: "Index tier, Neocloud vs. Hyperscaler", d: "SiliconData publishes two H100 indices and the rules name neither. Neocloud (SDH100RT) is the spot-like marketplace tier, neoclouds and providers like Vast.ai selling on-demand capacity; competitive, price-sensitive, ~$2/hr, and volatile (>20× the hyperscaler's daily variation). It's what our Vast.ai proxy measures. Hyperscaler is AWS/GCP/Azure/Oracle capacity priced via committed-use discounts, multi-year deals, and reserved instances, a ~3× premium (~$7.5/hr) and very stable (0.47% coefficient of variation). Because they differ ~3×, the choice is material: a fall to $1 is a plausible ~50% crash against neocloud but near-impossible against hyperscaler. The $1.00 trigger only makes sense for neocloud, which is the default." },
     ],
     ambiguities: [
       { t: "Which index?", d: "Neocloud (~$2) vs. hyperscaler (~$7.5), the tier option above. It's the dominant ambiguity here, and it swings whether the condition is even reachable." },
@@ -1239,7 +1239,7 @@ const SOURCE_INFO = {
     ],
     caveats: [
       { t: "It's an approximation", d: "The neocloud series is the Vast.ai median (proxy); the hyperscaler series is a handful of values quoted in public SiliconData posts (no live feed). Neither is the paywalled SDH100RT the rules name, that's a future plan." },
-      { t: "Sparse, forward-only history", d: "Vast.ai exposes only current offers, so daily history accumulates going forward. The “5 consecutive days” test needs daily data to be meaningful; today the index (~$2.2) sits far above $1, so it is never met." },
+      { t: "Sparse, forward-only history", d: "Vast.ai exposes only current offers, so daily history accumulates going forward. The '5 consecutive days' test needs daily data to be meaningful; today the index (~$2.2) sits far above $1, so it is never met." },
     ],
     cardinality: [
       { asset: "raw.vast_offers", count: "~27", meaning: "Verified on-demand H100 offers pulled per run." },
@@ -1267,10 +1267,10 @@ const SOURCE_INFO = {
     blurb: "Daily scans of federal Chapter 7/11 dockets (CourtListener/RECAP) drive the OpenAI and Anthropic bankruptcy conditions, live monitoring with a human-confirm gate before any filing counts.",
     options: [],
     ambiguities: [
-      { t: "What counts as “bankruptcy”?", d: "A parent-company Chapter 7/11 petition, versus a subsidiary filing, an adversary proceeding, or a restructuring rumor. That judgment is exactly why the human gate exists, the scan surfaces candidates; a person confirms." },
+      { t: "What counts as 'bankruptcy'?", d: "A parent-company Chapter 7/11 petition, versus a subsidiary filing, an adversary proceeding, or a restructuring rumor. That judgment is exactly why the human gate exists, the scan surfaces candidates; a person confirms." },
     ],
     caveats: [
-      { t: "Scan, don't trust blindly", d: "The search engine stems names (a personal Chapter 7 by “Chad Michael Anthrop” matches the Anthropic query), so an exact-substring name gate filters candidates, and even a passing candidate never flips the condition without confirmation in config." },
+      { t: "Scan, don't trust blindly", d: "The search engine stems names (a personal Chapter 7 by 'Chad Michael Anthrop' matches the Anthropic query), so an exact-substring name gate filters candidates, and even a passing candidate never flips the condition without confirmation in config." },
       { t: "Query validated on FTX", d: "The same query against FTX returns its 29 real Chapter 11 filings from Nov 2022, so a genuine OpenAI/Anthropic petition would be caught." },
     ],
     cardinality: [
@@ -1286,7 +1286,7 @@ const SOURCE_INFO = {
     blurb: "News monitoring plus LLM classification for the OpenAI-acquisition condition. Planned (Phase 3).",
     options: [],
     ambiguities: [
-      { t: "What counts as “acquired”?", d: "An announced deal, a completed deal, or a majority-stake investment? “A consensus of credible reporting” is a judgment the rules explicitly allow." },
+      { t: "What counts as 'acquired'?", d: "An announced deal, a completed deal, or a majority-stake investment? 'A consensus of credible reporting' is a judgment the rules explicitly allow." },
     ],
     caveats: [
       { t: "Not yet wired", d: "Planned. An LLM classifies articles; a credible-reporting consensus plus a human-confirm gate is required before it counts." },
@@ -1313,10 +1313,10 @@ function landingHtml() {
     <h1 class="asset" style="font-family:var(--font)">Data Source Intro</h1>
     <p class="why">This section documents the data sources and processing logic behind the oracle, how raw external
       data is pulled and normalized to produce the graphs, evaluate the contract's conditions, and surface the
-      ambiguities and options each condition carries. Every source is a chain of Dagster-style <b>assets</b>
+      ambiguities and options each condition carries. Every source is a chain of Dagster-style assets
       (materialized tables/views handed step to step). Pick a source to see its options, lineage, and per-asset detail.</p>
     <div class="note">
-      <b>Implementation note.</b> The oracle runs today as one Python process against SQLite (<code>oracle.db</code>),
+      Implementation note. The oracle runs today as one Python process against SQLite (<code>oracle.db</code>),
       not a Dagster/dbt project. The asset names, materializations, and macros describe the <i>logical</i> pipeline so
       the normalization is legible in standard analytics-engineering terms. Assets marked
       <span class="statusbadge st live">LIVE</span> exist now; the rest are planned.
@@ -1366,7 +1366,7 @@ function sourceOverviewHtml(gid) {
        <p class="desc">Follow one condition end to end: ${E.ticker} closed at <b>${money(E.close)}</b>, against its
        ${bn} all-time high of <b>${money(ath)}</b>, a drawdown of <b>${(dd * 100).toFixed(1)}%</b>, at or past the
        50% threshold (trigger <b>${money(trig)}</b>), so <code>met = 1</code>. It is 1 of ${E.supplierTotal} hardware
-       suppliers past threshold, which (needing just 1) makes the parent “supplier collapse” condition MET.
+       suppliers past threshold, which (needing just 1) makes the parent 'supplier collapse' condition MET.
        Switch the basis in the sidebar options to see the numbers change.</p>`;
   }
 
@@ -1390,7 +1390,7 @@ function sourceOverviewHtml(gid) {
 
     <h4>Cardinality, rows at each stage</h4>
     <p class="desc">Cardinality is how many rows a stage holds. Each row below is a stage in the graph above, so you
-      can see where the pipeline <b>fans out</b> (a join multiplies rows) and where it <b>collapses</b>
+      can see where the pipeline fans out (a join multiplies rows) and where it collapses
       (aggregation), the shape and cost of the transform, ending in one compact served document.</p>
     <div class="rowcard"><table class="card2">
       <thead><tr><th>Rows</th><th>Stage (asset)</th><th>What it means</th></tr></thead>

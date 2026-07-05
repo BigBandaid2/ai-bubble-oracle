@@ -40,7 +40,7 @@ KEY_EVENTS = [
      "https://www.cnn.com/2024/08/04/investing/japan-nikkei-stock-rout-intl-hnk/index.html"),
     ("2025-01-27", "DeepSeek triggers NVDA −17% record drop",
      "https://www.cnbc.com/2025/01/27/nvidia-sheds-almost-600-billion-in-market-cap-biggest-drop-ever.html"),
-    ("2025-04-02", "“Liberation Day” tariffs announced",
+    ("2025-04-02", '"Liberation Day" tariffs announced',
      "https://www.cbsnews.com/news/trump-liberation-day-new-tariffs-us/"),
     ("2025-11-04", "SMCI earnings disappoint, analyst downgrade",
      "https://www.cnbc.com/2025/11/04/super-micro-smci-q1-earnings-report-2026.html"),

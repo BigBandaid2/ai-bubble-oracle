@@ -323,7 +323,7 @@ const $ = (s, el) => (el || document).querySelector(s);
 const OPTIONS = {
   basis: {
     label: "All-time-high basis",
-    help: "The rules say “all-time high” but not whether it means the highest close or the highest intraday price. Intraday triggers more easily.",
+    help: "The rules say 'all-time high' but not whether it means the highest close or the highest intraday price. Intraday triggers more easily.",
     values: [
       { val: "close", t: "End-of-day", d: "Closing price vs. highest close" },
       { val: "intraday", t: "Intraday", d: "Day's low vs. highest intraday high" },
@@ -630,7 +630,7 @@ function nodeCard(node, depth, parentLabel) {
       leg.innerHTML = visible.map(e => {
         const k = evs.indexOf(e);   // number by full-list index so it matches the badge
         const d = new Date(e.date + "T00:00:00Z");
-        const ds = d.toLocaleDateString("en-US", { month: "short", year: "2-digit", timeZone: "UTC" }).replace(" ", " ’");
+        const ds = d.toLocaleDateString("en-US", { month: "short", year: "2-digit", timeZone: "UTC" }).replace(" ", " '");
         const body = `<a href="${e.url}" target="_blank" rel="noopener">${e.title || "news spike"}</a>` +
           `${e.domain ? ` <span class="evdate">${e.domain}</span>` : ""}`;
         return `<li><span class="evnum">${k + 1}</span><span>${body}</span> <span class="evdate">${ds}</span></li>`;
@@ -738,7 +738,7 @@ function sp500Card() {
   leg.innerHTML = visible.map(e => {
     const n = s.events.indexOf(e) + 1;
     const d = new Date(e.date + "T00:00:00Z");
-    const ds = d.toLocaleDateString("en-US", { month: "short", year: "2-digit", timeZone: "UTC" }).replace(" ", " ’");
+    const ds = d.toLocaleDateString("en-US", { month: "short", year: "2-digit", timeZone: "UTC" }).replace(" ", " '");
     const label = e.url
       ? `<a href="${e.url}" target="_blank" rel="noopener">${e.label}</a>` : e.label;
     return `<li><span class="evnum">${n}</span><span>${label}</span> <span class="evdate">${ds}</span></li>`;
@@ -774,7 +774,7 @@ function renderCards() {
   flat.sort((a, b) => metRank(a.node) - metRank(b.node));
   flat.forEach(e => { if (show(e.node.key)) grid.appendChild(nodeCard(e.node, e.depth, e.parentLabel)); });
   if (!grid.children.length) {
-    grid.innerHTML = `<div id="cardgrid-empty">All graphs are hidden, use the checkboxes in the sidebar (or “Show all”) to bring them back.</div>`;
+    grid.innerHTML = `<div id="cardgrid-empty">All graphs are hidden. Click any item in the sidebar, or "Show all", to bring them back.</div>`;
   }
 }
 
@@ -1121,10 +1121,10 @@ function renderOptions() {
   host.insertAdjacentHTML("beforeend", `
     <div class="clarified">
       <div class="clarified-h">90-day window, clarified rule</div>
-      The three qualifying events must fall within a <b>single 90-day window that ends no later than the
-      Dec 31, 2026 deadline</b> (clarification added Nov 20, 2025). For example, crossings on Jan 10, Feb 5 and
+      The three qualifying events must fall within a single 90-day window that ends no later than the
+      Dec 31, 2026 deadline (clarification added Nov 20, 2025). For example, crossings on Jan 10, Feb 5 and
       Mar 3, 2026 qualify (one 90-day span), but Jan 10, Apr 20 and Nov 1, 2026 do not (more than 90 days apart).
-      The oracle uses this rolling-window rule; the earlier “must be simultaneous” reading is ruled out, so this
+      The oracle uses this rolling-window rule; the earlier "must be simultaneous" reading is ruled out, so this
       is no longer a selectable option.
     </div>`);
 }
@@ -1256,11 +1256,11 @@ function renderAmbiguities() {
       </div>
       <div class="ambibody">
         <div class="ambirow">
-          <div class="ambiq"><b>“All-time high”, end-of-day close or intraday high?</b> Intraday highs sit higher, so a stock reaches its −50% mark sooner. Decisive for any condition hovering near its threshold.</div>
+          <div class="ambiq">"All-time high", end-of-day close or intraday high? Intraday highs sit higher, so a stock reaches its −50% mark sooner. Decisive for any condition hovering near its threshold.</div>
           ${ambiSeg("basis", [{ val: "close", t: "End-of-day" }, { val: "intraday", t: "Intraday" }])}
         </div>
         <div class="ambirow">
-          <div class="ambiq"><b>Which SiliconData H100 index?</b> Neocloud (~$2/hr) vs. hyperscaler (~$7.5/hr). The $1.00 trigger is only realistically reachable against the neocloud tier.</div>
+          <div class="ambiq">Which SiliconData H100 index? Neocloud (~$2/hr) vs. hyperscaler (~$7.5/hr). The $1.00 trigger is only realistically reachable against the neocloud tier.</div>
           ${ambiSeg("h100index", [{ val: "neocloud", t: "Neocloud" }, { val: "hyperscaler", t: "Hyperscaler" }])}
         </div>
         <div class="ambifoot">Neither is specified in the rules. Full breakdown on the <a href="datasources.html#src:yahoo">Data Sources</a> page.</div>

@@ -91,50 +91,50 @@
 
     <h2>What this is</h2>
     <p>Looking for something more precise than the vibes, I found a Polymarket bet, <a href="https://polymarket.com/event/ai-bubble-burst-by" target="_blank" rel="noopener">"AI bubble burst in
-      2026?"</a>, and got drawn to its <b>codification of terms</b>. Here, finally, was a concrete definition: six
+      2026?"</a>, and got drawn to its codification of terms. Here, finally, was a concrete definition: six
       specific conditions that either happen or they don't. That gave me a kernel to anchor my thinking and try to
       build a tracker for this wild thing we're all living through. I'm not a gambling man, I just want to know
       how much longer I can blissfully sleep before everything goes to shit.</p>
     <p>So the Oracle takes that codified definition and tracks, from public data, exactly where we stand against
       it in real time. Each condition (NVIDIA and semiconductor drawdowns, a major supplier collapse, an
       OpenAI/Anthropic bankruptcy or acquisition, H100 rental prices cratering) gets its own live chart, and the
-      contract's <b>"3 of 6 within 90 days"</b> rule is evaluated in front of you.</p>
+      contract's "3 of 6 within 90 days" rule is evaluated in front of you.</p>
     <p>It is deliberately transparent about <i>how</i> it decides. The
       <a href="datasources.html">Data Sources</a> section documents every feed, the processing pipeline that
-      normalizes it, and, importantly, the <b>ambiguities and options</b> baked into the rules (what counts as
+      normalizes it, and the ambiguities and options baked into the rules (what counts as
       an all-time high, how the 90-day window is read, which H100 index applies), so you can see how each
       interpretation changes the answer.</p>
 
     <h2>Where it's going</h2>
     <p>Tracking a single market's resolution conditions is the starting point, not the destination. The larger
-      goal is to build a living dashboard of the <b>data sources and indicators that actually help anticipate</b>
+      goal is to build a living dashboard of the data sources and indicators that actually help anticipate
       an AI downturn, well beyond one market's rulebook.</p>
     <ul>
       <li>Wire up the conditions that are still manual today: bankruptcy dockets and acquisition news.</li>
       <li>Add leading indicators (compute prices, capex and datacenter buildout, funding rounds, model-economics
         signals) that may foreshadow a turn before the headline conditions trip.</li>
-      <li>Make every indicator inspectable and every assumption a toggle, so the tool argues its case rather than
-        asserting a number.</li>
+      <li>Make every indicator inspectable and every assumption a toggle, so you can see how it reaches each
+        number.</li>
     </ul>
 
     <h2>How it's built</h2>
     <p>Full disclosure, I don't actually know how to do anything. I'm just trying to figure out this
       vibe-coding thing like the rest of you. I had a long quiet weekend while my wife and kid were out of town
-      and bam, here we are. This was built almost entirely with <b>Claude Code</b>, switching between
-      <b>Opus</b> for the heavy lifting and <b>Fable</b> for fast iteration.</p>
+      and bam, here we are. This was built almost entirely with Claude Code, switching between
+      Opus for the heavy lifting and Fable for fast iteration.</p>
     <p>The stack is deliberately lightweight:</p>
     <ul>
-      <li><b>Python (standard library only, zero dependencies)</b> generates the site, hand-written HTML, CSS, and
-        vanilla JavaScript, with every chart drawn on an HTML <b>&lt;canvas&gt;</b> (no charting library, no
+      <li>Python (standard library only, zero dependencies) generates the site, hand-written HTML, CSS, and
+        vanilla JavaScript, with every chart drawn on an HTML &lt;canvas&gt; (no charting library, no
         front-end framework).</li>
-      <li><b>SQLite</b> as the working data store, rebuilt from committed CSVs on each run.</li>
-      <li>Free public data feeds: <b>Yahoo Finance</b> (equity prices), <b>Polymarket's CLOB API</b> (the market's
-        own odds), <b>CourtListener / RECAP</b> (bankruptcy dockets), <b>GDELT</b> (a news-volume signal), and
-        <b>Vast.ai</b> (an H100 rental-price proxy).</li>
-      <li><b>Claude Haiku</b> classifies which news articles genuinely concern a company's financial distress,
+      <li>SQLite as the working data store, rebuilt from committed CSVs on each run.</li>
+      <li>Free public data feeds: Yahoo Finance (equity prices), Polymarket's CLOB API (the market's
+        own odds), CourtListener / RECAP (bankruptcy dockets), GDELT (a news-volume signal), and
+        Vast.ai (an H100 rental-price proxy).</li>
+      <li>Claude Haiku classifies which news articles genuinely concern a company's financial distress,
         keeping the buzz markers honest.</li>
-      <li><b>GitHub Actions</b> runs the data refresh on a daily schedule; <b>Vercel</b> hosts the static site and
-        auto-deploys on every push, with <b>Vercel Web Analytics</b> for traffic.</li>
+      <li>GitHub Actions runs the data refresh on a daily schedule; Vercel hosts the static site and
+        auto-deploys on every push, with Vercel Web Analytics for traffic.</li>
     </ul>
 
     <h2>Open source</h2>
@@ -147,14 +147,13 @@
     <p>The data refreshes automatically every day via a GitHub Action, and the site redeploys on every push.</p>
 
     <div class="note">
-      <b>This is a monitoring tool, not the referee.</b> The Polymarket market itself resolves through UMA's
-      optimistic oracle, humans reading the rules, not through this site or any code here. Treat these numbers
-      as a fast, transparent read on where things stand, not as the official resolution. Nothing here is
-      financial advice.
+      This is a monitoring tool. The Polymarket market resolves through UMA's optimistic oracle, humans reading
+      the rules, and this site plays no part in that. Treat these numbers as a quick, transparent read on where
+      things stand, and check the official resolution yourself. Nothing here is financial advice.
     </div>
 
     <div class="note">
-      <b>Unaffiliated, and a hobby.</b> This is an independent hobby project, not affiliated with, endorsed by,
+      Unaffiliated, and a hobby. This is an independent hobby project, not affiliated with, endorsed by,
       or connected to Polymarket in any way.
     </div>
 
