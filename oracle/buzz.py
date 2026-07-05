@@ -70,6 +70,38 @@ def _gdelt_query(entity):
     return f"({clauses})"
 
 
+# --- shared GDELT rate limiter --------------------------------------------
+# GDELT's free API is strict (≈1 request / 5 s) and drops you into a penalty
+# box after bursts (429, or a plain-text notice with HTTP 200). One getter
+# enforces a global minimum spacing and backs off hard on refusal, so every
+# call in a run is paced no matter which function makes it.
+GDELT_MIN_INTERVAL = 8.0
+_last_gdelt = [0.0]
+
+
+def _gdelt_get(url, timeout=60, tries=4):
+    """GET a GDELT URL as JSON (paced + backed off), or None after `tries`."""
+    for attempt in range(tries):
+        wait = GDELT_MIN_INTERVAL - (time.monotonic() - _last_gdelt[0])
+        if wait > 0:
+            time.sleep(wait)
+        req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                body = resp.read().decode("utf-8")
+            _last_gdelt[0] = time.monotonic()
+            if body.lstrip()[:1] in "{[":
+                return json.loads(body)
+            raise ValueError("non-JSON response (rate-limit notice)")
+        except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError,
+                json.JSONDecodeError, ValueError) as e:
+            _last_gdelt[0] = time.monotonic()
+            backoff = 20 * (attempt + 1)
+            print(f"GDELT attempt {attempt + 1} failed ({e}); backoff {backoff}s")
+            time.sleep(backoff)
+    return None
+
+
 # --- adaptive calibration + query-version persistence ----------------------
 
 def _read_meta():
@@ -114,23 +146,18 @@ def fetch_news_timeline(entity, backfill=False):
         params["enddatetime"] = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
     else:
         params["timespan"] = "3months"
-    url = GDELT_URL + "?" + urllib.parse.urlencode(params)
-    req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
-    for attempt in range(4):   # GDELT: 1 request / 5s, with a penalty box
-        try:
-            with urllib.request.urlopen(req, timeout=60) as resp:
-                body = resp.read().decode("utf-8")
-            data = json.loads(body)
-            per_day = {}
-            for p in data["timeline"][0]["data"]:
-                d = p["date"][:8]
-                iso = f"{d[:4]}-{d[4:6]}-{d[6:8]}"
-                per_day[iso] = max(per_day.get(iso, 0.0), float(p["value"]))
-            return sorted(per_day.items())
-        except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, KeyError, IndexError) as e:
-            print(f"GDELT news fetch attempt {attempt + 1} failed for {entity}: {e}")
-            time.sleep(15 * (attempt + 1))
-    return None
+    data = _gdelt_get(GDELT_URL + "?" + urllib.parse.urlencode(params))
+    if not data:
+        return None
+    try:
+        per_day = {}
+        for p in data["timeline"][0]["data"]:
+            d = p["date"][:8]
+            iso = f"{d[:4]}-{d[4:6]}-{d[6:8]}"
+            per_day[iso] = max(per_day.get(iso, 0.0), float(p["value"]))
+        return sorted(per_day.items())
+    except (KeyError, IndexError, ValueError, TypeError):
+        return None
 
 
 def fetch_docket_total(entity):
@@ -148,41 +175,58 @@ def fetch_docket_total(entity):
     return None
 
 
+def _has_news(conn, entity):
+    return any(r["news_share"] is not None for r in db.load_buzz(conn, entity))
+
+
+def all_backfilled(meta=None):
+    bf = (meta or _read_meta()).get("backfilled", {})
+    return all(bf.get(e) == NEWS_QUERY_VERSION for e in ENTITIES)
+
+
 def update_signals(conn):
     """Daily signal refresh: GDELT news + docket totals.
 
-    A full re-backfill runs when the query version changed (or an entity has no
-    news yet). Old news is cleared only after a *successful* fetch, so a failed
-    query can never wipe the existing coefficient.
+    Migration is spread across runs to stay under GDELT's rate limit: AT MOST
+    ONE entity is (re-)backfilled per run — the first one not yet at the current
+    query version. Entities already migrated get their light 3-month refresh.
+    Old news is cleared only after a successful fetch, so a failed query can
+    never wipe the existing coefficient. Returns True if a backfill ran.
     """
     meta = _read_meta()
-    force = meta.get("news_query_version") != NEWS_QUERY_VERSION
+    bf = dict(meta.get("backfilled", {}))
     today = datetime.now(timezone.utc).date().isoformat()
-    ok = True
-    for i, entity in enumerate(ENTITIES):
-        if i:
-            time.sleep(6)   # GDELT rate limit
-        has_news = any(r["news_share"] is not None for r in db.load_buzz(conn, entity))
-        backfill = force or not has_news
-        pairs = fetch_news_timeline(entity, backfill=backfill)
-        if pairs:
-            if backfill:
-                db.clear_buzz_news(conn, entity)
-            db.upsert_buzz_news(conn, entity, pairs)
-            print(f"Buzz news ({entity}): {len(pairs)} days "
-                  f"({'backfill' if backfill else 'refresh'}), latest {pairs[-1][1]:.4f}%")
+    did_backfill = False
+    for entity in ENTITIES:
+        needs = bf.get(entity) != NEWS_QUERY_VERSION or not _has_news(conn, entity)
+        if needs:
+            if did_backfill:
+                print(f"Buzz news ({entity}): backfill deferred to a later run")
+            else:
+                pairs = fetch_news_timeline(entity, backfill=True)
+                if pairs:
+                    db.clear_buzz_news(conn, entity)
+                    db.upsert_buzz_news(conn, entity, pairs)
+                    bf[entity] = NEWS_QUERY_VERSION
+                    did_backfill = True
+                    print(f"Buzz news ({entity}): {len(pairs)} days backfilled (v{NEWS_QUERY_VERSION})")
         else:
-            ok = False
+            pairs = fetch_news_timeline(entity, backfill=False)
+            if pairs:
+                db.upsert_buzz_news(conn, entity, pairs)
+                print(f"Buzz news ({entity}): {len(pairs)} days refreshed, latest {pairs[-1][1]:.4f}%")
         total = fetch_docket_total(entity)
         if total is not None:
             db.upsert_buzz_dockets(conn, today, entity, total)
             print(f"Buzz litigation ({entity}): {total} total dockets")
 
-    if force and ok:
-        meta["news_query_version"] = NEWS_QUERY_VERSION
+    meta["backfilled"] = bf
+    meta["news_query_version"] = NEWS_QUERY_VERSION
+    if all_backfilled(meta):
         meta["news_k"] = _calibrate_k(conn)
-        _write_meta(meta)
-        print(f"Recalibrated buzz: query v{NEWS_QUERY_VERSION}, news_k={meta['news_k']:.6f}")
+        print(f"Buzz calibrated: all entities on v{NEWS_QUERY_VERSION}, news_k={meta['news_k']:.6f}")
+    _write_meta(meta)   # always write so the file exists for the commit step
+    return did_backfill
 
 
 def sat(v, k):
@@ -283,26 +327,19 @@ def fetch_spike_candidates(entity, date, n=25):
         "sort": "hybridrel", "format": "json",
         "startdatetime": d + "000000", "enddatetime": d + "235959",
     }
-    url = GDELT_URL + "?" + urllib.parse.urlencode(params)
-    req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
-    for attempt in range(3):
-        try:
-            with urllib.request.urlopen(req, timeout=60) as resp:
-                data = json.loads(resp.read().decode("utf-8"))
-            out, seen = [], set()
-            for a in (data.get("articles") or []):
-                title = (a.get("title") or "").strip()
-                key = title.lower()[:80]
-                if not title or key in seen:
-                    continue
-                seen.add(key)
-                out.append({"title": title[:160], "url": a.get("url") or "",
-                            "domain": a.get("domain") or ""})
-            return out
-        except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as e:
-            print(f"Spike-candidates attempt {attempt + 1} failed ({entity} {date}): {e}")
-            time.sleep(10 * (attempt + 1))
-    return None
+    data = _gdelt_get(GDELT_URL + "?" + urllib.parse.urlencode(params))
+    if data is None:
+        return None
+    out, seen = [], set()
+    for a in (data.get("articles") or []):
+        title = (a.get("title") or "").strip()
+        key = title.lower()[:80]
+        if not title or key in seen:
+            continue
+        seen.add(key)
+        out.append({"title": title[:160], "url": a.get("url") or "",
+                    "domain": a.get("domain") or ""})
+    return out
 
 
 # Layer 3 — LLM classification (Claude Haiku via the Messages API).
@@ -365,21 +402,27 @@ def select_best_article(entity, date):
     return {**cands[idx], "related": 1}
 
 
+MAX_FETCH_PER_RUN = 8    # cap GDELT article calls per run (spikes fill over days)
+
+
 def update_buzz_events(conn):
     """Select (once) the on-topic article behind each notable spike; cache it.
 
-    Prunes cached articles for dates no longer among the notable spikes (spike
-    dates shift when the news query/backfill changes). Only rows with a URL are
-    treated as cached, so transient failures are retried on later runs.
+    Only runs when both entities are on the current query version (so spikes are
+    computed on consistent data). Prunes cached articles for dates no longer
+    among the notable spikes, and fetches at most MAX_FETCH_PER_RUN new ones per
+    run — the rest fill in over subsequent daily runs. Only rows with a URL are
+    treated as cached, so transient failures retry.
     """
+    if not all_backfilled():
+        print("Buzz events: skipped (news backfill still in progress)")
+        return None, None
     spikes, threshold = find_notable_spikes(conn)
     pruned = db.delete_buzz_events_not_in(conn, {(e, d) for e, d, _ in spikes})
     cached = {(r["entity"], r["date"]) for r in db.load_buzz_events(conn) if r["url"]}
+    todo = [s for s in spikes if (s[0], s[1]) not in cached]
     fetched = 0
-    for entity, date, share in spikes:
-        if (entity, date) in cached:
-            continue
-        time.sleep(6)   # GDELT rate limit
+    for entity, date, share in todo[:MAX_FETCH_PER_RUN]:
         art = select_best_article(entity, date)
         db.upsert_buzz_event(conn, entity, date,
                              art.get("title") if art else None,
@@ -390,8 +433,9 @@ def update_buzz_events(conn):
         tag = "" if not art else ("" if art.get("related") else " [flagged unrelated]")
         print(f"Buzz event ({entity} {date}, {share:.4f}%): "
               f"{(art or {}).get('domain') or 'no article'}{tag}")
+    remaining = max(0, len(todo) - fetched)
     print(f"Buzz events: {len(spikes)} spikes (threshold {threshold:.4f}%), "
-          f"{fetched} fetched, {pruned} pruned")
+          f"{fetched} fetched, {pruned} pruned, {remaining} deferred to later runs")
     return spikes, threshold
 
 

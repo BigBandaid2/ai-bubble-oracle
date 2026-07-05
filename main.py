@@ -87,13 +87,17 @@ def cmd_update(conn):
     # Bankruptcy-buzz signals (GDELT news volume + litigation pulse). The
     # coefficient itself is computed at page-generation time.
     import_buzz_csv(conn)
-    update_signals(conn)
+    did_backfill = update_signals(conn)
     bz_kept = export_buzz_csv(conn)
     print(f"Buzz history: {bz_kept} signal rows in data/buzz_history.csv")
 
-    # Notable buzz spikes: fetch (once) the news article behind each.
+    # Notable buzz spikes: pick the news item behind each. Skip on backfill runs
+    # so the heavy GDELT timeline call and the article calls don't stack up.
     import_buzz_events_csv(conn)
-    update_buzz_events(conn)
+    if did_backfill:
+        print("Buzz events: skipped this run (news backfill ran; GDELT cooldown)")
+    else:
+        update_buzz_events(conn)
     ev_kept = export_buzz_events_csv(conn)
     print(f"Buzz events: {ev_kept} cached articles in data/buzz_events.csv")
 
