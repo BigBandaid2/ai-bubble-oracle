@@ -23,14 +23,14 @@ SP500_TICKER = "^GSPC"
 KEY_EVENTS = [
     ("2022-11-30", "ChatGPT released"),
     ("2023-05-24", "Nvidia blowout AI guidance"),
-    ("2024-06-05", "Nvidia ~$3T, overtakes Apple #2"),
-    ("2024-08-05", "Yen carry-trade unwind"),
+    ("2024-06-05", "Nvidia hits ~$3T, overtakes Apple #2"),
+    ("2024-08-05", "Yen carry-trade unwind sparks selloff"),
     ("2025-01-27", "DeepSeek triggers NVDA −17% record drop"),
     ("2025-04-02", "“Liberation Day” tariffs announced"),
+    ("2025-11-04", "SMCI Q1 FY2026 earnings disappoint; stock drops ~40%"),
     ("2026-02-28", "US/Israel strike kills Khamenei"),
-    ("2026-06-08", "OpenAI files for $1T+ IPO"),
-    ("2026-06-12", "US export controls disable Anthropic Mythos 5/Fable 5"),
-    ("2026-06-12", "SpaceX largest-ever IPO"),
+    ("2026-05-28", "Anthropic hits $965B valuation, overtakes OpenAI"),
+    ("2026-06-08", "OpenAI confidentially files for IPO"),
 ]
 
 # The contract as a condition tree, from the Polymarket "AI bubble burst in
