@@ -79,35 +79,70 @@ def _gdelt_query(entity):
     return f"({clauses})"
 
 
-# --- shared GDELT rate limiter --------------------------------------------
+# --- shared GDELT rate limiter + circuit breaker ---------------------------
 # GDELT's free API is strict (≈1 request / 5 s) and drops you into a penalty
-# box after bursts (429, or a plain-text notice with HTTP 200). One getter
-# enforces a global minimum spacing and backs off hard on refusal, so every
-# call in a run is paced no matter which function makes it.
-GDELT_MIN_INTERVAL = 8.0
+# box after bursts. Critically, the box EXTENDS every time you hit it while
+# hot, and datacenter IPs (like GitHub Actions runners) are throttled far more
+# aggressively than residential ones — so the worst thing to do is keep
+# calling. When refused, GDELT answers with either HTTP 429 or an HTTP-200
+# plain-text notice ("Please limit requests to one every 5 seconds…").
+#
+# This one getter, used by EVERY GDELT call, therefore:
+#   1. enforces a global minimum spacing between all calls (no bursts),
+#   2. retries a couple of times with escalating backoff for transient blips,
+#   3. trips a per-run CIRCUIT BREAKER once GDELT is clearly throttling us —
+#      after which every further GDELT call this run returns None immediately
+#      instead of grinding (which is what made a run take ~24 min). A fresh
+#      process per scheduled run resets the breaker, so work resumes next run.
+GDELT_MIN_INTERVAL = 10.0     # headroom over the documented 1-req/5-s limit
+GDELT_MAX_TRIES = 3
 _last_gdelt = [0.0]
+_gdelt_blocked = [False]      # per-run circuit breaker
 
 
-def _gdelt_get(url, timeout=60, tries=4):
-    """GET a GDELT URL as JSON (paced + backed off), or None after `tries`."""
-    for attempt in range(tries):
-        wait = GDELT_MIN_INTERVAL - (time.monotonic() - _last_gdelt[0])
-        if wait > 0:
-            time.sleep(wait)
-        req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+def gdelt_blocked():
+    """True once GDELT has throttled us this run (callers should stop trying)."""
+    return _gdelt_blocked[0]
+
+
+def _is_throttle_notice(body):
+    b = body.lstrip().lower()
+    return b[:1] not in "{[" and (
+        b.startswith("please") or "limit requests" in b
+        or "high-traffic" in b or "high traffic" in b)
+
+
+def _gdelt_get(url, timeout=60):
+    """GET a GDELT URL as JSON — paced, retried, and circuit-broken. None on failure."""
+    if _gdelt_blocked[0]:
+        return None   # already throttled this run: don't hammer / extend the box
+    for attempt in range(GDELT_MAX_TRIES):
+        gap = GDELT_MIN_INTERVAL - (time.monotonic() - _last_gdelt[0])
+        if gap > 0:
+            time.sleep(gap)
         try:
+            req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
             with urllib.request.urlopen(req, timeout=timeout) as resp:
                 body = resp.read().decode("utf-8")
             _last_gdelt[0] = time.monotonic()
-            if body.lstrip()[:1] in "{[":
+            if _is_throttle_notice(body):
+                reason = "rate-limit notice"
+            elif body.lstrip()[:1] in "{[":
                 return json.loads(body)
-            raise ValueError("non-JSON response (rate-limit notice)")
+            else:
+                reason = "unexpected non-JSON response"
         except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError,
-                json.JSONDecodeError, ValueError) as e:
+                json.JSONDecodeError) as e:
             _last_gdelt[0] = time.monotonic()
-            backoff = 20 * (attempt + 1)
-            print(f"GDELT attempt {attempt + 1} failed ({e}); backoff {backoff}s")
+            reason = str(e)
+        if attempt < GDELT_MAX_TRIES - 1:
+            backoff = 20 * (2 ** attempt)   # 20s, then 40s
+            print(f"GDELT unavailable ({reason}); retry {attempt + 2}/{GDELT_MAX_TRIES} in {backoff}s")
             time.sleep(backoff)
+        else:
+            _gdelt_blocked[0] = True
+            print(f"GDELT unavailable ({reason}); tripping breaker — skipping further "
+                  f"GDELT calls this run (resumes next run)")
     return None
 
 
@@ -445,7 +480,11 @@ def update_buzz_events(conn):
     todo = [s for s in spikes if (s[0], s[1]) not in cached]
     fetched = 0
     for entity, date, share in todo[:MAX_FETCH_PER_RUN]:
+        if gdelt_blocked():
+            break   # throttled — leave the rest uncached so they retry next run
         art = select_best_article(entity, date)
+        if art is None and gdelt_blocked():
+            break   # this fetch was throttled (not a genuine "no article") — don't cache it
         db.upsert_buzz_event(conn, entity, date,
                              art.get("title") if art else None,
                              art.get("url") if art else None,
@@ -456,8 +495,9 @@ def update_buzz_events(conn):
         print(f"Buzz event ({entity} {date}, {share:.4f}%): "
               f"{(art or {}).get('domain') or 'no article'}{tag}")
     remaining = max(0, len(todo) - fetched)
+    note = " (GDELT throttled — stopped early)" if gdelt_blocked() else ""
     print(f"Buzz events: {len(spikes)} spikes (threshold {threshold:.4f}%), "
-          f"{fetched} fetched, {pruned} pruned, {remaining} deferred to later runs")
+          f"{fetched} fetched, {pruned} pruned, {remaining} deferred to later runs{note}")
     return spikes, threshold
 
 
