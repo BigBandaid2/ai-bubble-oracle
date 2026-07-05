@@ -64,10 +64,13 @@ CAP = 0.99
 # bankruptcy to the wider distress narrative (losses, layoffs, funding
 # trouble); the LLM pass then filters markers down to genuine trouble, so the
 # net can be wide without the markers becoming noisy.
+# Kept to ~7 clauses: GDELT rate-limits heavy multi-clause timelinevol backfills
+# hard (13 clauses got 429'd persistently; ~5-7 backfills cleanly). These cover
+# the distress narrative; near-synonyms (insolvent, liquidation, downturn) were
+# dropped as redundant with the LLM doing the fine filtering downstream.
 NEAR = 30
-DISTRESS_NEAR = ("bankruptcy", "insolvency", "bankrupt", "insolvent", "liquidation",
-                 "losses", "layoffs", "unprofitable", "restructuring", "bailout",
-                 "collapse", "cash-strapped", "downturn")
+DISTRESS_NEAR = ("bankruptcy", "insolvency", "losses", "layoffs",
+                 "restructuring", "bailout", "unprofitable")
 
 
 def _gdelt_query(entity):
