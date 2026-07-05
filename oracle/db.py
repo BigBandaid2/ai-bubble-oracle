@@ -77,6 +77,16 @@ CREATE TABLE IF NOT EXISTS buzz_signals (
     dockets_total INTEGER,
     PRIMARY KEY (date, entity)
 );
+
+-- Cached news articles behind notable buzz spikes (fetched once per spike).
+CREATE TABLE IF NOT EXISTS buzz_events (
+    entity TEXT NOT NULL,
+    date   TEXT NOT NULL,
+    title  TEXT,
+    url    TEXT,
+    domain TEXT,
+    PRIMARY KEY (entity, date)
+);
 """
 
 
@@ -204,6 +214,20 @@ def load_buzz(conn, entity):
     return conn.execute(
         "SELECT date, news_share, dockets_total FROM buzz_signals WHERE entity = ? ORDER BY date",
         (entity,),
+    ).fetchall()
+
+
+def upsert_buzz_event(conn, entity, date, title, url, domain):
+    conn.execute(
+        "INSERT OR REPLACE INTO buzz_events (entity, date, title, url, domain) VALUES (?, ?, ?, ?, ?)",
+        (entity, date, title, url, domain),
+    )
+    conn.commit()
+
+
+def load_buzz_events(conn):
+    return conn.execute(
+        "SELECT entity, date, title, url, domain FROM buzz_events ORDER BY date"
     ).fetchall()
 
 

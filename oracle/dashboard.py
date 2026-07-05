@@ -115,7 +115,7 @@ def _rental_type_series(rows, node, master):
     }
 
 
-def _docket_json(conn, node, master):
+def _docket_json(conn, node, master, spikes=None):
     """Payload for a bankruptcy-docket condition.
 
     Ships the buzz-coefficient series (news + litigation + docket floor, with
@@ -139,11 +139,27 @@ def _docket_json(conn, node, master):
     buzz = compute_buzz(master, news_by_date, dockets_pairs, dict(pairs), confirmed)
     cur_buzz = next((v for v in reversed(buzz) if v is not None), None)
 
+    # notable spikes for this entity, with their cached news articles
+    idx = {d: i for i, d in enumerate(master)}
+    arts = {(r["entity"], r["date"]): r for r in db.load_buzz_events(conn)}
+    events = []
+    for entity, d, share in (spikes or []):
+        if entity != node["entity"] or d not in idx:
+            continue
+        a = arts.get((entity, d))
+        events.append({
+            "date": d, "i": idx[d], "share": share,
+            "title": (a["title"] if a and a["title"] else None),
+            "url": (a["url"] if a and a["url"] else None),
+            "domain": (a["domain"] if a and a["domain"] else None),
+        })
+
     return {
         "key": node["key"], "label": node["label"], "type": "docket",
         "entity": node["entity"],
         "cand": cand,
         "buzz": buzz, "currentBuzz": cur_buzz,
+        "events": events,
         "candidates": pairs[-1][1], "lastChecked": pairs[-1][0],
         "confirmed": confirmed,
         "inst": "".join(inst),
@@ -202,6 +218,9 @@ def _sp500_json(conn, master):
 
 
 def build_payload(conn):
+    from .buzz import find_notable_spikes
+    spikes, _ = find_notable_spikes(conn)
+
     leaves = drawdown_leaves()
     leaf_recs = {}
     for leaf in leaves:
@@ -254,7 +273,7 @@ def build_payload(conn):
         if node["type"] == "rental":
             return _rental_json(conn, node, master)
         if node["type"] == "docket":
-            return _docket_json(conn, node, master)
+            return _docket_json(conn, node, master, spikes)
         return {"key": node["key"], "label": node["label"], "type": "manual",
                 "note": node.get("note", "")}
 

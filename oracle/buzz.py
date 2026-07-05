@@ -29,7 +29,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from .config import PROJECT_DIR
 from . import db
@@ -149,6 +149,112 @@ def compute_buzz(master, news_by_date, dockets_pairs, cand_by_date, confirmed):
         buzz.append(round(b, 4))
         prev = b
     return buzz
+
+
+# --- notable spikes: the news items behind the biggest buzz jumps ----------
+
+MAX_NOTABLE = 15          # combined cap across all entities
+PEAK_WINDOW_DAYS = 7      # a spike must be the local max within +/- this window
+BUZZ_EVENTS_CSV = PROJECT_DIR / "data" / "buzz_events.csv"
+
+
+def find_notable_spikes(conn):
+    """Top news-share peaks across ALL entities under one shared threshold.
+
+    Local maxima (one per +/-7-day news cycle) from every entity are pooled
+    and ranked by share; the threshold is set so at most MAX_NOTABLE survive.
+    Returns (spikes, threshold) with spikes = [(entity, date, share), ...].
+    """
+    peaks = []
+    for entity in ENTITIES:
+        rows = [(r["date"], r["news_share"]) for r in db.load_buzz(conn, entity)
+                if r["news_share"] is not None and r["news_share"] > 0]
+        by_date = dict(rows)
+        dates = [d for d, _ in rows]
+        for d, v in rows:
+            lo = (datetime.fromisoformat(d) - timedelta(days=PEAK_WINDOW_DAYS)).date().isoformat()
+            hi = (datetime.fromisoformat(d) + timedelta(days=PEAK_WINDOW_DAYS)).date().isoformat()
+            window = [x for x in dates if lo <= x <= hi]
+            if v == max(by_date[x] for x in window) and d == min(x for x in window if by_date[x] == v):
+                peaks.append((entity, d, v))
+    peaks.sort(key=lambda p: -p[2])
+    kept = peaks[:MAX_NOTABLE]
+    threshold = kept[-1][2] if kept else 0.0
+    return sorted(kept, key=lambda p: p[1]), threshold
+
+
+def fetch_spike_article(entity, date):
+    """The most relevant article for a spike day: {title, url, domain} or None."""
+    d = date.replace("-", "")
+    params = {
+        "query": _gdelt_query(entity), "mode": "artlist", "maxrecords": "1",
+        "sort": "hybridrel", "format": "json",
+        "startdatetime": d + "000000", "enddatetime": d + "235959",
+    }
+    url = GDELT_URL + "?" + urllib.parse.urlencode(params)
+    req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+    for attempt in range(3):
+        try:
+            with urllib.request.urlopen(req, timeout=60) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+            arts = data.get("articles") or []
+            if not arts:
+                return None
+            a = arts[0]
+            return {"title": (a.get("title") or "")[:160], "url": a.get("url") or "",
+                    "domain": a.get("domain") or ""}
+        except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as e:
+            print(f"Spike-article fetch attempt {attempt + 1} failed ({entity} {date}): {e}")
+            time.sleep(10 * (attempt + 1))
+    return None
+
+
+def update_buzz_events(conn):
+    """Fetch (once) the article behind each notable spike; cache in the DB/CSV.
+
+    Only successful fetches count as cached — spikes without an article are
+    retried on later runs (a transient GDELT failure shouldn't stick forever).
+    """
+    spikes, threshold = find_notable_spikes(conn)
+    cached = {(r["entity"], r["date"]) for r in db.load_buzz_events(conn) if r["url"]}
+    fetched = 0
+    for entity, date, share in spikes:
+        if (entity, date) in cached:
+            continue
+        time.sleep(6)   # GDELT rate limit
+        art = fetch_spike_article(entity, date)
+        db.upsert_buzz_event(conn, entity, date,
+                             art["title"] if art else None,
+                             art["url"] if art else None,
+                             art["domain"] if art else None)
+        fetched += 1
+        print(f"Buzz event ({entity} {date}, share {share:.4f}%): "
+              f"{(art or {}).get('domain') or 'no article found'}")
+    print(f"Buzz events: {len(spikes)} notable spikes (threshold {threshold:.4f}%), {fetched} newly fetched")
+    return spikes, threshold
+
+
+def import_buzz_events_csv(conn):
+    if not BUZZ_EVENTS_CSV.exists():
+        return 0
+    n = 0
+    with open(BUZZ_EVENTS_CSV, newline="", encoding="utf-8") as f:
+        for row in csv.DictReader(f):
+            db.upsert_buzz_event(conn, row["entity"], row["date"],
+                                 row["title"] or None, row["url"] or None, row["domain"] or None)
+            n += 1
+    return n
+
+
+def export_buzz_events_csv(conn):
+    BUZZ_EVENTS_CSV.parent.mkdir(parents=True, exist_ok=True)
+    rows = db.load_buzz_events(conn)
+    with open(BUZZ_EVENTS_CSV, "w", newline="", encoding="utf-8") as f:
+        w = csv.writer(f)
+        w.writerow(["entity", "date", "title", "url", "domain"])
+        for r in rows:
+            w.writerow([r["entity"], r["date"], r["title"] or "", r["url"] or "", r["domain"] or ""])
+    return len(rows)
 
 
 def import_buzz_csv(conn):

@@ -110,6 +110,8 @@
   .evnum { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 50%;
     background: rgba(0,147,253,.14); color: var(--accent); font-size: 9.5px; font-weight: 700; flex-shrink: 0; align-self: center; }
   .evlegend .evdate { color: var(--muted2); font-family: var(--mono); font-size: 10.5px; white-space: nowrap; }
+  .evlegend a { color: var(--muted); text-decoration: none; }
+  .evlegend a:hover { color: var(--accent); text-decoration: underline; }
   .evmore { font-size: 11px; color: var(--muted2); margin-top: 8px; }
   @media (max-width: 700px) { .evlegend { columns: 1; } }
 
@@ -547,6 +549,27 @@ function nodeCard(node, depth, parentLabel) {
       : node.type === "rental" ? drawRental(c, res)
       : node.type === "docket" ? drawDocket(c, res) : drawCount(c, res));
     sec.appendChild(chartLegend(node));
+    if (node.type === "docket" && (node.events || []).length) {
+      // numbered badge → news item (same visual language as the S&P legend)
+      c.parentElement.addEventListener("click", ev => {
+        const r = c.getBoundingClientRect();
+        const mx = ev.clientX - r.left, my = ev.clientY - r.top;
+        const hit = (node._badges || []).find(b => (mx - b.x) ** 2 + (my - b.y) ** 2 <= b.r ** 2);
+        if (hit) window.open(hit.url, "_blank", "noopener");
+      });
+      const leg = document.createElement("ol");
+      leg.className = "evlegend";
+      leg.innerHTML = node.events.map((e, k) => {
+        const d = new Date(e.date + "T00:00:00Z");
+        const ds = d.toLocaleDateString("en-US", { month: "short", year: "2-digit", timeZone: "UTC" }).replace(" ", " ’");
+        const label = e.title || `news spike (${(e.share).toFixed(3)}% of coverage)`;
+        const inner = `<span class="evnum">${k + 1}</span><span>${e.url
+          ? `<a href="${e.url}" target="_blank" rel="noopener">${label}</a>` : label}` +
+          `${e.domain ? ` <span class="evdate">${e.domain}</span>` : ""}</span> <span class="evdate">${ds}</span>`;
+        return `<li>${inner}</li>`;
+      }).join("");
+      sec.appendChild(leg);
+    }
   }
   return sec;
 }
@@ -901,6 +924,30 @@ function drawDocket(canvas, res) {
   ctx.strokeStyle = css.getPropertyValue("--trigger");
   ctx.beginPath(); ctx.moveTo(PAD.l, y2px(1.0)); ctx.lineTo(w - PAD.r, y2px(1.0)); ctx.stroke();
   ctx.setLineDash([]);
+  // notable-spike markers — same visual language as the S&P event badges,
+  // with hit-rects recorded so badges are clickable (opens the news item).
+  node._badges = [];
+  const rowX = [-Infinity, -Infinity, -Infinity];
+  (node.events || []).forEach((e, k) => {
+    if (e.i < SLICE) return;
+    const x = xScale(e.i - SLICE, n, w);
+    let row = rowX.findIndex(rx => x - rx >= 18);
+    if (row === -1) row = 0;
+    rowX[row] = x;
+    const by = PAD.t + 8 + row * 18;
+    ctx.strokeStyle = "#3a4453"; ctx.lineWidth = 1; ctx.setLineDash([3, 4]);
+    ctx.beginPath(); ctx.moveTo(x, by + 10); ctx.lineTo(x, h - PAD.b); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = "#12202e";
+    ctx.beginPath(); ctx.arc(x, by, 8, 0, 6.2832); ctx.fill();
+    ctx.strokeStyle = css.getPropertyValue("--accent"); ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(x, by, 8, 0, 6.2832); ctx.stroke();
+    ctx.fillStyle = css.getPropertyValue("--accent");
+    ctx.font = "700 9px 'Segoe UI', sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText(String(k + 1), x, by + 0.5);
+    ctx.textBaseline = "alphabetic";
+    if (e.url) node._badges.push({ x, y: by, r: 10, url: e.url });
+  });
   polyline(ctx, buzz, n, w, y2px, css.getPropertyValue("--price"), 1.6);
 }
 

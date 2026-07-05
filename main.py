@@ -22,7 +22,8 @@ from oracle.datasources import write_datasources
 from oracle.h100 import fetch_h100_proxy, SEED_POINTS, import_h100_csv, export_h100_csv
 from oracle.polymarket import fetch_market_history, import_polymarket_csv, export_polymarket_csv
 from oracle.bankruptcy import scan_all, import_bankruptcy_csv, export_bankruptcy_csv
-from oracle.buzz import update_signals, import_buzz_csv, export_buzz_csv
+from oracle.buzz import (update_signals, import_buzz_csv, export_buzz_csv,
+                         update_buzz_events, import_buzz_events_csv, export_buzz_events_csv)
 from oracle.report import status_report
 from oracle.tracker import rebuild_events
 from oracle.yahoo import fetch_history, YahooError
@@ -89,6 +90,12 @@ def cmd_update(conn):
     update_signals(conn)
     bz_kept = export_buzz_csv(conn)
     print(f"Buzz history: {bz_kept} signal rows in data/buzz_history.csv")
+
+    # Notable buzz spikes: fetch (once) the news article behind each.
+    import_buzz_events_csv(conn)
+    update_buzz_events(conn)
+    ev_kept = export_buzz_events_csv(conn)
+    print(f"Buzz events: {ev_kept} cached articles in data/buzz_events.csv")
 
     db.set_meta(conn, "last_update", datetime.now(timezone.utc).isoformat(timespec="seconds"))
 
