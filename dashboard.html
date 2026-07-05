@@ -220,7 +220,6 @@
   .srow { display: flex; align-items: center; gap: 8px; padding: 8px 8px; border-radius: 8px; cursor: pointer; }
   .srow:hover { background: var(--panel2); }
   .srow.off .slabel, .srow.off .sdate { opacity: .45; }
-  .svis { width: 13px; height: 13px; flex-shrink: 0; cursor: pointer; accent-color: var(--accent); margin: 0; }
   .sidehead { display: flex; align-items: center; justify-content: space-between; margin: 4px 8px 10px; }
   .sidehead h3 { margin: 0; }
   .hideall { font-size: 10.5px; font-weight: 600; letter-spacing: .3px; color: var(--muted);
@@ -356,26 +355,16 @@ function allCardKeys() {
 function hideBtn(key) {
   const b = document.createElement("button");
   b.className = "hidebtn"; b.innerHTML = "&times;";
-  b.title = "Hide this graph (toggle it back from the sidebar)";
+  b.title = "Hide this graph (click it in the sidebar to bring it back)";
   b.onclick = () => { hidden.add(key); refreshVisibility(); };
   return b;
 }
 
-function visCheckbox(key) {
-  const cb = document.createElement("input");
-  cb.type = "checkbox"; cb.className = "svis"; cb.checked = !hidden.has(key);
-  cb.title = "Show / hide this graph";
-  cb.addEventListener("click", e => e.stopPropagation());   // don't trigger the row's jump
-  cb.addEventListener("change", () => {
-    if (cb.checked) hidden.delete(key); else hidden.add(key);
-    refreshVisibility();
-  });
-  return cb;
-}
-
 function jumpToCard(key) {
+  // clicking a hidden item reveals it, then jumps; a shown item just jumps
+  if (hidden.has(key)) { hidden.delete(key); refreshVisibility(); }
   const card = document.getElementById("card-" + key);
-  if (!card) return;   // hidden — nothing to jump to
+  if (!card) return;
   card.scrollIntoView({ behavior: "smooth", block: "start" });
   card.classList.remove("flash");
   requestAnimationFrame(() => card.classList.add("flash"));
@@ -1128,8 +1117,6 @@ function sidebarNode(node) {
   row.className = "srow" + (hidden.has(node.key) ? " off" : "");
   const hasKids = (node.children || []).length > 0;
 
-  row.appendChild(visCheckbox(node.key));
-
   const caret = document.createElement("span");
   caret.className = "caret" + (hasKids ? "" : " leafpad");
   caret.textContent = collapsed.has(node.key) ? "▶" : "▼";
@@ -1179,7 +1166,6 @@ function marketSidebar() {
   row.innerHTML = `<span class="caret leafpad"></span><span class="dot market"></span>` +
     `<span class="slabel">Market probability</span>` +
     `<span class="sdate"><span class="lbl">YES now</span>${cur}</span>`;
-  row.insertBefore(visCheckbox("market_price"), row.firstChild);
   row.addEventListener("click", () => jumpToCard("market_price"));
   wrap.appendChild(row);
   return wrap;
@@ -1196,7 +1182,6 @@ function sp500Sidebar() {
   row.innerHTML = `<span class="caret leafpad"></span><span class="dot market"></span>` +
     `<span class="slabel">S&amp;P 500 &amp; key events</span>` +
     `<span class="sdate"><span class="lbl">now</span>${cur}</span>`;
-  row.insertBefore(visCheckbox("sp500"), row.firstChild);
   row.addEventListener("click", () => jumpToCard("sp500"));
   wrap.appendChild(row);
   return wrap;
