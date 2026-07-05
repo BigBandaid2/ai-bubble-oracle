@@ -214,8 +214,8 @@ def _sp500_json(conn, master):
     pairs = [(r["date"], round(r["close"], 2)) for r in rows]
     close = _align_series(pairs, master)
     idx = {d: i for i, d in enumerate(master)}
-    events = [{"date": d, "label": lbl, "i": idx[d]}
-              for d, lbl in KEY_EVENTS if d in idx]
+    events = [{"date": d, "label": lbl, "url": url, "i": idx[d]}
+              for d, lbl, url in KEY_EVENTS if d in idx]
     current = next((v for v in reversed(close) if v is not None), None)
     return {"close": close, "events": events, "current": current}
 

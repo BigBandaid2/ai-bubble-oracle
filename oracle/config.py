@@ -26,17 +26,30 @@ SP500_TICKER = "^GSPC"
 # Key AI-era / macro events overlaid on the S&P 500 context chart.
 # Editable list: (date, short label). Keep labels tight — they render as a
 # numbered legend under the chart.
+# (date, label, url) — url is a hand-curated article link (prefer
+# Reuters/Bloomberg/FT/The Register), or None if no solid source. Curated, not
+# automated: edit these directly.
 KEY_EVENTS = [
-    ("2022-11-30", "ChatGPT released"),
-    ("2023-05-24", "Nvidia blowout AI guidance"),
-    ("2024-06-05", "Nvidia hits ~$3T, overtakes Apple #2"),
-    ("2024-08-05", "Yen carry-trade unwind sparks selloff"),
-    ("2025-01-27", "DeepSeek triggers NVDA −17% record drop"),
-    ("2025-04-02", "“Liberation Day” tariffs announced"),
-    ("2025-11-04", "SMCI earnings disappoint, analyst downgrade"),
-    ("2026-02-28", "US/Israel strike kills Khamenei"),
-    ("2026-05-28", "Anthropic hits $965B valuation, overtakes OpenAI"),
-    ("2026-06-08", "OpenAI confidentially files for IPO"),
+    ("2022-11-30", "ChatGPT released",
+     "https://www.theregister.com/2022/12/03/in_brief_ai/"),
+    ("2023-05-24", "Nvidia blowout AI guidance",
+     "https://www.cnbc.com/2023/05/24/nvidia-nvda-earnings-report-q1-2024.html"),
+    ("2024-06-05", "Nvidia hits ~$3T, overtakes Apple #2",
+     "https://www.cnbc.com/2024/06/05/nvidia-briefly-passes-3-trillion-market-cap-on-back-of-ai-boom.html"),
+    ("2024-08-05", "Yen carry-trade unwind sparks selloff",
+     "https://www.cnn.com/2024/08/04/investing/japan-nikkei-stock-rout-intl-hnk/index.html"),
+    ("2025-01-27", "DeepSeek triggers NVDA −17% record drop",
+     "https://www.cnbc.com/2025/01/27/nvidia-sheds-almost-600-billion-in-market-cap-biggest-drop-ever.html"),
+    ("2025-04-02", "“Liberation Day” tariffs announced",
+     "https://www.cbsnews.com/news/trump-liberation-day-new-tariffs-us/"),
+    ("2025-11-04", "SMCI earnings disappoint, analyst downgrade",
+     "https://www.cnbc.com/2025/11/04/super-micro-smci-q1-earnings-report-2026.html"),
+    ("2026-02-28", "US/Israel strike kills Khamenei",
+     "https://www.aljazeera.com/news/2026/2/28/irans-supreme-leader-ali-khamenei-killed-in-us-israeli-attacks-reports"),
+    ("2026-05-28", "Anthropic hits $965B valuation, overtakes OpenAI",
+     "https://www.cnbc.com/2026/05/28/anthropic-open-ai-startup-value.html"),
+    ("2026-06-08", "OpenAI confidentially files for IPO",
+     "https://www.cnbc.com/2026/06/08/openai-confidentially-files-for-ipo-prepping-wall-street-for-ai-debut.html"),
 ]
 
 # The contract as a condition tree, from the Polymarket "AI bubble burst in

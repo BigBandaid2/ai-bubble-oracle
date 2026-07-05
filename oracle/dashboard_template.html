@@ -725,6 +725,13 @@ function sp500Card() {
   sec.appendChild(meta);
   const c = chartCanvas(sec);
   requestAnimationFrame(() => drawSP500(c, s));
+  // numbered badge → the event's news article (when one is linked)
+  c.parentElement.addEventListener("click", ev => {
+    const r = c.getBoundingClientRect();
+    const mx = ev.clientX - r.left, my = ev.clientY - r.top;
+    const hit = (s._badges || []).find(b => (mx - b.x) ** 2 + (my - b.y) ** 2 <= b.r ** 2);
+    if (hit) window.open(hit.url, "_blank", "noopener");
+  });
   const visible = s.events.filter(e => e.i >= SLICE);
   const leg = document.createElement("ol");
   leg.className = "evlegend";
@@ -732,7 +739,9 @@ function sp500Card() {
     const n = s.events.indexOf(e) + 1;
     const d = new Date(e.date + "T00:00:00Z");
     const ds = d.toLocaleDateString("en-US", { month: "short", year: "2-digit", timeZone: "UTC" }).replace(" ", " ’");
-    return `<li><span class="evnum">${n}</span><span>${e.label}</span> <span class="evdate">${ds}</span></li>`;
+    const label = e.url
+      ? `<a href="${e.url}" target="_blank" rel="noopener">${e.label}</a>` : e.label;
+    return `<li><span class="evnum">${n}</span><span>${label}</span> <span class="evdate">${ds}</span></li>`;
   }).join("");
   sec.appendChild(leg);
   const hidden = s.events.length - visible.length;
@@ -1060,6 +1069,7 @@ function drawSP500(canvas, s) {
   const css = getComputedStyle(document.documentElement);
   // event markers: dashed vertical line + numbered badge at the top.
   // Clustered badges cascade to lower rows (up to 3) so none overlap.
+  s._badges = [];
   const rowX = [-Infinity, -Infinity, -Infinity];
   s.events.forEach((e, k) => {
     if (e.i < SLICE) return;
@@ -1079,6 +1089,7 @@ function drawSP500(canvas, s) {
     ctx.font = "700 9px 'Segoe UI', sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
     ctx.fillText(String(k + 1), x, by + 0.5);
     ctx.textBaseline = "alphabetic";
+    if (e.url) s._badges.push({ x, y: by, r: 10, url: e.url });
   });
   polyline(ctx, close, n, w, y2px, css.getPropertyValue("--price"), 1.6);
 }
