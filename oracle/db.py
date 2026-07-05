@@ -79,12 +79,15 @@ CREATE TABLE IF NOT EXISTS buzz_signals (
 );
 
 -- Cached news articles behind notable buzz spikes (fetched once per spike).
+-- related: 1 if the selected article is genuinely about the entity's own
+--          financial distress (heuristics / LLM), 0 if judged co-occurrence noise.
 CREATE TABLE IF NOT EXISTS buzz_events (
-    entity TEXT NOT NULL,
-    date   TEXT NOT NULL,
-    title  TEXT,
-    url    TEXT,
-    domain TEXT,
+    entity  TEXT NOT NULL,
+    date    TEXT NOT NULL,
+    title   TEXT,
+    url     TEXT,
+    domain  TEXT,
+    related INTEGER DEFAULT 1,
     PRIMARY KEY (entity, date)
 );
 """
@@ -97,6 +100,11 @@ def _migrate(conn):
     if cols and "index_type" not in cols:
         conn.execute("DROP TABLE h100_prices")
         conn.executescript(SCHEMA)
+        conn.commit()
+    # buzz_events gained a `related` flag; add it non-destructively.
+    bcols = [r["name"] for r in conn.execute("PRAGMA table_info(buzz_events)").fetchall()]
+    if bcols and "related" not in bcols:
+        conn.execute("ALTER TABLE buzz_events ADD COLUMN related INTEGER DEFAULT 1")
         conn.commit()
 
 
@@ -217,18 +225,37 @@ def load_buzz(conn, entity):
     ).fetchall()
 
 
-def upsert_buzz_event(conn, entity, date, title, url, domain):
+def clear_buzz_news(conn, entity):
+    """Null out news_share for an entity (dockets_total preserved) before a
+    fresh backfill under a changed query, so no stale values linger."""
+    conn.execute("UPDATE buzz_signals SET news_share = NULL WHERE entity = ?", (entity,))
+    conn.commit()
+
+
+def upsert_buzz_event(conn, entity, date, title, url, domain, related=1):
     conn.execute(
-        "INSERT OR REPLACE INTO buzz_events (entity, date, title, url, domain) VALUES (?, ?, ?, ?, ?)",
-        (entity, date, title, url, domain),
+        "INSERT OR REPLACE INTO buzz_events (entity, date, title, url, domain, related)"
+        " VALUES (?, ?, ?, ?, ?, ?)",
+        (entity, date, title, url, domain, related),
     )
     conn.commit()
 
 
 def load_buzz_events(conn):
     return conn.execute(
-        "SELECT entity, date, title, url, domain FROM buzz_events ORDER BY date"
+        "SELECT entity, date, title, url, domain, related FROM buzz_events ORDER BY date"
     ).fetchall()
+
+
+def delete_buzz_events_not_in(conn, keep):
+    """Prune cached spike articles no longer among the current notable spikes.
+    keep is an iterable of (entity, date) tuples."""
+    keep = set(keep)
+    kill = [(r["entity"], r["date"]) for r in load_buzz_events(conn)
+            if (r["entity"], r["date"]) not in keep]
+    conn.executemany("DELETE FROM buzz_events WHERE entity = ? AND date = ?", kill)
+    conn.commit()
+    return len(kill)
 
 
 def set_meta(conn, key, value):

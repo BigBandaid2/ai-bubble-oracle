@@ -25,6 +25,8 @@ Sources page.
 
 import csv
 import json
+import os
+import re
 import time
 import urllib.error
 import urllib.parse
@@ -37,12 +39,16 @@ from .bankruptcy import ENTITIES, USER_AGENT, SEARCH_URL
 
 GDELT_URL = "https://api.gdeltproject.org/api/v2/doc/doc"
 BUZZ_CSV = PROJECT_DIR / "data" / "buzz_history.csv"
+BUZZ_META = PROJECT_DIR / "data" / "buzz_meta.json"
 NEWS_BACKFILL_START = "20220101000000"
 
-# Calibration (editorial): news share (%) at which sat() = 0.5, and the
-# 30-day new-docket count at which the litigation pulse saturates halfway.
-# K_NEWS was fit to the 2022-2026 backfill: median day ~0%, p90 ~0.001%,
-# historical max 0.027% -> buzz ~0.04 calm, ~0.54 at the historical peak.
+# Bump to force a one-time re-backfill + recalibration when the query changes.
+# v2: proximity operators (below) replaced loose keyword co-occurrence.
+NEWS_QUERY_VERSION = 2
+
+# Calibration. K_NEWS is a fallback; after each backfill an adaptive value is
+# fit to the data (see _calibrate_k) and frozen in buzz_meta.json, so the
+# coefficient's scale is stable even as the query evolves.
 K_NEWS = 0.008
 K_LITIGATION = 10.0
 W_NEWS, W_LIT = 0.70, 0.10
@@ -50,9 +56,54 @@ DECAY = 0.02          # slow release: max drop per day
 DOCKET_FLOOR = 0.90   # while candidates are pending human review
 CAP = 0.99
 
+# Distress terms that must appear *near* the entity name (GDELT proximity
+# operator) — this is what kills digest-page co-occurrence: a "Top Headlines"
+# roundup with OpenAI in one bullet and a bankruptcy in another no longer
+# matches, because the two aren't within NEAR words of each other.
+NEAR = 30
+DISTRESS_NEAR = ("bankruptcy", "insolvency", "bankrupt", "insolvent", "liquidation")
+
 
 def _gdelt_query(entity):
-    return f'"{entity}" (bankruptcy OR insolvency OR "chapter 11")'
+    e = entity.lower()
+    clauses = " OR ".join(f'near{NEAR}:"{e} {w}"' for w in DISTRESS_NEAR)
+    return f"({clauses})"
+
+
+# --- adaptive calibration + query-version persistence ----------------------
+
+def _read_meta():
+    try:
+        return json.loads(BUZZ_META.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def _write_meta(d):
+    BUZZ_META.parent.mkdir(parents=True, exist_ok=True)
+    BUZZ_META.write_text(json.dumps(d, indent=2), encoding="utf-8")
+
+
+def get_news_k():
+    """The frozen adaptive saturation constant (falls back to K_NEWS)."""
+    return _read_meta().get("news_k") or K_NEWS
+
+
+def _calibrate_k(conn):
+    """Set k so a *notable* spike reads as clearly elevated buzz.
+
+    k = the MAX_NOTABLE-th largest daily share across both entities, so the
+    smallest notable spike gives sat = share/(share+k) ~ 0.5 and the biggest
+    spikes approach the news ceiling. Ties calibration to the notability scale.
+    """
+    shares = []
+    for e in ENTITIES:
+        shares += [r["news_share"] for r in db.load_buzz(conn, e)
+                   if r["news_share"] and r["news_share"] > 0]
+    shares.sort(reverse=True)
+    if not shares:
+        return K_NEWS
+    return max(shares[min(MAX_NOTABLE - 1, len(shares) - 1)], 1e-7)
 
 
 def fetch_news_timeline(entity, backfill=False):
@@ -98,29 +149,49 @@ def fetch_docket_total(entity):
 
 
 def update_signals(conn):
-    """Daily signal refresh: GDELT news (backfill on first run) + docket totals."""
+    """Daily signal refresh: GDELT news + docket totals.
+
+    A full re-backfill runs when the query version changed (or an entity has no
+    news yet). Old news is cleared only after a *successful* fetch, so a failed
+    query can never wipe the existing coefficient.
+    """
+    meta = _read_meta()
+    force = meta.get("news_query_version") != NEWS_QUERY_VERSION
     today = datetime.now(timezone.utc).date().isoformat()
+    ok = True
     for i, entity in enumerate(ENTITIES):
         if i:
             time.sleep(6)   # GDELT rate limit
-        backfill = not db.load_buzz(conn, entity)
+        has_news = any(r["news_share"] is not None for r in db.load_buzz(conn, entity))
+        backfill = force or not has_news
         pairs = fetch_news_timeline(entity, backfill=backfill)
         if pairs:
+            if backfill:
+                db.clear_buzz_news(conn, entity)
             db.upsert_buzz_news(conn, entity, pairs)
             print(f"Buzz news ({entity}): {len(pairs)} days "
                   f"({'backfill' if backfill else 'refresh'}), latest {pairs[-1][1]:.4f}%")
+        else:
+            ok = False
         total = fetch_docket_total(entity)
         if total is not None:
             db.upsert_buzz_dockets(conn, today, entity, total)
             print(f"Buzz litigation ({entity}): {total} total dockets")
+
+    if force and ok:
+        meta["news_query_version"] = NEWS_QUERY_VERSION
+        meta["news_k"] = _calibrate_k(conn)
+        _write_meta(meta)
+        print(f"Recalibrated buzz: query v{NEWS_QUERY_VERSION}, news_k={meta['news_k']:.6f}")
 
 
 def sat(v, k):
     return v / (v + k) if v and v > 0 else 0.0
 
 
-def compute_buzz(master, news_by_date, dockets_pairs, cand_by_date, confirmed):
+def compute_buzz(master, news_by_date, dockets_pairs, cand_by_date, confirmed, k_news=None):
     """The coefficient over the master axis. None before the first news datum."""
+    k = k_news if k_news else K_NEWS
     dock = dict(dockets_pairs)
     dock_dates = sorted(dock)
     buzz, prev, started = [], 0.0, False
@@ -139,7 +210,7 @@ def compute_buzz(master, news_by_date, dockets_pairs, cand_by_date, confirmed):
             base = dock[max((x for x in dock_dates if x <= master[max(0, i - 30)]),
                             default=past[0])]
             lit = max(0, cur - base)
-        raw = 1 - (1 - W_NEWS * sat(news, K_NEWS)) * (1 - W_LIT * sat(lit, K_LITIGATION))
+        raw = 1 - (1 - W_NEWS * sat(news, k)) * (1 - W_LIT * sat(lit, K_LITIGATION))
         b = max(raw, prev - DECAY)
         if cand_by_date.get(d, 0) > 0 and not (confirmed and d >= confirmed):
             b = max(b, DOCKET_FLOOR)
@@ -183,11 +254,32 @@ def find_notable_spikes(conn):
     return sorted(kept, key=lambda p: p[1]), threshold
 
 
-def fetch_spike_article(entity, date):
-    """The most relevant article for a spike day: {title, url, domain} or None."""
+# Layer 2 — heuristic scoring of the candidate pool.
+DIGEST_DOMAINS = {"menafn.com", "marketscreener.com", "morningstar.com", "finanznachrichten.de"}
+DIGEST_MARKERS = ("top company headlines", "headlines at", "briefing", "wrap-up",
+                  "wrap up", "roundup", "round-up", "market talk", "things to know",
+                  "up first", "what to watch", "morning brief", "evening brief",
+                  "week ahead", "recap", "at a glance", "in brief")
+DISTRESS_WORDS = ("bankrupt", "insolven", "chapter 11", "restructur", "liquidat",
+                  "collapse", "shut down", "shutting", "wind down", "winding down",
+                  "default", "distress", "out of cash", "running out of money", "going under")
+
+
+def score_candidate(entity, c):
+    t = (c.get("title") or "").lower()
+    s = 0
+    if entity.lower() in t:                                   s += 3   # headline names the entity
+    if any(w in t for w in DISTRESS_WORDS):                   s += 2   # …and talks distress
+    if (c.get("domain") or "") in DIGEST_DOMAINS:             s -= 3   # known aggregator
+    if any(m in t for m in DIGEST_MARKERS):                   s -= 3   # digest/roundup headline
+    return s
+
+
+def fetch_spike_candidates(entity, date, n=25):
+    """Up to n de-duplicated candidate articles for the spike day, or None."""
     d = date.replace("-", "")
     params = {
-        "query": _gdelt_query(entity), "mode": "artlist", "maxrecords": "1",
+        "query": _gdelt_query(entity), "mode": "artlist", "maxrecords": str(n),
         "sort": "hybridrel", "format": "json",
         "startdatetime": d + "000000", "enddatetime": d + "235959",
     }
@@ -197,40 +289,109 @@ def fetch_spike_article(entity, date):
         try:
             with urllib.request.urlopen(req, timeout=60) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
-            arts = data.get("articles") or []
-            if not arts:
-                return None
-            a = arts[0]
-            return {"title": (a.get("title") or "")[:160], "url": a.get("url") or "",
-                    "domain": a.get("domain") or ""}
+            out, seen = [], set()
+            for a in (data.get("articles") or []):
+                title = (a.get("title") or "").strip()
+                key = title.lower()[:80]
+                if not title or key in seen:
+                    continue
+                seen.add(key)
+                out.append({"title": title[:160], "url": a.get("url") or "",
+                            "domain": a.get("domain") or ""})
+            return out
         except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as e:
-            print(f"Spike-article fetch attempt {attempt + 1} failed ({entity} {date}): {e}")
+            print(f"Spike-candidates attempt {attempt + 1} failed ({entity} {date}): {e}")
             time.sleep(10 * (attempt + 1))
     return None
 
 
-def update_buzz_events(conn):
-    """Fetch (once) the article behind each notable spike; cache in the DB/CSV.
+# Layer 3 — LLM classification (Claude Haiku via the Messages API).
+LLM_MODEL = "claude-haiku-4-5-20251001"
 
-    Only successful fetches count as cached — spikes without an article are
-    retried on later runs (a transient GDELT failure shouldn't stick forever).
+
+def classify_with_llm(entity, date, cands):
+    """Index of the genuinely-on-topic headline, -1 for NONE, or None (no key/error)."""
+    key = os.environ.get("ANTHROPIC_API_KEY")
+    if not key:
+        return None
+    listing = "\n".join(f"{i}. [{c.get('domain', '')}] {c.get('title', '')}"
+                        for i, c in enumerate(cands))
+    prompt = (
+        f"On this day there was a spike in news matching \"{entity}\" near bankruptcy-related "
+        f"terms. {entity} is the AI company. Which ONE of the headlines below, if any, is "
+        f"genuinely reporting on {entity} itself facing bankruptcy, insolvency, financial "
+        f"distress, or a serious funding/cash crisis? Ignore headlines that merely mention "
+        f"{entity} in passing next to some unrelated company's bankruptcy, and ignore news "
+        f"digests that bundle many unrelated stories. Reply with ONLY the number of the best "
+        f"headline, or the single word NONE if none are actually about {entity}'s own financial "
+        f"trouble.\n\n{listing}"
+    )
+    body = json.dumps({
+        "model": LLM_MODEL, "max_tokens": 16,
+        "messages": [{"role": "user", "content": prompt}],
+    }).encode("utf-8")
+    req = urllib.request.Request(
+        "https://api.anthropic.com/v1/messages", data=body,
+        headers={"x-api-key": key, "anthropic-version": "2023-06-01",
+                 "content-type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=40) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        text = "".join(b.get("text", "") for b in data.get("content", [])).strip()
+        if text.upper().startswith("NONE"):
+            return -1
+        m = re.search(r"\d+", text)
+        if m and 0 <= int(m.group()) < len(cands):
+            return int(m.group())
+    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, KeyError, ValueError) as e:
+        print(f"LLM classify failed ({entity} {date}): {e}")
+    return None
+
+
+def select_best_article(entity, date):
+    """Pick the on-topic article for a spike: LLM if available, else heuristics.
+    Returns {title, url, domain, related} or None if nothing fetched."""
+    cands = fetch_spike_candidates(entity, date)
+    if not cands:
+        return None
+    idx = classify_with_llm(entity, date, cands)
+    if idx is None:                          # no LLM / failure → heuristics
+        best = max(cands, key=lambda c: score_candidate(entity, c))
+        related = 1 if score_candidate(entity, best) >= 3 else 0
+        return {**best, "related": related}
+    if idx == -1:                            # LLM: none genuinely on-topic
+        best = max(cands, key=lambda c: score_candidate(entity, c))
+        return {**best, "related": 0}
+    return {**cands[idx], "related": 1}
+
+
+def update_buzz_events(conn):
+    """Select (once) the on-topic article behind each notable spike; cache it.
+
+    Prunes cached articles for dates no longer among the notable spikes (spike
+    dates shift when the news query/backfill changes). Only rows with a URL are
+    treated as cached, so transient failures are retried on later runs.
     """
     spikes, threshold = find_notable_spikes(conn)
+    pruned = db.delete_buzz_events_not_in(conn, {(e, d) for e, d, _ in spikes})
     cached = {(r["entity"], r["date"]) for r in db.load_buzz_events(conn) if r["url"]}
     fetched = 0
     for entity, date, share in spikes:
         if (entity, date) in cached:
             continue
         time.sleep(6)   # GDELT rate limit
-        art = fetch_spike_article(entity, date)
+        art = select_best_article(entity, date)
         db.upsert_buzz_event(conn, entity, date,
-                             art["title"] if art else None,
-                             art["url"] if art else None,
-                             art["domain"] if art else None)
+                             art.get("title") if art else None,
+                             art.get("url") if art else None,
+                             art.get("domain") if art else None,
+                             art.get("related", 1) if art else 1)
         fetched += 1
-        print(f"Buzz event ({entity} {date}, share {share:.4f}%): "
-              f"{(art or {}).get('domain') or 'no article found'}")
-    print(f"Buzz events: {len(spikes)} notable spikes (threshold {threshold:.4f}%), {fetched} newly fetched")
+        tag = "" if not art else ("" if art.get("related") else " [flagged unrelated]")
+        print(f"Buzz event ({entity} {date}, {share:.4f}%): "
+              f"{(art or {}).get('domain') or 'no article'}{tag}")
+    print(f"Buzz events: {len(spikes)} spikes (threshold {threshold:.4f}%), "
+          f"{fetched} fetched, {pruned} pruned")
     return spikes, threshold
 
 
@@ -240,8 +401,11 @@ def import_buzz_events_csv(conn):
     n = 0
     with open(BUZZ_EVENTS_CSV, newline="", encoding="utf-8") as f:
         for row in csv.DictReader(f):
+            rel = row.get("related")
             db.upsert_buzz_event(conn, row["entity"], row["date"],
-                                 row["title"] or None, row["url"] or None, row["domain"] or None)
+                                 row["title"] or None, row["url"] or None,
+                                 row["domain"] or None,
+                                 int(rel) if rel not in (None, "") else 1)
             n += 1
     return n
 
@@ -251,9 +415,11 @@ def export_buzz_events_csv(conn):
     rows = db.load_buzz_events(conn)
     with open(BUZZ_EVENTS_CSV, "w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
-        w.writerow(["entity", "date", "title", "url", "domain"])
+        w.writerow(["entity", "date", "title", "url", "domain", "related"])
         for r in rows:
-            w.writerow([r["entity"], r["date"], r["title"] or "", r["url"] or "", r["domain"] or ""])
+            rel = r["related"] if r["related"] is not None else 1
+            w.writerow([r["entity"], r["date"], r["title"] or "", r["url"] or "",
+                        r["domain"] or "", rel])
     return len(rows)
 
 

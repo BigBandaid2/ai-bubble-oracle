@@ -803,14 +803,39 @@ const ASSETS = [
     dagster: "recap/gdelt_news", dbt: "source('gdelt','timelinevol')",
     grain: "one timeline document per (entity, refresh)",
     why: "The news half of the bankruptcy-buzz coefficient — how loud the bankruptcy narrative is, daily, back to 2022.",
-    desc: "GDELT's free DOC API in timelinevol mode: the share of ALL global news coverage matching “<entity>” plus bankruptcy-flavored keywords, per day. Backfilled once from 2022 (~1,625 days per entity), then refreshed with a rolling 3-month window. Keyless; rate limit 1 request / 5 s.",
+    desc: "GDELT's free DOC API in timelinevol mode: the share of ALL global news coverage where a distress term appears WITHIN ~30 words of the entity name, per day. The proximity operator (near30) is deliberate — plain co-occurrence matched digest pages that mention the entity in one bullet and an unrelated bankruptcy in another; requiring nearness kills that noise. Backfilled from 2022, refreshed on a rolling 3-month window. Keyless; 1 request / 5 s.",
     upstream: [],
     json: `GET api.gdeltproject.org/api/v2/doc/doc
-  ?query="OpenAI" (bankruptcy OR insolvency OR "chapter 11")
+  ?query=(near30:"openai bankruptcy" OR near30:"openai insolvency"
+          OR near30:"openai bankrupt" OR near30:"openai insolvent"
+          OR near30:"openai liquidation")
   &mode=timelinevol&format=json
-→ { "timeline": [ { "data": [ { "date": "20231120T000000Z", "value": 0.027 }, … ] } ] }`,
-    transforms: [{ tag: "extract", text: "daily volume-share series per entity; stored in buzz_signals (with the litigation totals) and cached to data/buzz_history.csv" }],
+→ { "timeline": [ { "data": [ { "date": "20231120T000000Z", "value": 0.011 }, … ] } ] }`,
+    transforms: [{ tag: "extract", text: "proximity-filtered daily volume-share per entity; stored in buzz_signals, cached to data/buzz_history.csv" }],
     cardinality: "≈1,625 backfilled days per entity, +1/day.",
+  },
+  {
+    id: "int_buzz_events", group: "courtlistener", layer: "intermediate", status: "live",
+    name: "int_buzz_events", mat: "table · cached per spike", cadence: "on new spike",
+    dagster: "recap/int_buzz_events", dbt: "int_buzz_events",
+    grain: "one row per notable news-volume spike (≤ 15 across both entities)",
+    why: "The clickable news item behind each spike marker — with a relevance judgment, so co-occurrence noise is labeled, not linked.",
+    desc: "For each notable spike, up to 25 candidate articles are pulled (artlist, that day, proximity query), then the on-topic one is chosen in two stages: (1) heuristic scoring — reward a headline that names the entity and uses a distress word, penalize known aggregators and “Top Headlines” digests; (2) an LLM pass (Claude Haiku) picks the single genuinely-on-topic headline or answers NONE. NONE (or a weak heuristic) sets related=0, and the marker/legend render muted and unlinked. Cached in data/buzz_events.csv; only new spikes trigger a fetch.",
+    upstream: ["raw.gdelt_news"],
+    schema: [
+      { col: "entity", type: "STRING", kind: "key", ex: "OpenAI" },
+      { col: "date", type: "DATE", kind: "key", ex: "2023-12-20" },
+      { col: "title", type: "STRING", kind: "pass", ex: "…the selected headline…" },
+      { col: "url", type: "STRING", kind: "pass", ex: "https://…" },
+      { col: "related", type: "BOOLEAN", kind: "derived", ex: 1, note: "0 = judged co-occurrence noise (heuristics / LLM)" },
+    ],
+    transforms: [
+      { tag: "rank", text: "pull 25 candidates, sort=hybridrel" },
+      { tag: "score", text: "heuristics: +names entity, +distress word, −aggregator, −digest headline" },
+      { tag: "classify", text: "Claude Haiku picks the on-topic headline or NONE (fallback: heuristics only, no key needed)" },
+    ],
+    tests: ["accepted_values: related in (0, 1)", "≤ 15 spikes total across both entities"],
+    cardinality: "≤ 15 rows; refreshed only when the notable-spike set changes.",
   },
   {
     id: "int_bankruptcy_buzz", group: "courtlistener", layer: "intermediate", status: "live",
@@ -841,8 +866,8 @@ const ASSETS = [
     dagster: "dashboard (bankruptcy slice)", dbt: "exposure: bankruptcy_state",
     grain: "one block per entity in dashboard.html",
     why: "The bankruptcy pipeline's conclusion — its slice of the served payload, feeding the 1-of-2 parent and the 3-of-6 root.",
-    desc: "Per entity: the buzz-coefficient series (drawn as the chart line), the candidate counts, and the confirmed-met bitstring, master-aligned. The browser counts the met flag into the contract exactly like the equity and H100 leaves; buzz is display-only.",
-    upstream: ["int_bankruptcy_state", "int_bankruptcy_buzz"],
+    desc: "Per entity: the buzz-coefficient series (drawn as the chart line), the notable-spike markers with their selected articles, the candidate counts, and the confirmed-met bitstring, master-aligned. The browser counts the met flag into the contract exactly like the equity and H100 leaves; buzz and spikes are display-only.",
+    upstream: ["int_bankruptcy_state", "int_bankruptcy_buzz", "int_buzz_events"],
     json: `"openai_bankruptcy": {
   "type": "docket", "entity": "OpenAI",
   "buzz": [ null, …, 0.12 ],   <span class="cm">// the chart line (display-only)</span>
@@ -971,14 +996,15 @@ const GRAPHS = {
     curves: [],
   },
   courtlistener: {
-    viewBox: "0 0 660 470",
+    viewBox: "0 0 660 500",
     nodes: [
       { id: "raw.courtlistener_search", cx: MX, cy: 40 },
       { id: "raw.gdelt_news", cx: 498, cy: 40, w: 188 },
       { id: "bankruptcy_checks", cx: MX, cy: 132 },
       { id: "int_bankruptcy_state", cx: MX, cy: 224 },
       { id: "int_bankruptcy_buzz", cx: 498, cy: 224, w: 188 },
-      { id: "exposure.bankruptcy_state", cx: MX, cy: 400, short: "exposure: bankruptcy" },
+      { id: "int_buzz_events", cx: 498, cy: 316, w: 188 },
+      { id: "exposure.bankruptcy_state", cx: MX, cy: 430, short: "exposure: bankruptcy" },
     ],
     spine: [
       ["raw.courtlistener_search", "bankruptcy_checks"],
@@ -987,8 +1013,10 @@ const GRAPHS = {
     ],
     curves: [
       "M498,63 C 498,150 498,150 498,201",        // gdelt news → buzz
+      "M498,63 C 560,180 560,240 498,293",        // gdelt news → buzz events
       "M318,150 C 420,170 470,180 470,201",       // bankruptcy_checks → buzz
-      "M470,247 C 420,340 330,370 318,392",       // buzz → exposure
+      "M470,339 C 430,380 330,400 318,422",       // buzz events → exposure
+      "M470,247 C 430,340 340,380 320,422",       // buzz → exposure
     ],
   },
   gdelt: {

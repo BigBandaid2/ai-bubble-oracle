@@ -123,7 +123,7 @@ def _docket_json(conn, node, master, spikes=None):
     unless the entity has a human-confirmed filing in CONFIRMED_BANKRUPTCIES —
     neither buzz nor a scan hit ever flips it.
     """
-    from .buzz import compute_buzz
+    from .buzz import compute_buzz, get_news_k
     rows = db.load_bankruptcy(conn, node["entity"])
     if not rows:
         return {"key": node["key"], "label": node["label"], "type": "manual",
@@ -136,10 +136,11 @@ def _docket_json(conn, node, master, spikes=None):
     sig = db.load_buzz(conn, node["entity"])
     news_by_date = {r["date"]: r["news_share"] for r in sig if r["news_share"] is not None}
     dockets_pairs = [(r["date"], r["dockets_total"]) for r in sig if r["dockets_total"] is not None]
-    buzz = compute_buzz(master, news_by_date, dockets_pairs, dict(pairs), confirmed)
+    buzz = compute_buzz(master, news_by_date, dockets_pairs, dict(pairs), confirmed,
+                        k_news=get_news_k())
     cur_buzz = next((v for v in reversed(buzz) if v is not None), None)
 
-    # notable spikes for this entity, with their cached news articles
+    # notable spikes for this entity, with their selected (on-topic) news article
     idx = {d: i for i, d in enumerate(master)}
     arts = {(r["entity"], r["date"]): r for r in db.load_buzz_events(conn)}
     events = []
@@ -147,11 +148,13 @@ def _docket_json(conn, node, master, spikes=None):
         if entity != node["entity"] or d not in idx:
             continue
         a = arts.get((entity, d))
+        related = True if (a is None or a["related"] is None) else bool(a["related"])
         events.append({
             "date": d, "i": idx[d], "share": share,
             "title": (a["title"] if a and a["title"] else None),
-            "url": (a["url"] if a and a["url"] else None),
+            "url": (a["url"] if a and a["url"] and related else None),
             "domain": (a["domain"] if a and a["domain"] else None),
+            "related": related,
         })
 
     return {

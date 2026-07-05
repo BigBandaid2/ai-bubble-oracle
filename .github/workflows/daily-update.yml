@@ -26,13 +26,17 @@ jobs:
           python-version: "3.12"
 
       - name: Run daily update (fetch data + regenerate site)
+        env:
+          # Enables LLM classification of buzz-spike news items. If unset, the
+          # pipeline falls back to heuristic scoring — it never hard-fails.
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: python main.py update
 
       - name: Commit regenerated site + accumulated H100 history
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add dashboard.html datasources.html data/h100_history.csv data/polymarket_history.csv data/bankruptcy_history.csv data/buzz_history.csv data/buzz_events.csv
+          git add dashboard.html datasources.html data/h100_history.csv data/polymarket_history.csv data/bankruptcy_history.csv data/buzz_history.csv data/buzz_events.csv data/buzz_meta.json
           if git diff --staged --quiet; then
             echo "No changes to commit."
           else
