@@ -798,16 +798,55 @@ const ASSETS = [
     cardinality: "2 entities × master-axis days from the first scan onward.",
   },
   {
+    id: "raw.gdelt_news", group: "courtlistener", layer: "source", status: "live",
+    name: "raw.gdelt_news", mat: "API response (JSON)", cadence: "daily · backfilled from 2022",
+    dagster: "recap/gdelt_news", dbt: "source('gdelt','timelinevol')",
+    grain: "one timeline document per (entity, refresh)",
+    why: "The news half of the bankruptcy-buzz coefficient — how loud the bankruptcy narrative is, daily, back to 2022.",
+    desc: "GDELT's free DOC API in timelinevol mode: the share of ALL global news coverage matching “<entity>” plus bankruptcy-flavored keywords, per day. Backfilled once from 2022 (~1,625 days per entity), then refreshed with a rolling 3-month window. Keyless; rate limit 1 request / 5 s.",
+    upstream: [],
+    json: `GET api.gdeltproject.org/api/v2/doc/doc
+  ?query="OpenAI" (bankruptcy OR insolvency OR "chapter 11")
+  &mode=timelinevol&format=json
+→ { "timeline": [ { "data": [ { "date": "20231120T000000Z", "value": 0.027 }, … ] } ] }`,
+    transforms: [{ tag: "extract", text: "daily volume-share series per entity; stored in buzz_signals (with the litigation totals) and cached to data/buzz_history.csv" }],
+    cardinality: "≈1,625 backfilled days per entity, +1/day.",
+  },
+  {
+    id: "int_bankruptcy_buzz", group: "courtlistener", layer: "intermediate", status: "live",
+    name: "int_bankruptcy_buzz", mat: "computed at generation", cadence: "on rebuild",
+    dagster: "recap/int_bankruptcy_buzz", dbt: "int_bankruptcy_buzz",
+    grain: "one buzz value per (entity, master-axis date)",
+    why: "The 0–1 “bankruptcy buzz” coefficient that makes the charts informative between filings — capped at 0.99 unless a human confirms.",
+    desc: "Noisy-OR of independent evidence with a slow-release ratchet: raw = 1 − (1 − 0.70·sat(news)) · (1 − 0.10·sat(litigation)); buzz = min(0.99, max(raw, prev − 0.02/day)); floored at 0.90 while docket candidates await review; exactly 1.00 only from a human-confirmed filing date. sat(v) = v/(v+k). Calibrated on the 2022–26 backfill (calm ≈ 0.04, historical peak ≈ 0.54). Buzz is context and early warning only — it never feeds the contract count.",
+    upstream: ["raw.gdelt_news", "bankruptcy_checks", "int_bankruptcy_state"],
+    schema: [
+      { col: "entity", type: "STRING", kind: "key", ex: "OpenAI" },
+      { col: "date", type: "DATE", kind: "key", ex: E_BK.lastChecked || "2026-07-05" },
+      { col: "news_sat", type: "NUMERIC", kind: "derived", ex: "0.13", note: "sat(news_share, k=0.008), weight 0.70" },
+      { col: "lit_sat", type: "NUMERIC", kind: "derived", ex: "0.00", note: "sat(30-day new dockets, k=10), weight 0.10" },
+      { col: "buzz", type: "NUMERIC", kind: "derived", ex: "0.12", note: "noisy-OR + slow release + docket floor + confirm cap" },
+    ],
+    transforms: [
+      { tag: "noisy-OR", text: "independent evidence compounds but never reaches 1" },
+      { tag: "slow release", text: "fast rise; decay capped at 0.02/day (~7 weeks to baseline)" },
+      { tag: "human gate", text: "0.90–0.99 = docket pending review; 1.00 requires config confirmation" },
+    ],
+    tests: ["dbt_utils.accepted_range: buzz ∈ [0, 1]", "buzz = 1.0 only where confirmed"],
+    cardinality: "2 entities × master-axis days from 2022 — the series behind each bankruptcy chart.",
+  },
+  {
     id: "exposure.bankruptcy_state", group: "courtlistener", layer: "serve", status: "live",
     name: "exposure: bankruptcy_state", mat: "exposure (JSON)", cadence: "on generate",
     dagster: "dashboard (bankruptcy slice)", dbt: "exposure: bankruptcy_state",
     grain: "one block per entity in dashboard.html",
     why: "The bankruptcy pipeline's conclusion — its slice of the served payload, feeding the 1-of-2 parent and the 3-of-6 root.",
-    desc: "Per entity: the candidate-count series (null before the first scan) and the confirmed-met bitstring, master-aligned. The browser counts it into the contract exactly like the equity and H100 leaves.",
-    upstream: ["int_bankruptcy_state"],
+    desc: "Per entity: the buzz-coefficient series (drawn as the chart line), the candidate counts, and the confirmed-met bitstring, master-aligned. The browser counts the met flag into the contract exactly like the equity and H100 leaves; buzz is display-only.",
+    upstream: ["int_bankruptcy_state", "int_bankruptcy_buzz"],
     json: `"openai_bankruptcy": {
   "type": "docket", "entity": "OpenAI",
-  "cand": [ null, …, ${(E_BK.entities && E_BK.entities.OpenAI) || 0} ],   <span class="cm">// aligned candidate counts</span>
+  "buzz": [ null, …, 0.12 ],   <span class="cm">// the chart line (display-only)</span>
+  "cand": [ null, …, ${(E_BK.entities && E_BK.entities.OpenAI) || 0} ],
   "candidates": ${(E_BK.entities && E_BK.entities.OpenAI) || 0}, "lastChecked": "${E_BK.lastChecked || "2026-07-05"}",
   "confirmed": null, "inst": "0000…0000"
 }`,
@@ -932,19 +971,25 @@ const GRAPHS = {
     curves: [],
   },
   courtlistener: {
-    viewBox: "0 0 460 380",
+    viewBox: "0 0 660 470",
     nodes: [
       { id: "raw.courtlistener_search", cx: MX, cy: 40 },
+      { id: "raw.gdelt_news", cx: 498, cy: 40, w: 188 },
       { id: "bankruptcy_checks", cx: MX, cy: 132 },
       { id: "int_bankruptcy_state", cx: MX, cy: 224 },
-      { id: "exposure.bankruptcy_state", cx: MX, cy: 316, short: "exposure: bankruptcy" },
+      { id: "int_bankruptcy_buzz", cx: 498, cy: 224, w: 188 },
+      { id: "exposure.bankruptcy_state", cx: MX, cy: 400, short: "exposure: bankruptcy" },
     ],
     spine: [
       ["raw.courtlistener_search", "bankruptcy_checks"],
       ["bankruptcy_checks", "int_bankruptcy_state"],
       ["int_bankruptcy_state", "exposure.bankruptcy_state"],
     ],
-    curves: [],
+    curves: [
+      "M498,63 C 498,150 498,150 498,201",        // gdelt news → buzz
+      "M318,150 C 420,170 470,180 470,201",       // bankruptcy_checks → buzz
+      "M470,247 C 420,340 330,370 318,392",       // buzz → exposure
+    ],
   },
   gdelt: {
     viewBox: "0 0 460 210",
@@ -1201,10 +1246,12 @@ const SOURCE_INFO = {
       { t: "Query validated on FTX", d: "The same query against FTX returns its 29 real Chapter 11 filings from Nov 2022, so a genuine OpenAI/Anthropic petition would be caught." },
     ],
     cardinality: [
-      { asset: "raw.courtlistener_search", count: "2/day", meaning: "One search per entity per day; result lists near-empty in the normal case." },
+      { asset: "raw.courtlistener_search", count: "2/day", meaning: "One docket search per entity per day; result lists near-empty in the normal case." },
+      { asset: "raw.gdelt_news", count: "≈1,625×2", meaning: "Daily news-volume shares per entity, backfilled to 2022 — the buzz coefficient's history." },
       { asset: "bankruptcy_checks", count: "2/day ↑", meaning: "One row per (date, entity) — candidate counts accumulating into a monitoring history." },
       { asset: "int_bankruptcy_state", count: "×~1,200", meaning: "The confirmed-met flag is aligned onto the master date axis so the 1-of-2 parent can count it daily." },
-      { asset: "exposure.bankruptcy_state", count: "2 blocks", meaning: "One JSON block per entity, served into the dashboard's contract count." },
+      { asset: "int_bankruptcy_buzz", count: "×~1,650", meaning: "The 0–1 buzz coefficient per entity per day — display-only; never feeds the contract count." },
+      { asset: "exposure.bankruptcy_state", count: "2 blocks", meaning: "One JSON block per entity (buzz line + met flag), served into the dashboard." },
     ],
   },
   gdelt: {

@@ -118,10 +118,12 @@ def _rental_type_series(rows, node, master):
 def _docket_json(conn, node, master):
     """Payload for a bankruptcy-docket condition.
 
-    Ships the candidate-count series (aligned; null before the first scan) and
-    a met bitstring that is all-zero unless the entity has a human-confirmed
-    filing in CONFIRMED_BANKRUPTCIES — the scan alone never flips it.
+    Ships the buzz-coefficient series (news + litigation + docket floor, with
+    slow release), the candidate counts, and a met bitstring that is all-zero
+    unless the entity has a human-confirmed filing in CONFIRMED_BANKRUPTCIES —
+    neither buzz nor a scan hit ever flips it.
     """
+    from .buzz import compute_buzz
     rows = db.load_bankruptcy(conn, node["entity"])
     if not rows:
         return {"key": node["key"], "label": node["label"], "type": "manual",
@@ -130,10 +132,18 @@ def _docket_json(conn, node, master):
     cand = _align_series(pairs, master)
     confirmed = CONFIRMED_BANKRUPTCIES.get(node["entity"])
     inst = ["1" if (confirmed and d >= confirmed) else "0" for d in master]
+
+    sig = db.load_buzz(conn, node["entity"])
+    news_by_date = {r["date"]: r["news_share"] for r in sig if r["news_share"] is not None}
+    dockets_pairs = [(r["date"], r["dockets_total"]) for r in sig if r["dockets_total"] is not None]
+    buzz = compute_buzz(master, news_by_date, dockets_pairs, dict(pairs), confirmed)
+    cur_buzz = next((v for v in reversed(buzz) if v is not None), None)
+
     return {
         "key": node["key"], "label": node["label"], "type": "docket",
         "entity": node["entity"],
         "cand": cand,
+        "buzz": buzz, "currentBuzz": cur_buzz,
         "candidates": pairs[-1][1], "lastChecked": pairs[-1][0],
         "confirmed": confirmed,
         "inst": "".join(inst),

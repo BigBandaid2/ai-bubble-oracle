@@ -64,6 +64,19 @@ CREATE TABLE IF NOT EXISTS bankruptcy_checks (
     candidates INTEGER NOT NULL,
     PRIMARY KEY (date, entity)
 );
+
+-- Raw inputs for the bankruptcy-buzz coefficient, one row per (date, entity).
+-- news_share: GDELT daily volume share (% of global coverage) for
+--             "<entity>" + bankruptcy-flavored keywords (backfillable).
+-- dockets_total: total federal dockets naming the entity (litigation pulse;
+--                accumulates from the first scan; NULL for backfilled days).
+CREATE TABLE IF NOT EXISTS buzz_signals (
+    date          TEXT NOT NULL,
+    entity        TEXT NOT NULL,
+    news_share    REAL,
+    dockets_total INTEGER,
+    PRIMARY KEY (date, entity)
+);
 """
 
 
@@ -164,6 +177,32 @@ def load_bankruptcy(conn, entity=None):
         ).fetchall()
     return conn.execute(
         "SELECT date, entity, candidates FROM bankruptcy_checks WHERE entity = ? ORDER BY date",
+        (entity,),
+    ).fetchall()
+
+
+def upsert_buzz_news(conn, entity, pairs):
+    """Upsert (date, news_share) rows, preserving any dockets_total already set."""
+    conn.executemany(
+        "INSERT INTO buzz_signals (date, entity, news_share) VALUES (?, ?, ?)"
+        " ON CONFLICT(date, entity) DO UPDATE SET news_share = excluded.news_share",
+        [(d, entity, v) for d, v in pairs],
+    )
+    conn.commit()
+
+
+def upsert_buzz_dockets(conn, date, entity, total):
+    conn.execute(
+        "INSERT INTO buzz_signals (date, entity, dockets_total) VALUES (?, ?, ?)"
+        " ON CONFLICT(date, entity) DO UPDATE SET dockets_total = excluded.dockets_total",
+        (date, entity, total),
+    )
+    conn.commit()
+
+
+def load_buzz(conn, entity):
+    return conn.execute(
+        "SELECT date, news_share, dockets_total FROM buzz_signals WHERE entity = ? ORDER BY date",
         (entity,),
     ).fetchall()
 

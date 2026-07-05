@@ -500,9 +500,11 @@ function metaHtml(res) {
     const candTxt = cand > 0
       ? `<b style="color:var(--met)">${cand} candidate filing${cand === 1 ? "" : "s"} — pending human review</b>`
       : `<b>0</b> candidate filings`;
-    return `Daily scan of federal Chapter 7/11 dockets naming <b>${node.entity}</b> (CourtListener/RECAP) &middot; ` +
+    const b = node.currentBuzz;
+    const bTxt = b != null ? `buzz coefficient <b>${b.toFixed(2)}</b> (${buzzTier(b)}) &middot; ` : "";
+    return `${bTxt}daily GDELT news scan + federal Ch.7/11 docket scan for <b>${node.entity}</b> &middot; ` +
       `${candTxt} &middot; confirmed: <b>${node.confirmed || "none"}</b> &middot; last checked <b>${node.lastChecked}</b> &middot; ` +
-      `<span style="color:var(--muted2)">a filing counts only after human review confirms it</span>`;
+      `<span style="color:var(--muted2)">buzz is context only — the condition needs a docket plus human confirmation</span>`;
   }
   return "No automated data source yet &middot; tracked manually until Phase 3.";
 }
@@ -561,7 +563,9 @@ function chartLegend(node) {
        <span><i class="sw" style="background:rgba(244,52,55,.24)"></i>&le; trigger ${node.days} days</span>`;
   } else if (node.type === "docket") {
     el.innerHTML =
-      `<span><i style="background:var(--price)"></i>candidate Ch.7/11 filings (daily scan)</span>
+      `<span><i style="background:var(--price)"></i>bankruptcy-buzz coefficient (news + dockets)</span>
+       <span><i style="background:var(--ath)"></i>0.90 — docket found</span>
+       <span><i style="background:var(--trigger)"></i>1.00 — confirmed</span>
        <span><i class="sw" style="background:rgba(244,52,55,.24)"></i>confirmed bankruptcy</span>`;
   } else {
     el.innerHTML =
@@ -863,19 +867,35 @@ function drawRental(canvas, res) {
   polyline(ctx, vals, n, w, y2px, css.getPropertyValue("--price"), 1.6);
 }
 
+function buzzTier(b) {
+  if (b == null) return "–";
+  if (b >= 1) return "CONFIRMED";
+  if (b >= 0.9) return "docket found — pending review";
+  if (b >= 0.7) return "heavy corroborated coverage";
+  if (b >= 0.4) return "widespread distress narrative";
+  if (b >= 0.1) return "elevated chatter";
+  return "background noise";
+}
+
 function drawDocket(canvas, res) {
   const node = res.node;
   const { ctx, w, h } = setupCanvas(canvas);
   const dates = AX.slice(SLICE);
-  const cand = node.cand.slice(SLICE);
+  const buzz = node.buzz.slice(SLICE);
   const met = Array.from(res.met).slice(SLICE);
   const n = dates.length;
-  const nums = cand.filter(v => v != null);
-  if (!nums.length) return;
-  const yMax = Math.max(2, Math.max(...nums)) + 0.5;
-  const y2px = drawFrame(ctx, w, h, dates, 0, yMax, v => Number.isInteger(v) ? String(v) : "");
+  if (!buzz.some(v => v != null)) return;
+  const y2px = drawFrame(ctx, w, h, dates, 0, 1.05, v => v.toFixed(2));
   shade(ctx, w, h, met, n, "rgba(244,52,55,.24)");
-  polyline(ctx, cand, n, w, y2px, getComputedStyle(document.documentElement).getPropertyValue("--price"), 1.6);
+  const css = getComputedStyle(document.documentElement);
+  // reference lines: 0.90 docket zone, 1.00 confirmed
+  ctx.setLineDash([2, 3]); ctx.lineWidth = 1.2;
+  ctx.strokeStyle = css.getPropertyValue("--ath");
+  ctx.beginPath(); ctx.moveTo(PAD.l, y2px(0.9)); ctx.lineTo(w - PAD.r, y2px(0.9)); ctx.stroke();
+  ctx.strokeStyle = css.getPropertyValue("--trigger");
+  ctx.beginPath(); ctx.moveTo(PAD.l, y2px(1.0)); ctx.lineTo(w - PAD.r, y2px(1.0)); ctx.stroke();
+  ctx.setLineDash([]);
+  polyline(ctx, buzz, n, w, y2px, css.getPropertyValue("--price"), 1.6);
 }
 
 function drawMarket(canvas, m) {

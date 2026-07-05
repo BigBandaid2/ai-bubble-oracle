@@ -22,6 +22,7 @@ from oracle.datasources import write_datasources
 from oracle.h100 import fetch_h100_proxy, SEED_POINTS, import_h100_csv, export_h100_csv
 from oracle.polymarket import fetch_market_history, import_polymarket_csv, export_polymarket_csv
 from oracle.bankruptcy import scan_all, import_bankruptcy_csv, export_bankruptcy_csv
+from oracle.buzz import update_signals, import_buzz_csv, export_buzz_csv
 from oracle.report import status_report
 from oracle.tracker import rebuild_events
 from oracle.yahoo import fetch_history, YahooError
@@ -81,6 +82,13 @@ def cmd_update(conn):
         print(f"Bankruptcy scan ({entity}): {r['candidates']} candidate Ch.7/11 filings")
     bk_kept = export_bankruptcy_csv(conn)
     print(f"Bankruptcy history: {bk_kept} scan rows in data/bankruptcy_history.csv")
+
+    # Bankruptcy-buzz signals (GDELT news volume + litigation pulse). The
+    # coefficient itself is computed at page-generation time.
+    import_buzz_csv(conn)
+    update_signals(conn)
+    bz_kept = export_buzz_csv(conn)
+    print(f"Buzz history: {bz_kept} signal rows in data/buzz_history.csv")
 
     db.set_meta(conn, "last_update", datetime.now(timezone.utc).isoformat(timespec="seconds"))
 
