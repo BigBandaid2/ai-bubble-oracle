@@ -3,6 +3,6 @@
     "OpenAI": 2,
     "Anthropic": 2
   },
-  "news_query_version": 2,
+  "news_query_version": 3,
   "news_k": 0.002
 }
