@@ -115,6 +115,25 @@
         asserting a number.</li>
     </ul>
 
+    <h2>How it's built</h2>
+    <p>Full disclosure on the "living dashboard" ambition: this came together over the long
+      <b>4th of July weekend</b>, while my wife and kids were out of town. It was built almost entirely with
+      <b>Claude Code</b>, switching between <b>Opus</b> for the heavy lifting and <b>Fable</b> for fast iteration.</p>
+    <p>The stack is deliberately lightweight:</p>
+    <ul>
+      <li><b>Python (standard library only, zero dependencies)</b> generates the site — hand-written HTML, CSS, and
+        vanilla JavaScript, with every chart drawn on an HTML <b>&lt;canvas&gt;</b> (no charting library, no
+        front-end framework).</li>
+      <li><b>SQLite</b> as the working data store, rebuilt from committed CSVs on each run.</li>
+      <li>Free public data feeds: <b>Yahoo Finance</b> (equity prices), <b>Polymarket's CLOB API</b> (the market's
+        own odds), <b>CourtListener / RECAP</b> (bankruptcy dockets), <b>GDELT</b> (a news-volume signal), and
+        <b>Vast.ai</b> (an H100 rental-price proxy).</li>
+      <li><b>Claude Haiku</b> classifies which news articles genuinely concern a company's financial distress,
+        keeping the buzz markers honest.</li>
+      <li><b>GitHub Actions</b> runs the data refresh on a daily schedule; <b>Vercel</b> hosts the static site and
+        auto-deploys on every push, with <b>Vercel Web Analytics</b> for traffic.</li>
+    </ul>
+
     <h2>Open source</h2>
     <p>The whole thing — data collectors, the evaluation engine, and the site generators — is public. Fork it,
       check the methodology, or open an issue.</p>
