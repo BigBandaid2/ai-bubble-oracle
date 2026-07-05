@@ -43,7 +43,15 @@ jobs:
             echo "No changes to commit."
           else
             git commit -m "chore: daily data update ($(date -u +%Y-%m-%d))"
-            git push
+            # Survive a concurrent push (e.g. a manual fix landing mid-run):
+            # rebase onto the remote and retry rather than failing the job.
+            pushed=""
+            for i in 1 2 3; do
+              if git push; then pushed=1; break; fi
+              echo "push rejected (attempt $i) — rebasing onto remote and retrying"
+              git pull --rebase --autostash origin main || true
+            done
+            [ -n "$pushed" ] || { echo "::error::could not push after retries"; exit 1; }
           fi
 
       # If today's docket scan found any Chapter 7/11 candidates, open a GitHub
