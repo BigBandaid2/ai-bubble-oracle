@@ -377,6 +377,12 @@ function evalNode(node) {
     return { key: node.key, node, tier, inst, met };
   }
 
+  if (node.type === "docket") {
+    const inst = strToArr(node.inst);   // confirmed-bankruptcy state, master-aligned
+    const met = state.window === "instant" ? inst : trailingArr(inst);
+    return { key: node.key, node, inst, met };
+  }
+
   // count
   const kids = node.children.map(evalNode);
   const withData = kids.filter(k => k.met);
@@ -414,6 +420,7 @@ function dotOf(res) {
 function lastMetOf(res) {
   if (res.node.type === "drawdown") return res.node.lastInst[state.basis];
   if (res.node.type === "rental") return res.tier.lastMet;
+  if (res.node.type === "docket") return res.node.confirmed || null;
   if (!res.met) return null;
   for (let i = LAST; i >= 0; i--) if (res.met[i]) return AX[i];
   return null;
@@ -428,7 +435,7 @@ document.getElementById("topsub").textContent = "Last update: " + (DATA.updated 
 // A node "has an automated data source" if any leaf under it is data-driven.
 // Structural (toggle-independent), so the ordering is stable across options.
 function hasData(node) {
-  if (node.type === "drawdown" || node.type === "rental") return true;
+  if (node.type === "drawdown" || node.type === "rental" || node.type === "docket") return true;
   if (node.type === "manual") return false;
   return (node.children || []).some(hasData);
 }
@@ -451,6 +458,8 @@ function optChips(node) {
     chips.push(chip("ATH", OPT_TEXT.basis[state.basis]));
   } else if (node.type === "rental") {
     chips.push(chip("Tier", OPT_TEXT.h100index[state.h100index]));
+  } else if (node.type === "docket") {
+    chips.push(chip("Source", "CourtListener"));
   }
   return chips.length ? `<div class="optchips">${chips.join("")}</div>` : "";
 }
@@ -486,7 +495,16 @@ function metaHtml(res) {
       `last at/below: <b>${t.lastMet || "never"}</b> &middot; ` +
       `<span style="color:var(--muted2)">approximation — authoritative index is SiliconData's paywalled feed</span>`;
   }
-  return "No automated data source yet &middot; tracked manually until Phase 3/4.";
+  if (node.type === "docket") {
+    const cand = node.candidates;
+    const candTxt = cand > 0
+      ? `<b style="color:var(--met)">${cand} candidate filing${cand === 1 ? "" : "s"} — pending human review</b>`
+      : `<b>0</b> candidate filings`;
+    return `Daily scan of federal Chapter 7/11 dockets naming <b>${node.entity}</b> (CourtListener/RECAP) &middot; ` +
+      `${candTxt} &middot; confirmed: <b>${node.confirmed || "none"}</b> &middot; last checked <b>${node.lastChecked}</b> &middot; ` +
+      `<span style="color:var(--muted2)">a filing counts only after human review confirms it</span>`;
+  }
+  return "No automated data source yet &middot; tracked manually until Phase 3.";
 }
 
 function nodeCard(node, depth, parentLabel) {
@@ -518,7 +536,8 @@ function nodeCard(node, depth, parentLabel) {
   } else {
     const c = chartCanvas(sec);
     requestAnimationFrame(() => node.type === "drawdown" ? drawPrice(c, res)
-      : node.type === "rental" ? drawRental(c, res) : drawCount(c, res));
+      : node.type === "rental" ? drawRental(c, res)
+      : node.type === "docket" ? drawDocket(c, res) : drawCount(c, res));
     sec.appendChild(chartLegend(node));
   }
   return sec;
@@ -540,6 +559,10 @@ function chartLegend(node) {
       `<span><i style="background:var(--price)"></i>H100 median $/hr (proxy)</span>
        <span><i style="background:var(--trigger)"></i>trigger (&le; $${node.threshold.toFixed(2)})</span>
        <span><i class="sw" style="background:rgba(244,52,55,.24)"></i>&le; trigger ${node.days} days</span>`;
+  } else if (node.type === "docket") {
+    el.innerHTML =
+      `<span><i style="background:var(--price)"></i>candidate Ch.7/11 filings (daily scan)</span>
+       <span><i class="sw" style="background:rgba(244,52,55,.24)"></i>confirmed bankruptcy</span>`;
   } else {
     el.innerHTML =
       `<span><i style="background:var(--price)"></i>sub-conditions met</span>
@@ -838,6 +861,21 @@ function drawRental(canvas, res) {
   ctx.beginPath(); ctx.moveTo(PAD.l, y2px(node.threshold)); ctx.lineTo(w - PAD.r, y2px(node.threshold)); ctx.stroke();
   ctx.setLineDash([]);
   polyline(ctx, vals, n, w, y2px, css.getPropertyValue("--price"), 1.6);
+}
+
+function drawDocket(canvas, res) {
+  const node = res.node;
+  const { ctx, w, h } = setupCanvas(canvas);
+  const dates = AX.slice(SLICE);
+  const cand = node.cand.slice(SLICE);
+  const met = Array.from(res.met).slice(SLICE);
+  const n = dates.length;
+  const nums = cand.filter(v => v != null);
+  if (!nums.length) return;
+  const yMax = Math.max(2, Math.max(...nums)) + 0.5;
+  const y2px = drawFrame(ctx, w, h, dates, 0, yMax, v => Number.isInteger(v) ? String(v) : "");
+  shade(ctx, w, h, met, n, "rgba(244,52,55,.24)");
+  polyline(ctx, cand, n, w, y2px, getComputedStyle(document.documentElement).getPropertyValue("--price"), 1.6);
 }
 
 function drawMarket(canvas, m) {

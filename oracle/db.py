@@ -54,6 +54,16 @@ CREATE TABLE IF NOT EXISTS polymarket_prices (
     date     TEXT PRIMARY KEY,
     yes_prob REAL NOT NULL
 );
+
+-- Daily CourtListener bankruptcy-docket scans, one row per (date, entity).
+-- candidates = Chapter 7/11 dockets whose case name contains the entity name;
+-- a candidate only makes the condition met after human confirmation (config).
+CREATE TABLE IF NOT EXISTS bankruptcy_checks (
+    date       TEXT NOT NULL,
+    entity     TEXT NOT NULL,
+    candidates INTEGER NOT NULL,
+    PRIMARY KEY (date, entity)
+);
 """
 
 
@@ -136,6 +146,25 @@ def upsert_polymarket(conn, rows):
 def load_polymarket(conn):
     return conn.execute(
         "SELECT date, yes_prob FROM polymarket_prices ORDER BY date"
+    ).fetchall()
+
+
+def upsert_bankruptcy(conn, date, entity, candidates):
+    conn.execute(
+        "INSERT OR REPLACE INTO bankruptcy_checks (date, entity, candidates) VALUES (?, ?, ?)",
+        (date, entity, candidates),
+    )
+    conn.commit()
+
+
+def load_bankruptcy(conn, entity=None):
+    if entity is None:
+        return conn.execute(
+            "SELECT date, entity, candidates FROM bankruptcy_checks ORDER BY date"
+        ).fetchall()
+    return conn.execute(
+        "SELECT date, entity, candidates FROM bankruptcy_checks WHERE entity = ? ORDER BY date",
+        (entity,),
     ).fetchall()
 
 

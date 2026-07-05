@@ -14,6 +14,12 @@ DEADLINE = "2026-12-31"
 # The Polymarket market page this oracle tracks.
 MARKET_URL = "https://polymarket.com/event/ai-bubble-burst-by"
 
+# Human-confirm gate for bankruptcy candidates: a docket found by the daily
+# CourtListener scan only makes its condition met once it is confirmed here,
+# as {entity: "YYYY-MM-DD"} (the filing date it should count from).
+# e.g. CONFIRMED_BANKRUPTCIES = {"OpenAI": "2026-08-14"}
+CONFIRMED_BANKRUPTCIES = {}
+
 # Broad-market context series (not a condition): the S&P 500 index.
 SP500_TICKER = "^GSPC"
 
@@ -63,8 +69,10 @@ CONTRACT = {
             "label": "OpenAI or Anthropic bankruptcy",
             "type": "count", "min_met": 1,
             "children": [
-                {"key": "openai_bankruptcy", "label": "OpenAI declares bankruptcy", "type": "manual"},
-                {"key": "anthropic_bankruptcy", "label": "Anthropic declares bankruptcy", "type": "manual"},
+                {"key": "openai_bankruptcy", "label": "OpenAI declares bankruptcy",
+                 "type": "docket", "entity": "OpenAI"},
+                {"key": "anthropic_bankruptcy", "label": "Anthropic declares bankruptcy",
+                 "type": "docket", "entity": "Anthropic"},
             ],
         },
         {

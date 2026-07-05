@@ -18,7 +18,7 @@ the count and are surfaced via chart.unknown.
 
 import bisect
 
-from .config import CONTRACT, CHART_START
+from .config import CONFIRMED_BANKRUPTCIES, CONTRACT, CHART_START
 from .tracker import compute_series
 from . import db
 
@@ -98,6 +98,25 @@ def _eval_rental(node, conn):
     }
 
 
+def _eval_docket(node, conn):
+    rows = db.load_bankruptcy(conn, node["entity"])
+    if not rows:
+        return _no_data(node)
+    dates = [r["date"] for r in rows]
+    confirmed = CONFIRMED_BANKRUPTCIES.get(node["entity"])
+    met = [bool(confirmed and d >= confirmed) for d in dates]
+    return {
+        "key": node["key"], "label": node["label"], "type": "docket",
+        "status": "met" if met[-1] else "not_met",
+        "last_met": confirmed,
+        "met_series": (dates, met),
+        "chart": {"kind": "none"},
+        "stats": {"date": dates[-1], "candidates": rows[-1]["candidates"],
+                  "entity": node["entity"], "confirmed": confirmed},
+        "children": [],
+    }
+
+
 def _no_data(node, children=None):
     return {
         "key": node["key"],
@@ -171,6 +190,8 @@ def eval_node(node, conn):
         return _eval_drawdown(node, conn)
     if node["type"] == "rental":
         return _eval_rental(node, conn)
+    if node["type"] == "docket":
+        return _eval_docket(node, conn)
     if node["type"] == "manual":
         return _no_data(node)
     if node["type"] == "count":

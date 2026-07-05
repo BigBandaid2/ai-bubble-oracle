@@ -42,9 +42,15 @@ Four of the six conditions now resolve from automated data:
 | `soxx_down_40` | SOXX down 40% from all-time high | Yahoo Finance |
 | `supplier_down_50` | Any of TSM, ASML, AVGO, ANET, SMCI down 50% from ATH | Yahoo Finance |
 | `h100_rental_dollar` | H100 rental ≤ $1.00/hr for 5 straight days | Vast.ai proxy (see below) |
+| `openai_bankruptcy` / `anthropic_bankruptcy` | Chapter 7/11 filing | CourtListener/RECAP daily scan |
 
-The remaining two (OpenAI/Anthropic bankruptcy, OpenAI acquisition) await Phase 3
-news/court-docket monitoring.
+The bankruptcy scan queries `caseName:(<entity>) AND chapter:(7 OR 11)` daily
+(validated against FTX's 2022 Chapter 11 wave), applies an exact-substring name
+gate against stemming noise, and records candidate counts to
+`data/bankruptcy_history.csv`. A candidate **never** flips the condition by
+itself — it counts only after human review confirms it in
+`CONFIRMED_BANKRUPTCIES` (`oracle/config.py`). Only the OpenAI-acquisition
+condition still awaits a data source (news monitoring).
 
 - Data: Yahoo Finance public chart API (split-adjusted daily OHLC) + Vast.ai
   public bundles API — neither needs a key
@@ -192,9 +198,9 @@ schtasks /Create /TN "AI Bubble Oracle" /SC DAILY /ST 17:15 /TR "python C:\works
 - **Phase 2 — aggregation + alerting:** 3-of-6 rolling 90-day window over event
   dates; tiered alerts (approaching / triggered / N-of-6) via webhook or email;
   daily digest.
-- **Phase 3 — news/event monitoring:** CourtListener (RECAP) docket alerts for
-  OpenAI/Anthropic bankruptcy; GDELT/RSS + LLM classification for acquisition
-  news; human confirm before an event counts.
+- **Phase 3 — news/event monitoring:** bankruptcy half ✅ done (daily
+  CourtListener docket scan with a human-confirm gate). Remaining: GDELT/RSS +
+  LLM classification for OpenAI-acquisition news.
 - **Phase 4 — H100 rental price proxy:** ✅ done — Vast.ai on-demand median with
   the 5-consecutive-days ≤ $1.00 logic. Remaining: alerting when the proxy
   approaches the threshold, and swapping in the authoritative SDH100RT index

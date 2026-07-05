@@ -33,6 +33,12 @@ def _node_lines(node, depth, lines):
             f"{indent}      H100 rental ${s['usd_hr']:.2f}/hr ({s['date']}, {s['source']})"
             f" | trigger <= ${s['threshold']:.2f} for {s['days']} straight days"
         )
+    elif node["type"] == "docket" and s:
+        conf = f"confirmed {s['confirmed']}" if s["confirmed"] else "none confirmed"
+        lines.append(
+            f"{indent}      CourtListener scan ({s['date']}): {s['candidates']}"
+            f" candidate Ch.7/11 filings naming {s['entity']} | {conf}"
+        )
     for child in node["children"]:
         _node_lines(child, depth + 1, lines)
 

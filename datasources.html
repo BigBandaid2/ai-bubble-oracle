@@ -263,11 +263,12 @@
 </div>
 
 <script>
-const DATA = {"updated":"2026-07-05T03:50:37+00:00","prices":{"columns":[{"name":"ticker","type":"TEXT"},{"name":"date","type":"TEXT"},{"name":"open","type":"REAL"},{"name":"high","type":"REAL"},{"name":"low","type":"REAL"},{"name":"close","type":"REAL"}],"byTicker":[{"ticker":"ANET","rows":3036,"first":"2014-06-06","last":"2026-07-02"},{"ticker":"ASML","rows":7877,"first":"1995-03-15","last":"2026-07-02"},{"ticker":"AVGO","rows":4252,"first":"2009-08-06","last":"2026-07-02"},{"ticker":"NVDA","rows":6903,"first":"1999-01-22","last":"2026-07-02"},{"ticker":"SMCI","rows":4846,"first":"2007-03-29","last":"2026-07-02"},{"ticker":"SOXX","rows":6279,"first":"2001-07-13","last":"2026-07-02"},{"ticker":"TSM","rows":7226,"first":"1997-10-09","last":"2026-07-02"},{"ticker":"^GSPC","rows":14246,"first":"1970-01-02","last":"2026-07-02"}],"total":54665},"events":{"columns":[{"name":"condition_key","type":"TEXT"},{"name":"ticker","type":"TEXT"},{"name":"basis","type":"TEXT"},{"name":"date","type":"TEXT"},{"name":"kind","type":"TEXT"},{"name":"drawdown","type":"REAL"},{"name":"price","type":"REAL"},{"name":"ath","type":"REAL"}],"total":826},"example":{"ticker":"SMCI","condition":"smci_down_50","date":"2026-07-02","open":28.05,"high":29.22,"low":26.7,"close":27.22,"skey":"83feabfe1e94","athClose":118.81,"athIntraday":122.9,"ddClose":0.7709,"ddIntraday":0.7785,"triggerClose":59.4,"triggerIntraday":61.45,"threshold":0.5,"metInstant":1,"metInstantIntraday":1,"metTrailing":1,"lastBreach":"2025-07-31","supplierHits":["SMCI"],"supplierCount":1,"supplierTotal":5,"supplierMinMet":1},"h100":{"neocloud":{"date":"2026-07-05","usd_hr":2.201,"low":1.734,"n":31,"source":"vast_proxy","rows":5},"hyperscaler":{"date":"2026-04-20","usd_hr":7.48,"low":null,"n":null,"source":"silicondata_published","rows":4},"rowsAll":9},"polymarket":{"date":"2026-07-05","yes_prob":0.1615,"first":"2025-11-21","count":224}};
+const DATA = {"updated":"2026-07-05T04:46:30+00:00","prices":{"columns":[{"name":"ticker","type":"TEXT"},{"name":"date","type":"TEXT"},{"name":"open","type":"REAL"},{"name":"high","type":"REAL"},{"name":"low","type":"REAL"},{"name":"close","type":"REAL"}],"byTicker":[{"ticker":"ANET","rows":3036,"first":"2014-06-06","last":"2026-07-02"},{"ticker":"ASML","rows":7877,"first":"1995-03-15","last":"2026-07-02"},{"ticker":"AVGO","rows":4252,"first":"2009-08-06","last":"2026-07-02"},{"ticker":"NVDA","rows":6903,"first":"1999-01-22","last":"2026-07-02"},{"ticker":"SMCI","rows":4846,"first":"2007-03-29","last":"2026-07-02"},{"ticker":"SOXX","rows":6279,"first":"2001-07-13","last":"2026-07-02"},{"ticker":"TSM","rows":7226,"first":"1997-10-09","last":"2026-07-02"},{"ticker":"^GSPC","rows":14246,"first":"1970-01-02","last":"2026-07-02"}],"total":54665},"events":{"columns":[{"name":"condition_key","type":"TEXT"},{"name":"ticker","type":"TEXT"},{"name":"basis","type":"TEXT"},{"name":"date","type":"TEXT"},{"name":"kind","type":"TEXT"},{"name":"drawdown","type":"REAL"},{"name":"price","type":"REAL"},{"name":"ath","type":"REAL"}],"total":826},"example":{"ticker":"SMCI","condition":"smci_down_50","date":"2026-07-02","open":28.05,"high":29.22,"low":26.7,"close":27.22,"skey":"83feabfe1e94","athClose":118.81,"athIntraday":122.9,"ddClose":0.7709,"ddIntraday":0.7785,"triggerClose":59.4,"triggerIntraday":61.45,"threshold":0.5,"metInstant":1,"metInstantIntraday":1,"metTrailing":1,"lastBreach":"2025-07-31","supplierHits":["SMCI"],"supplierCount":1,"supplierTotal":5,"supplierMinMet":1},"h100":{"neocloud":{"date":"2026-07-05","usd_hr":2.296,"low":1.734,"n":22,"source":"vast_proxy","rows":5},"hyperscaler":{"date":"2026-04-20","usd_hr":7.48,"low":null,"n":null,"source":"silicondata_published","rows":4},"rowsAll":9},"polymarket":{"date":"2026-07-05","yes_prob":0.155,"first":"2025-11-21","count":224},"bankruptcy":{"lastChecked":"2026-07-05","entities":{"Anthropic":0,"OpenAI":0},"rows":2}};
 const E = DATA.example || {};
 const E100 = (DATA.h100 && DATA.h100.neocloud) || {};   // neocloud tier for static asset examples
 const H100_ROWS_ALL = (DATA.h100 && DATA.h100.rowsAll) || 8;
 const E_PM = DATA.polymarket || {};
+const E_BK = DATA.bankruptcy || {};
 document.getElementById("topsub").textContent = "Last update: " + (DATA.updated || "never") + " UTC";
 
 const money = v => "$" + (v >= 100 ? v.toFixed(0) : v.toFixed(2));
@@ -738,45 +739,80 @@ const ASSETS = [
     cardinality: "one JSON block; drives the headline chart.",
   },
 
-  /* -------- CourtListener (planned) -------- */
+  /* -------- CourtListener (live) -------- */
   {
-    id: "court_dockets", group: "courtlistener", layer: "raw", status: "planned",
-    name: "court_dockets", mat: "table (planned)", cadence: "hourly alerts",
-    dagster: "recap/court_dockets", dbt: "—",
-    grain: "one row per federal docket",
-    why: "Feeds the OpenAI/Anthropic bankruptcy conditions. Chapter 7/11 filings are public and immediate.",
-    desc: "CourtListener RECAP party-name alerts.",
+    id: "raw.courtlistener_search", group: "courtlistener", layer: "source", status: "live",
+    name: "raw.courtlistener_search", mat: "API response (JSON)", cadence: "daily",
+    dagster: "recap/search", dbt: "source('courtlistener','search')",
+    grain: "one JSON document per (entity, day)",
+    why: "Feeds the OpenAI/Anthropic bankruptcy conditions. Chapter 7/11 petitions hit federal dockets within hours of filing.",
+    desc: "CourtListener's free RECAP search API, queried daily per entity with caseName:(<entity>) AND chapter:(7 OR 11). No key needed. Validated against FTX's Nov-2022 Chapter 11 wave (29 hits), so the query provably catches real bankruptcies.",
     upstream: [],
-    schema: [
-      { col: "id", type: "INTEGER", kind: "key", ex: "70123456" },
-      { col: "case_name", type: "STRING", kind: "pass", ex: "In re: Example AI Inc." },
-      { col: "court", type: "STRING", kind: "pass", ex: "cacb" },
-      { col: "date_filed", type: "DATE", kind: "pass", ex: "—" },
-      { col: "chapter", type: "STRING", kind: "pass", ex: "11" },
-    ],
-    transforms: [{ tag: "extract", text: "REST party-name alerts, free API key" }],
-    cardinality: "one row per matching docket (rare).",
+    json: `GET courtlistener.com/api/rest/v4/search/
+  ?type=r&q=caseName:(OpenAI) AND chapter:(7 OR 11)
+→ { "count": ${(E_BK.entities && E_BK.entities.OpenAI) || 0}, "results": [ …caseName, court_id, chapter, dateFiled… ] }`,
+    transforms: [{ tag: "extract", text: "HTTP GET per entity; retries with backoff (the search endpoint is occasionally slow)." }],
+    cardinality: "2 documents per day (one per entity); result lists are near-empty in the normal case.",
   },
   {
-    id: "stg_recap__dockets", group: "courtlistener", layer: "staging", status: "planned",
-    name: "stg_recap__dockets", mat: "view (planned)", cadence: "on read",
-    dagster: "recap/stg_dockets", dbt: "stg_recap__dockets",
-    grain: "one row per bankruptcy docket matched to a tracked entity",
-    why: "Filters to real bankruptcy petitions and fuzzy-matches parties to OpenAI/Anthropic, with a human gate.",
-    desc: "Dedupe, filter to chapters 7/11, and fuzzy-match parties; low-confidence hits go to a human-confirm gate before the flag counts.",
-    upstream: ["court_dockets"],
+    id: "bankruptcy_checks", group: "courtlistener", layer: "raw", status: "live",
+    name: "bankruptcy_checks", mat: "table · daily upsert", cadence: "daily",
+    dagster: "recap/bankruptcy_checks", dbt: "—  (landed by the tap)",
+    grain: "one row per (date, entity)",
+    why: "The persisted daily scan result — candidate counts per entity, accumulating a monitoring history.",
+    desc: "Candidates = Chapter 7/11 dockets whose case name actually contains the entity name. The exact-substring gate matters: the search engine stems, so a personal Chapter 7 by one “Chad Michael Anthrop” matches the Anthropic query — and is filtered out here.",
+    upstream: ["raw.courtlistener_search"],
     schema: [
-      { col: "docket_id", type: "INTEGER", kind: "key", ex: "70123456" },
-      { col: "entity", type: "STRING", kind: "derived", ex: "OpenAI", note: "fuzzy party match" },
-      { col: "confidence", type: "NUMERIC", kind: "derived", ex: "0.94" },
-      { col: "confirmed", type: "BOOLEAN", kind: "meta", ex: "false", note: "human gate" },
+      { col: "date", type: "TEXT", kind: "key", ex: E_BK.lastChecked || "2026-07-05" },
+      { col: "entity", type: "TEXT", kind: "key", ex: "OpenAI" },
+      { col: "candidates", type: "INTEGER", kind: "derived", ex: (E_BK.entities && E_BK.entities.OpenAI) || 0, note: "Ch.7/11 dockets passing the substring name gate" },
     ],
     transforms: [
-      { tag: "dedupe", macro: "dbt_utils.deduplicate", text: "by docket id" },
-      { tag: "filter", macro: "accepted_values(chapter in ['7','11'])" },
-      { tag: "entity match", text: "Jaro-Winkler party match; human-confirm gate for low confidence" },
+      { tag: "filter", text: "chapter ∈ {7, 11} (from the fielded query)" },
+      { tag: "entity match", text: "case name must contain the entity as an exact substring — removes stemming noise" },
+      { tag: "incremental", text: "upsert on (date, entity); cached to data/bankruptcy_history.csv" },
     ],
-    cardinality: "sparse; near-zero rows in the normal case.",
+    tests: ["not_null: candidates", "accepted_values: entity in (OpenAI, Anthropic)"],
+    cardinality: `${E_BK.rows || 2} scan rows so far (2 per day, accumulating).`,
+  },
+  {
+    id: "int_bankruptcy_state", group: "courtlistener", layer: "intermediate", status: "live",
+    name: "int_bankruptcy_state", mat: "table", cadence: "on rebuild",
+    dagster: "recap/int_bankruptcy_state", dbt: "int_bankruptcy_state",
+    grain: "one row per (entity, master-axis date)",
+    why: "Applies the HUMAN-CONFIRM GATE — the reason a scan hit can never flip the condition by itself.",
+    desc: "A candidate docket (subsidiary, adversary proceeding, name collision) needs a human read. The met flag comes only from CONFIRMED_BANKRUPTCIES in config — set after review — and is then aligned to the master date axis from the confirmed filing date onward. Candidates are surfaced on the dashboard so a nonzero day is impossible to miss.",
+    upstream: ["bankruptcy_checks"],
+    schema: [
+      { col: "entity", type: "STRING", kind: "key", ex: "OpenAI" },
+      { col: "date", type: "DATE", kind: "key", ex: E_BK.lastChecked || "2026-07-05" },
+      { col: "candidates", type: "INTEGER", kind: "pass", ex: (E_BK.entities && E_BK.entities.OpenAI) || 0 },
+      { col: "confirmed", type: "BOOLEAN", kind: "seed", ex: 0, note: "human gate: config.CONFIRMED_BANKRUPTCIES" },
+      { col: "met", type: "BOOLEAN", kind: "derived", ex: 0, note: "1 from the confirmed filing date onward" },
+    ],
+    transforms: [
+      { tag: "human gate", text: "met = date ≥ confirmed filing date (config), NOT candidates > 0" },
+      { tag: "forward-fill", text: "align onto the master date axis so the 1-of-2 parent can count it" },
+    ],
+    tests: ["not_null: met", "source freshness (a stalled scan must not read as ‘no filings’)"],
+    cardinality: "2 entities × master-axis days from the first scan onward.",
+  },
+  {
+    id: "exposure.bankruptcy_state", group: "courtlistener", layer: "serve", status: "live",
+    name: "exposure: bankruptcy_state", mat: "exposure (JSON)", cadence: "on generate",
+    dagster: "dashboard (bankruptcy slice)", dbt: "exposure: bankruptcy_state",
+    grain: "one block per entity in dashboard.html",
+    why: "The bankruptcy pipeline's conclusion — its slice of the served payload, feeding the 1-of-2 parent and the 3-of-6 root.",
+    desc: "Per entity: the candidate-count series (null before the first scan) and the confirmed-met bitstring, master-aligned. The browser counts it into the contract exactly like the equity and H100 leaves.",
+    upstream: ["int_bankruptcy_state"],
+    json: `"openai_bankruptcy": {
+  "type": "docket", "entity": "OpenAI",
+  "cand": [ null, …, ${(E_BK.entities && E_BK.entities.OpenAI) || 0} ],   <span class="cm">// aligned candidate counts</span>
+  "candidates": ${(E_BK.entities && E_BK.entities.OpenAI) || 0}, "lastChecked": "${E_BK.lastChecked || "2026-07-05"}",
+  "confirmed": null, "inst": "0000…0000"
+}`,
+    transforms: [{ tag: "reverse-etl", text: "→ the bankruptcy blocks of the static JSON", macro: "dbt exposure" }],
+    cardinality: "two JSON blocks; the pipeline's terminal node.",
   },
 
   /* -------- GDELT (planned) -------- */
@@ -823,7 +859,7 @@ const GROUPS = [
   { id: "yahoo", name: "Yahoo Finance", status: "live" },
   { id: "h100", name: "H100 rental (proxy)", status: "live" },
   { id: "polymarket", name: "Polymarket", status: "live" },
-  { id: "courtlistener", name: "CourtListener", status: "planned" },
+  { id: "courtlistener", name: "CourtListener", status: "live" },
   { id: "gdelt", name: "GDELT news", status: "planned" },
 ];
 
@@ -896,12 +932,19 @@ const GRAPHS = {
     curves: [],
   },
   courtlistener: {
-    viewBox: "0 0 460 210",
+    viewBox: "0 0 460 380",
     nodes: [
-      { id: "court_dockets", cx: MX, cy: 46 },
-      { id: "stg_recap__dockets", cx: MX, cy: 142 },
+      { id: "raw.courtlistener_search", cx: MX, cy: 40 },
+      { id: "bankruptcy_checks", cx: MX, cy: 132 },
+      { id: "int_bankruptcy_state", cx: MX, cy: 224 },
+      { id: "exposure.bankruptcy_state", cx: MX, cy: 316, short: "exposure: bankruptcy" },
     ],
-    spine: [["court_dockets", "stg_recap__dockets"]], curves: [],
+    spine: [
+      ["raw.courtlistener_search", "bankruptcy_checks"],
+      ["bankruptcy_checks", "int_bankruptcy_state"],
+      ["int_bankruptcy_state", "exposure.bankruptcy_state"],
+    ],
+    curves: [],
   },
   gdelt: {
     viewBox: "0 0 460 210",
@@ -1148,17 +1191,20 @@ const SOURCE_INFO = {
     ],
   },
   courtlistener: {
-    blurb: "Federal bankruptcy dockets for the OpenAI / Anthropic bankruptcy conditions. Planned (Phase 3).",
+    blurb: "Daily scans of federal Chapter 7/11 dockets (CourtListener/RECAP) drive the OpenAI and Anthropic bankruptcy conditions — live monitoring with a human-confirm gate before any filing counts.",
     options: [],
     ambiguities: [
-      { t: "What counts as “bankruptcy”?", d: "A Chapter 7/11 petition, versus a restructuring rumor or a subsidiary filing. Needs a human read." },
+      { t: "What counts as “bankruptcy”?", d: "A parent-company Chapter 7/11 petition, versus a subsidiary filing, an adversary proceeding, or a restructuring rumor. That judgment is exactly why the human gate exists — the scan surfaces candidates; a person confirms." },
     ],
     caveats: [
-      { t: "Not yet wired", d: "Planned. Entity matching to OpenAI/Anthropic is fuzzy; low-confidence hits go to a human-confirm gate before the flag counts." },
+      { t: "Scan, don't trust blindly", d: "The search engine stems names (a personal Chapter 7 by “Chad Michael Anthrop” matches the Anthropic query), so an exact-substring name gate filters candidates — and even a passing candidate never flips the condition without confirmation in config." },
+      { t: "Query validated on FTX", d: "The same query against FTX returns its 29 real Chapter 11 filings from Nov 2022, so a genuine OpenAI/Anthropic petition would be caught." },
     ],
     cardinality: [
-      { asset: "court_dockets", count: "~0", meaning: "Sparse — a qualifying Chapter 7/11 filing is a rare event." },
-      { asset: "stg_recap__dockets", count: "~0", meaning: "Filtered to matched bankruptcy petitions; near-zero in the normal case." },
+      { asset: "raw.courtlistener_search", count: "2/day", meaning: "One search per entity per day; result lists near-empty in the normal case." },
+      { asset: "bankruptcy_checks", count: "2/day ↑", meaning: "One row per (date, entity) — candidate counts accumulating into a monitoring history." },
+      { asset: "int_bankruptcy_state", count: "×~1,200", meaning: "The confirmed-met flag is aligned onto the master date axis so the 1-of-2 parent can count it daily." },
+      { asset: "exposure.bankruptcy_state", count: "2 blocks", meaning: "One JSON block per entity, served into the dashboard's contract count." },
     ],
   },
   gdelt: {

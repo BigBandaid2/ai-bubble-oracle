@@ -19,8 +19,9 @@ Everything is inlined (JSON + CSS + JS), so the file works offline from disk.
 import json
 from datetime import date, datetime, timedelta, timezone
 
-from .config import (BASES, CHART_START, CONTRACT, DASHBOARD_PATH, DEADLINE,
-                     KEY_EVENTS, MARKET_URL, SP500_TICKER, drawdown_leaves)
+from .config import (BASES, CHART_START, CONFIRMED_BANKRUPTCIES, CONTRACT,
+                     DASHBOARD_PATH, DEADLINE, KEY_EVENTS, MARKET_URL,
+                     SP500_TICKER, drawdown_leaves)
 from . import db
 from .tracker import compute_series
 
@@ -111,6 +112,31 @@ def _rental_type_series(rows, node, master):
         "values": _align_series(list(zip(dates, values)), master),   # null before first reading
         "current": values[-1], "currentDate": dates[-1], "source": sources[-1],
         "inst": "".join(str(x) for x in inst), "lastMet": last_met,
+    }
+
+
+def _docket_json(conn, node, master):
+    """Payload for a bankruptcy-docket condition.
+
+    Ships the candidate-count series (aligned; null before the first scan) and
+    a met bitstring that is all-zero unless the entity has a human-confirmed
+    filing in CONFIRMED_BANKRUPTCIES — the scan alone never flips it.
+    """
+    rows = db.load_bankruptcy(conn, node["entity"])
+    if not rows:
+        return {"key": node["key"], "label": node["label"], "type": "manual",
+                "note": node.get("note", "")}
+    pairs = [(r["date"], r["candidates"]) for r in rows]
+    cand = _align_series(pairs, master)
+    confirmed = CONFIRMED_BANKRUPTCIES.get(node["entity"])
+    inst = ["1" if (confirmed and d >= confirmed) else "0" for d in master]
+    return {
+        "key": node["key"], "label": node["label"], "type": "docket",
+        "entity": node["entity"],
+        "cand": cand,
+        "candidates": pairs[-1][1], "lastChecked": pairs[-1][0],
+        "confirmed": confirmed,
+        "inst": "".join(inst),
     }
 
 
@@ -217,6 +243,8 @@ def build_payload(conn):
             }
         if node["type"] == "rental":
             return _rental_json(conn, node, master)
+        if node["type"] == "docket":
+            return _docket_json(conn, node, master)
         return {"key": node["key"], "label": node["label"], "type": "manual",
                 "note": node.get("note", "")}
 

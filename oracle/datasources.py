@@ -143,6 +143,21 @@ def build_payload(conn):
             "count": conn.execute("SELECT COUNT(*) n FROM polymarket_prices").fetchone()["n"],
         }
 
+    bk_last = conn.execute(
+        "SELECT MAX(date) d FROM bankruptcy_checks"
+    ).fetchone()["d"]
+    bankruptcy = None
+    if bk_last:
+        ents = conn.execute(
+            "SELECT entity, candidates FROM bankruptcy_checks WHERE date = ? ORDER BY entity",
+            (bk_last,),
+        ).fetchall()
+        bankruptcy = {
+            "lastChecked": bk_last,
+            "entities": {r["entity"]: r["candidates"] for r in ents},
+            "rows": conn.execute("SELECT COUNT(*) n FROM bankruptcy_checks").fetchone()["n"],
+        }
+
     return {
         "updated": db.get_meta(conn, "last_update"),
         "prices": {"columns": _columns(conn, "prices"), "byTicker": by_ticker, "total": prices_total},
@@ -150,6 +165,7 @@ def build_payload(conn):
         "example": _example(conn),
         "h100": h100,
         "polymarket": polymarket,
+        "bankruptcy": bankruptcy,
     }
 
 
