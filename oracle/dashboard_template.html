@@ -612,6 +612,7 @@ function nodeCard(node, depth, parentLabel) {
       : node.type === "docket" ? drawDocket(c, res) : drawCount(c, res));
     sec.appendChild(chartLegend(node));
     const evs = relevantEvents(node);
+    const visible = evs.filter(e => e.i >= SLICE);   // only spikes in the current date range
     if (node.type === "docket" && evs.length) {
       // numbered badge → news item (same visual language as the S&P legend)
       c.parentElement.addEventListener("click", ev => {
@@ -622,7 +623,8 @@ function nodeCard(node, depth, parentLabel) {
       });
       const leg = document.createElement("ol");
       leg.className = "evlegend";
-      leg.innerHTML = evs.map((e, k) => {
+      leg.innerHTML = visible.map(e => {
+        const k = evs.indexOf(e);   // number by full-list index so it matches the badge
         const d = new Date(e.date + "T00:00:00Z");
         const ds = d.toLocaleDateString("en-US", { month: "short", year: "2-digit", timeZone: "UTC" }).replace(" ", " ’");
         const body = `<a href="${e.url}" target="_blank" rel="noopener">${e.title || "news spike"}</a>` +
@@ -630,6 +632,13 @@ function nodeCard(node, depth, parentLabel) {
         return `<li><span class="evnum">${k + 1}</span><span>${body}</span> <span class="evdate">${ds}</span></li>`;
       }).join("");
       sec.appendChild(leg);
+      const off = evs.length - visible.length;
+      if (off > 0) {
+        const more = document.createElement("div");
+        more.className = "evmore";
+        more.textContent = `${off} earlier event${off === 1 ? "" : "s"} outside this range — switch Range to All.`;
+        sec.appendChild(more);
+      }
     }
   }
   return sec;
