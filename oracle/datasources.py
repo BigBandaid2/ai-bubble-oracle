@@ -18,6 +18,7 @@ import json
 
 from .config import DASHBOARD_PATH
 from . import db
+from .thennow import compute_thennow
 from .tracker import compute_series
 
 DATASOURCES_PATH = DASHBOARD_PATH.parent / "datasources.html"
@@ -102,6 +103,41 @@ def _example(conn):
     }
 
 
+def _thennow_example(conn):
+    """Real scalars from the Then-and-Now roll-up tree so the per-graph IR
+    example rows are authentic (mirrors how _example traces SMCI)."""
+    t = compute_thennow(conn)
+    if not t:
+        return None
+
+    def find(node, key):
+        if node.get("key") == key:
+            return node
+        for c in node.get("children", []):
+            hit = find(c, key)
+            if hit:
+                return hit
+        return {}
+
+    root = t["tree"]
+    price, cape, val = (find(root, "price_appreciation"),
+                        find(root, "valuation_multiple"),
+                        find(root, "valuation"))
+    return {
+        "headlineDate": t["headlineDate"], "bandLow": t["bandLow"],
+        "bandHigh": t["bandHigh"], "asOf": t["asOf"],
+        "dotMonths": len(t["progDot"]), "aiMonths": len(t["progAi"]),
+        "priceIntensity": price.get("intensityNow"), "priceEquiv": price.get("equivalentDotcomDate"),
+        "priceProj": price.get("projectedPeakDate"), "priceDisplay": price.get("display"),
+        "priceDaysFromPeak": price.get("daysFromPeak"), "priceCompression": price.get("compression"),
+        "capeIntensity": cape.get("intensityNow"), "capeEquiv": cape.get("equivalentDotcomDate"),
+        "capeProj": cape.get("projectedPeakDate"), "capeDisplay": cape.get("display"),
+        "capeDaysFromPeak": cape.get("daysFromPeak"), "capeCompression": cape.get("compression"),
+        "valIntensity": val.get("intensityNow"), "valEquiv": val.get("equivalentDotcomDate"),
+        "valProj": val.get("projectedPeakDate"), "valPhase": val.get("phase"),
+    }
+
+
 def build_payload(conn):
     by_ticker = [
         {"ticker": r["ticker"], "rows": r["n"], "first": r["first"], "last": r["last"]}
@@ -166,6 +202,7 @@ def build_payload(conn):
         "h100": h100,
         "polymarket": polymarket,
         "bankruptcy": bankruptcy,
+        "thennow": _thennow_example(conn),
     }
 
 

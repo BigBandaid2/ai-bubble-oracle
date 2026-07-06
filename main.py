@@ -16,7 +16,8 @@ import time
 from datetime import datetime, timezone
 
 from oracle import db
-from oracle.config import SP500_TICKER, TICKERS
+from oracle.cape import fetch_cape, import_cape_csv, export_cape_csv
+from oracle.config import SP500_TICKER, THENNOW_TICKERS, TICKERS
 from oracle.dashboard import write_dashboard
 from oracle.datasources import write_datasources
 from oracle.h100 import fetch_h100_proxy, SEED_POINTS, import_h100_csv, export_h100_csv
@@ -26,13 +27,15 @@ from oracle.buzz import (update_signals, import_buzz_csv, export_buzz_csv,
                          update_buzz_events, import_buzz_events_csv, export_buzz_events_csv,
                          record_gdelt_health)
 from oracle.report import status_report
+from oracle.thennow_page import write_thennow_page
 from oracle.tracker import rebuild_events
 from oracle.yahoo import fetch_history, YahooError
 
 
 def cmd_update(conn):
-    # Condition tickers plus the S&P 500 context series (not a condition).
-    for ticker in TICKERS + [SP500_TICKER]:
+    # Condition tickers, the S&P 500 context series, and the long-history
+    # Then-and-Now series (^IXIC etc). dict.fromkeys dedupes if any overlap.
+    for ticker in dict.fromkeys(TICKERS + [SP500_TICKER] + THENNOW_TICKERS):
         days = 90 if db.has_prices(conn, ticker) else None
         try:
             bars = fetch_history(ticker, days)
@@ -46,6 +49,19 @@ def cmd_update(conn):
         time.sleep(1)  # be polite to Yahoo
     events = rebuild_events(conn)
     print(f"events rebuilt: {len(events)} crossings in history")
+
+    # Shiller CAPE valuation multiple (Then-and-Now valuation leaf). Re-fetchable;
+    # the committed CSV is a fallback so a stalled fetch doesn't blank the leaf.
+    cape_restored = import_cape_csv(conn)
+    cape_rows = fetch_cape()
+    if cape_rows:
+        db.upsert_cape(conn, cape_rows)
+        print(f"CAPE: fetched {len(cape_rows)} monthly points "
+              f"({cape_rows[0][0]}..{cape_rows[-1][0]}, latest {cape_rows[-1][1]})")
+    else:
+        print(f"CAPE: fetch failed (kept {cape_restored} cached points)")
+    cape_kept = export_cape_csv(conn)
+    print(f"CAPE history: {cape_kept} points in data/cape_history.csv")
 
     # H100 rental proxy (condition 5). Restore accumulated readings from the
     # committed CSV, seed the published index points (both tiers), append
@@ -127,7 +143,7 @@ def cmd_events(conn):
 
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("command", choices=["update", "status", "events", "html", "datasources"], nargs="?", default="status")
+    p.add_argument("command", choices=["update", "status", "events", "html", "datasources", "thennow"], nargs="?", default="status")
     args = p.parse_args()
 
     conn = db.connect()
@@ -135,7 +151,8 @@ def main():
         if args.command == "update":
             cmd_update(conn)
             print(f"\ndashboard written:   {write_dashboard(conn)}")
-            print(f"datasources written: {write_datasources(conn)}\n")
+            print(f"datasources written: {write_datasources(conn)}")
+            print(f"thennow written:     {write_thennow_page(conn)}\n")
             print(status_report(conn))
         elif args.command == "status":
             print(status_report(conn))
@@ -144,8 +161,11 @@ def main():
         elif args.command == "html":
             print(f"dashboard written:   {write_dashboard(conn)}")
             print(f"datasources written: {write_datasources(conn)}")
+            print(f"thennow written:     {write_thennow_page(conn)}")
         elif args.command == "datasources":
             print(f"datasources written: {write_datasources(conn)}")
+        elif args.command == "thennow":
+            print(f"thennow written:     {write_thennow_page(conn)}")
     finally:
         conn.close()
 

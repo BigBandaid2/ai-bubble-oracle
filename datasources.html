@@ -264,12 +264,13 @@
 </div>
 
 <script>
-const DATA = {"updated":"2026-07-05T04:46:30+00:00","prices":{"columns":[{"name":"ticker","type":"TEXT"},{"name":"date","type":"TEXT"},{"name":"open","type":"REAL"},{"name":"high","type":"REAL"},{"name":"low","type":"REAL"},{"name":"close","type":"REAL"}],"byTicker":[{"ticker":"ANET","rows":3036,"first":"2014-06-06","last":"2026-07-02"},{"ticker":"ASML","rows":7877,"first":"1995-03-15","last":"2026-07-02"},{"ticker":"AVGO","rows":4252,"first":"2009-08-06","last":"2026-07-02"},{"ticker":"NVDA","rows":6903,"first":"1999-01-22","last":"2026-07-02"},{"ticker":"SMCI","rows":4846,"first":"2007-03-29","last":"2026-07-02"},{"ticker":"SOXX","rows":6279,"first":"2001-07-13","last":"2026-07-02"},{"ticker":"TSM","rows":7226,"first":"1997-10-09","last":"2026-07-02"},{"ticker":"^GSPC","rows":14246,"first":"1970-01-02","last":"2026-07-02"}],"total":54665},"events":{"columns":[{"name":"condition_key","type":"TEXT"},{"name":"ticker","type":"TEXT"},{"name":"basis","type":"TEXT"},{"name":"date","type":"TEXT"},{"name":"kind","type":"TEXT"},{"name":"drawdown","type":"REAL"},{"name":"price","type":"REAL"},{"name":"ath","type":"REAL"}],"total":826},"example":{"ticker":"SMCI","condition":"smci_down_50","date":"2026-07-02","open":28.05,"high":29.22,"low":26.7,"close":27.22,"skey":"83feabfe1e94","athClose":118.81,"athIntraday":122.9,"ddClose":0.7709,"ddIntraday":0.7785,"triggerClose":59.4,"triggerIntraday":61.45,"threshold":0.5,"metInstant":1,"metInstantIntraday":1,"metTrailing":1,"lastBreach":"2025-07-31","supplierHits":["SMCI"],"supplierCount":1,"supplierTotal":5,"supplierMinMet":1},"h100":{"neocloud":{"date":"2026-07-05","usd_hr":2.201,"low":1.734,"n":31,"source":"vast_proxy","rows":5},"hyperscaler":{"date":"2026-04-20","usd_hr":7.48,"low":null,"n":null,"source":"silicondata_published","rows":4},"rowsAll":9},"polymarket":{"date":"2026-07-05","yes_prob":0.155,"first":"2025-11-21","count":224},"bankruptcy":{"lastChecked":"2026-07-05","entities":{"Anthropic":0,"OpenAI":0},"rows":2}};
+const DATA = {"updated":"2026-07-05T04:46:30+00:00","prices":{"columns":[{"name":"ticker","type":"TEXT"},{"name":"date","type":"TEXT"},{"name":"open","type":"REAL"},{"name":"high","type":"REAL"},{"name":"low","type":"REAL"},{"name":"close","type":"REAL"}],"byTicker":[{"ticker":"ANET","rows":3036,"first":"2014-06-06","last":"2026-07-02"},{"ticker":"ASML","rows":7877,"first":"1995-03-15","last":"2026-07-02"},{"ticker":"AVGO","rows":4252,"first":"2009-08-06","last":"2026-07-02"},{"ticker":"NVDA","rows":6903,"first":"1999-01-22","last":"2026-07-02"},{"ticker":"SMCI","rows":4846,"first":"2007-03-29","last":"2026-07-02"},{"ticker":"SOXX","rows":6279,"first":"2001-07-13","last":"2026-07-02"},{"ticker":"TSM","rows":7226,"first":"1997-10-09","last":"2026-07-02"},{"ticker":"^GSPC","rows":14246,"first":"1970-01-02","last":"2026-07-02"},{"ticker":"^IXIC","rows":13968,"first":"1971-02-05","last":"2026-07-02"}],"total":68633},"events":{"columns":[{"name":"condition_key","type":"TEXT"},{"name":"ticker","type":"TEXT"},{"name":"basis","type":"TEXT"},{"name":"date","type":"TEXT"},{"name":"kind","type":"TEXT"},{"name":"drawdown","type":"REAL"},{"name":"price","type":"REAL"},{"name":"ath","type":"REAL"}],"total":826},"example":{"ticker":"SMCI","condition":"smci_down_50","date":"2026-07-02","open":28.05,"high":29.22,"low":26.7,"close":27.22,"skey":"83feabfe1e94","athClose":118.81,"athIntraday":122.9,"ddClose":0.7709,"ddIntraday":0.7785,"triggerClose":59.4,"triggerIntraday":61.45,"threshold":0.5,"metInstant":1,"metInstantIntraday":1,"metTrailing":1,"lastBreach":"2025-07-31","supplierHits":["SMCI"],"supplierCount":1,"supplierTotal":5,"supplierMinMet":1},"h100":{"neocloud":{"date":"2026-07-05","usd_hr":2.201,"low":1.734,"n":31,"source":"vast_proxy","rows":5},"hyperscaler":{"date":"2026-04-20","usd_hr":7.48,"low":null,"n":null,"source":"silicondata_published","rows":4},"rowsAll":9},"polymarket":{"date":"2026-07-05","yes_prob":0.155,"first":"2025-11-21","count":224},"bankruptcy":{"lastChecked":"2026-07-05","entities":{"Anthropic":0,"OpenAI":0},"rows":2},"thennow":{"headlineDate":"2027-09-03","bandLow":"2027-05-26","bandHigh":"2028-08-10","asOf":"2026-07-06","dotMonths":94,"aiMonths":45,"priceIntensity":0.295,"priceEquiv":"1998-04-16","priceProj":"2028-08-10","priceDisplay":"up 2.4x since ChatGPT","priceDaysFromPeak":-685,"priceCompression":1.12,"capeIntensity":0.932,"capeEquiv":"1999-02-28","capeProj":"2027-05-26","capeDisplay":"CAPE 41","capeDaysFromPeak":-367,"capeCompression":0.88,"valIntensity":0.614,"valEquiv":"1998-12-04","valProj":"2027-09-03","valPhase":"Acceleration"}};
 const E = DATA.example || {};
 const E100 = (DATA.h100 && DATA.h100.neocloud) || {};   // neocloud tier for static asset examples
 const H100_ROWS_ALL = (DATA.h100 && DATA.h100.rowsAll) || 8;
 const E_PM = DATA.polymarket || {};
 const E_BK = DATA.bankruptcy || {};
+const TN = DATA.thennow || {};   // Then-and-Now engine example scalars
 document.getElementById("topsub").textContent = "Last update: " + (DATA.updated || "never") + " UTC";
 
 const money = v => "$" + (v >= 100 ? v.toFixed(0) : v.toFixed(2));
@@ -918,6 +919,169 @@ const ASSETS = [
     ],
     cardinality: "one row per day (planned).",
   },
+
+  /* -------- Then and Now: Price appreciation (WIP) -------- */
+  {
+    id: "int_tn_price_monthly", group: "tn_price", layer: "intermediate", status: "live",
+    name: "int_tn_price_monthly", mat: "table", cadence: "on generate",
+    dagster: "thennow/int_tn_price_monthly", dbt: "int_tn_price_monthly",
+    grain: "one row per (era, month)",
+    why: "Puts the Nasdaq index on a monthly, smoothed footing for both the dot-com and AI windows.",
+    desc: "Reads ^IXIC from prices, slices the two eras, resamples to month-end and applies a centered 3-month average. In oracle/thennow.py (_leaf_raw + _smooth).",
+    upstream: ["prices"],
+    schema: [
+      { col: "era", type: "STRING", kind: "key", ex: "ai", note: "dotcom | ai" },
+      { col: "month", type: "DATE", kind: "key", ex: (E.date || "").slice(0, 7) },
+      { col: "nasdaq", type: "NUMERIC", kind: "derived", ex: "smoothed close" },
+    ],
+    transforms: [
+      { tag: "resample", text: "month-end last close" },
+      { tag: "smooth", text: "centered 3-month average" },
+    ],
+    tests: ["not_null: nasdaq"],
+    cardinality: `${TN.dotMonths} dot-com + ${TN.aiMonths} AI months.`,
+  },
+  {
+    id: "int_tn_price_intensity", group: "tn_price", layer: "intermediate", status: "live",
+    name: "int_tn_price_intensity", mat: "table", cadence: "on generate",
+    dagster: "thennow/int_tn_price_intensity", dbt: "int_tn_price_intensity",
+    grain: "one row per (era, month)",
+    why: "Turns price into the shared 0–1 intensity: 0 = dot-com starting level, 1 = the 2000 peak.",
+    desc: "Indexes each era to its own start (appreciation), then maps onto the dot-com appreciation range. AI's high absolute price is normalized away, so this is the 'how far it has run' signal. Mode: relative.",
+    upstream: ["int_tn_price_monthly"],
+    schema: [
+      { col: "era", type: "STRING", kind: "key", ex: "ai" },
+      { col: "progress", type: "NUMERIC", kind: "derived", ex: "69.1", note: "cycle-progress %" },
+      { col: "intensity", type: "NUMERIC", kind: "derived", ex: TN.priceIntensity, note: "0 start, 1 peak" },
+    ],
+    transforms: [
+      { tag: "index", text: "each era to its own start" },
+      { tag: "normalize", text: "intensity = (appreciation − 1) / (dot-com peak appreciation − 1)" },
+    ],
+    tests: ["accepted_range: dot-com intensity spans 0→1 to the peak"],
+    cardinality: "1:1 with the monthly series.",
+  },
+  {
+    id: "graph.price_appreciation", group: "tn_price", layer: "serve", status: "live",
+    name: "graph: price_appreciation", mat: "exposure (JSON)", cadence: "on generate",
+    dagster: "thennow (exposure)", dbt: "exposure: price_appreciation",
+    grain: "one leaf block on thennow.html",
+    why: "The graph the reader sees: today's price intensity matched to a dot-com date and rate-scaled to a projected top.",
+    desc: "Value-match on the dot-com ramp gives the equivalent date and phase; rate-scaling gives the projected peak. Built by _evaluate() in compute_thennow.",
+    upstream: ["int_tn_price_intensity"],
+    json: `{ "intensityNow": ${TN.priceIntensity}, "equivalentDotcomDate": "${TN.priceEquiv}",
+  "daysFromPeak": ${TN.priceDaysFromPeak}, "projectedPeakDate": "${TN.priceProj}",
+  "display": "${TN.priceDisplay}" }`,
+    transforms: [
+      { tag: "lookup", text: "value-match on the dot-com ramp → equivalent date" },
+      { tag: "rate-scale", text: "remaining distance × AI pace → projected top" },
+    ],
+    cardinality: "one leaf node on the Then-and-Now page.",
+  },
+
+  /* -------- Then and Now: Valuation multiple (WIP) -------- */
+  {
+    id: "raw.multpl_cape", group: "tn_cape", layer: "source", status: "live",
+    name: "raw.multpl_cape", mat: "HTML table", cadence: "on generate",
+    dagster: "thennow/multpl_cape", dbt: "source('multpl','shiller_pe')",
+    grain: "one HTML document (monthly CAPE table)",
+    why: "The valuation-multiple tap: Shiller CAPE, comparable in absolute terms across eras.",
+    desc: "multpl.com's public 'Shiller PE by month' table (Robert Shiller's data), parsed with the stdlib. No key. In oracle/cape.py.",
+    upstream: [],
+    transforms: [{ tag: "extract", text: "HTTP GET + regex parse of the monthly table" }],
+    cardinality: "one document, ~1,800 monthly rows back to the 1870s.",
+  },
+  {
+    id: "cape_history", group: "tn_cape", layer: "raw", status: "live",
+    name: "cape_history", mat: "table · upsert", cadence: "on generate",
+    dagster: "thennow/cape_history", dbt: "cape_history",
+    grain: "one row per month",
+    why: "The parsed CAPE series, persisted with a committed CSV as fallback.",
+    desc: "date + CAPE, kept from 1990 on, upserted on date. oracle/cape.py import/export round-trip, data/cape_history.csv.",
+    upstream: ["raw.multpl_cape"],
+    schema: [
+      { col: "date", type: "TEXT", kind: "key", ex: "2000-03-01" },
+      { col: "cape", type: "REAL", kind: "pass", ex: "43.22" },
+    ],
+    transforms: [
+      { tag: "parse", text: "'Mon D, YYYY' → month-start iso; keep ≥ 1990" },
+      { tag: "incremental", text: "upsert on date" },
+    ],
+    tests: ["unique: date", "not_null: cape"],
+    cardinality: "~440 monthly rows (1990+).",
+  },
+  {
+    id: "int_tn_cape_intensity", group: "tn_cape", layer: "intermediate", status: "live",
+    name: "int_tn_cape_intensity", mat: "table", cadence: "on generate",
+    dagster: "thennow/int_tn_cape_intensity", dbt: "int_tn_cape_intensity",
+    grain: "one row per (era, month)",
+    why: "Maps CAPE onto the shared 0–1 intensity by ABSOLUTE level (a P/E means the same in any era).",
+    desc: "Smooths monthly CAPE, then intensity = (cape − dot-com start cape) / (dot-com peak cape − start). AI keeps its absolute level, so a high starting CAPE reads as high intensity. Mode: absolute.",
+    upstream: ["cape_history"],
+    schema: [
+      { col: "era", type: "STRING", kind: "key", ex: "ai" },
+      { col: "progress", type: "NUMERIC", kind: "derived", ex: "69.1" },
+      { col: "intensity", type: "NUMERIC", kind: "derived", ex: TN.capeIntensity, note: "0 start, 1 peak" },
+    ],
+    transforms: [
+      { tag: "smooth", text: "centered 3-month average" },
+      { tag: "normalize", text: "absolute level on the dot-com CAPE range" },
+    ],
+    tests: ["not_null: intensity"],
+    cardinality: `${TN.dotMonths} dot-com + ${TN.aiMonths} AI months.`,
+  },
+  {
+    id: "graph.valuation_multiple", group: "tn_cape", layer: "serve", status: "live",
+    name: "graph: valuation_multiple", mat: "exposure (JSON)", cadence: "on generate",
+    dagster: "thennow (exposure)", dbt: "exposure: valuation_multiple",
+    grain: "one leaf block on thennow.html",
+    why: "The graph the reader sees: today's CAPE matched to a dot-com date and rate-scaled.",
+    desc: "Same _evaluate() as price. CAPE reads LATE (near the 2000 peak), the deliberate counterweight to price appreciation.",
+    upstream: ["int_tn_cape_intensity"],
+    json: `{ "intensityNow": ${TN.capeIntensity}, "equivalentDotcomDate": "${TN.capeEquiv}",
+  "daysFromPeak": ${TN.capeDaysFromPeak}, "projectedPeakDate": "${TN.capeProj}",
+  "display": "${TN.capeDisplay}" }`,
+    transforms: [
+      { tag: "lookup", text: "value-match on the dot-com ramp" },
+      { tag: "rate-scale", text: "→ projected top" },
+    ],
+    cardinality: "one leaf node on the Then-and-Now page.",
+  },
+
+  /* -------- Then and Now: Valuation roll-up (WIP) -------- */
+  {
+    id: "int_tn_valuation_blend", group: "tn_valuation", layer: "intermediate", status: "live",
+    name: "int_tn_valuation_blend", mat: "table", cadence: "on generate",
+    dagster: "thennow/int_tn_valuation_blend", dbt: "int_tn_valuation_blend",
+    grain: "one row per (era, month)",
+    why: "The roll-up: price and CAPE intensities combined into one Valuation curve by weight.",
+    desc: "Pointwise weighted average of the two leaf intensities (equal by default, adjustable on the page). This is how children become a parent, uniform for every roll-up. In _combine().",
+    upstream: ["int_tn_price_intensity", "int_tn_cape_intensity"],
+    schema: [
+      { col: "era", type: "STRING", kind: "key", ex: "ai" },
+      { col: "progress", type: "NUMERIC", kind: "derived", ex: "69.1" },
+      { col: "intensity", type: "NUMERIC", kind: "derived", ex: TN.valIntensity, note: "weighted mean of children" },
+    ],
+    transforms: [{ tag: "combine", text: "weighted average of child intensities (equal weights by default)" }],
+    tests: ["not_null: intensity"],
+    cardinality: "1:1 with the monthly grid.",
+  },
+  {
+    id: "graph.valuation", group: "tn_valuation", layer: "serve", status: "live",
+    name: "graph: valuation", mat: "exposure (JSON)", cadence: "on generate",
+    dagster: "thennow (exposure)", dbt: "exposure: valuation",
+    grain: "one parent block on thennow.html",
+    why: "The Valuation parent: one graph, one date, from the blended curve, exactly like a leaf.",
+    desc: "The same _evaluate() runs on the combined curve, so the parent is one conclusion date. This node rolls up into the root 'AI bubble bursts' headline.",
+    upstream: ["int_tn_valuation_blend"],
+    json: `{ "intensityNow": ${TN.valIntensity}, "equivalentDotcomDate": "${TN.valEquiv}",
+  "phase": "${TN.valPhase}", "projectedPeakDate": "${TN.valProj}" }`,
+    transforms: [
+      { tag: "lookup", text: "value-match on the combined curve" },
+      { tag: "rate-scale", text: "→ parent projected top" },
+    ],
+    cardinality: "one parent node; feeds the root headline.",
+  },
 ];
 
 const GROUPS = [
@@ -926,6 +1090,9 @@ const GROUPS = [
   { id: "polymarket", name: "Polymarket", status: "live" },
   { id: "courtlistener", name: "CourtListener", status: "live" },
   { id: "gdelt", name: "GDELT news", status: "planned" },
+  { id: "tn_price", name: "Price appreciation (WIP)", status: "live" },
+  { id: "tn_cape", name: "Valuation multiple (WIP)", status: "live" },
+  { id: "tn_valuation", name: "Valuation roll-up (WIP)", status: "live" },
 ];
 
 const BY_ID = Object.fromEntries(ASSETS.map(a => [a.id, a]));
@@ -1027,6 +1194,52 @@ const GRAPHS = {
       { id: "int_acquisition_signals", cx: MX, cy: 142 },
     ],
     spine: [["news_articles", "int_acquisition_signals"]], curves: [],
+  },
+  tn_price: {
+    viewBox: "0 0 460 380",
+    nodes: [
+      { id: "prices", cx: MX, cy: 40, short: "prices (^IXIC)" },
+      { id: "int_tn_price_monthly", cx: MX, cy: 128 },
+      { id: "int_tn_price_intensity", cx: MX, cy: 216 },
+      { id: "graph.price_appreciation", cx: MX, cy: 320, short: "graph: price appreciation" },
+    ],
+    spine: [
+      ["prices", "int_tn_price_monthly"],
+      ["int_tn_price_monthly", "int_tn_price_intensity"],
+      ["int_tn_price_intensity", "graph.price_appreciation"],
+    ],
+    curves: [],
+  },
+  tn_cape: {
+    viewBox: "0 0 460 380",
+    nodes: [
+      { id: "raw.multpl_cape", cx: MX, cy: 40 },
+      { id: "cape_history", cx: MX, cy: 128 },
+      { id: "int_tn_cape_intensity", cx: MX, cy: 216 },
+      { id: "graph.valuation_multiple", cx: MX, cy: 320, short: "graph: valuation multiple" },
+    ],
+    spine: [
+      ["raw.multpl_cape", "cape_history"],
+      ["cape_history", "int_tn_cape_intensity"],
+      ["int_tn_cape_intensity", "graph.valuation_multiple"],
+    ],
+    curves: [],
+  },
+  tn_valuation: {
+    viewBox: "0 0 660 300",
+    nodes: [
+      { id: "int_tn_price_intensity", cx: 170, cy: 44, w: 200 },
+      { id: "int_tn_cape_intensity", cx: 490, cy: 44, w: 200 },
+      { id: "int_tn_valuation_blend", cx: 330, cy: 150 },
+      { id: "graph.valuation", cx: 330, cy: 240, short: "graph: valuation" },
+    ],
+    spine: [
+      ["int_tn_valuation_blend", "graph.valuation"],
+    ],
+    curves: [
+      "M170,67 C 170,112 280,120 300,127",   // price intensity → blend
+      "M490,67 C 490,112 380,120 360,127",   // cape intensity → blend
+    ],
   },
 };
 
@@ -1295,6 +1508,58 @@ const SOURCE_INFO = {
     cardinality: [
       { asset: "news_articles", count: "many/day", meaning: "High-volume, low-signal; deduped by URL, then classified." },
       { asset: "int_acquisition_signals", count: "1/day", meaning: "Collapsed to one consensus signal per day." },
+    ],
+  },
+  tn_price: {
+    blurb: "Price appreciation (WIP): a Then-and-Now leaf. Nasdaq indexed to each era's start, so it reads 'how far the cycle has run'. On price alone AI looks earlier and less stretched than 1995–2000. Ends in the Price appreciation graph on the (unlinked, WIP) thennow.html page.",
+    options: [
+      { t: "Smoothing window", d: "A centered 3-month average on the monthly series, so the equivalent point reads without chasing noise. Documented and tunable (SMOOTH_MONTHS)." },
+    ],
+    ambiguities: [
+      { t: "Price, not a multiple", d: "This leaf measures appreciation, not richness. Its counterweight is the Valuation multiple (CAPE) leaf, which reads late. The Valuation parent reconciles them." },
+    ],
+    caveats: [
+      { t: "WIP prototype", d: "Method and copy will change. Not linked in the site nav; reachable by direct URL only." },
+      { t: "A hook, not a forecast", d: "The projected date is a deliberately bold framing over a transparent analog. Change the anchors or weights and it moves." },
+    ],
+    cardinality: [
+      { asset: "int_tn_price_monthly", count: `${TN.dotMonths} + ${TN.aiMonths}`, meaning: "Monthly smoothed Nasdaq for the dot-com and AI eras." },
+      { asset: "int_tn_price_intensity", count: "1:1", meaning: "Each month mapped to 0–1 intensity (0 dot-com start, 1 the 2000 peak)." },
+      { asset: "graph.price_appreciation", count: "1 leaf", meaning: "The projected top for the price leaf, drawn on thennow.html." },
+    ],
+  },
+  tn_cape: {
+    blurb: "Valuation multiple (WIP): a Then-and-Now leaf. Shiller CAPE (S&P 500), comparable in absolute terms across eras, so it reads 'how expensive'. AI's CAPE is already near the 2000 peak, so this leaf reads late, the deliberate counterweight to price appreciation.",
+    options: [],
+    ambiguities: [
+      { t: "Absolute vs relative", d: "Unlike price, CAPE is compared by absolute level (a P/E means the same in any era), so AI's high starting valuation shows up as high intensity rather than being normalized away." },
+    ],
+    caveats: [
+      { t: "WIP prototype", d: "Method and copy will change. Not linked in the site nav; reachable by direct URL only." },
+      { t: "Parsed from multpl.com", d: "The public 'Shiller PE by month' table (Robert Shiller's data), parsed from HTML with the stdlib, kept as a committed CSV fallback. Broad-market CAPE, not Nasdaq-specific." },
+    ],
+    cardinality: [
+      { asset: "raw.multpl_cape", count: "1 doc", meaning: "The monthly CAPE table, back to the 1870s." },
+      { asset: "cape_history", count: "~440", meaning: "Parsed monthly CAPE from 1990 on, committed to data/cape_history.csv." },
+      { asset: "int_tn_cape_intensity", count: `${TN.dotMonths} + ${TN.aiMonths}`, meaning: "CAPE mapped to 0–1 intensity by absolute level on the dot-com range." },
+      { asset: "graph.valuation_multiple", count: "1 leaf", meaning: "The projected top for the CAPE leaf." },
+    ],
+  },
+  tn_valuation: {
+    blurb: "Valuation roll-up (WIP): how the two children become one parent. Price and CAPE intensities are combined by weight (equal by default, adjustable on the page) into a single Valuation curve, then the same alignment + projection gives the parent's one date. This roll-up is uniform for every parent in Then and Now.",
+    options: [
+      { t: "Weights", d: "Each child's share of the parent, split evenly by default and adjustable with the sliders on thennow.html. The blended curve, its equivalent date, and the projected top all recompute live." },
+    ],
+    ambiguities: [
+      { t: "Price early, CAPE late", d: "The two leaves disagree on purpose. The parent is where they reconcile; the weights decide how much each voice counts." },
+    ],
+    caveats: [
+      { t: "WIP prototype", d: "Method and copy will change. Not linked in the site nav; reachable by direct URL only." },
+      { t: "Root is Valuation for now", d: "Concentration, capex and speculation are not wired, so the root 'AI bubble bursts' headline currently equals the Valuation roll-up." },
+    ],
+    cardinality: [
+      { asset: "int_tn_valuation_blend", count: "1:1", meaning: "Weighted average of the two leaf intensities on the monthly grid." },
+      { asset: "graph.valuation", count: "1 parent", meaning: "The Valuation date; feeds the root AI-bubble-bursts headline." },
     ],
   },
 };

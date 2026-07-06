@@ -1,0 +1,398 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Then and Now (WIP) · AI Bubble Oracle</title>
+<!-- Semi-private WIP page: reachable by direct URL, not linked in nav, not indexed. -->
+<meta name="robots" content="noindex, nofollow">
+<style>
+  :root {
+    --bg: #0a0b10; --panel: #1a1f23; --panel2: #242b32; --border: #1f2937;
+    --text: #f4f4f6; --muted: #80838e; --muted2: #6b6e7a; --accent: #0093fd;
+    --met: #f55b55; --notmet: #2bae4c; --ath: #99a1af; --trigger: #f43437; --price: #0093fd;
+    --font: Inter, "Open Sauce One", "Segoe UI", system-ui, -apple-system, sans-serif;
+    --mono: "Geist Mono", "SF Mono", Consolas, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { height: 100%; }
+  body { background: var(--bg); color: var(--text); font: 14px/1.5 var(--font); }
+  #topbar { display: flex; align-items: center; gap: 12px; padding: 0 24px; height: 56px;
+    background: var(--bg); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 10; }
+  #topbar .mark { width: 26px; height: 26px; border-radius: 6px; background: var(--text);
+    color: var(--bg); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 15px; }
+  #topbar .brand { font-size: 16px; font-weight: 700; letter-spacing: -.2px; }
+  .topnav { display: flex; gap: 4px; margin-left: 18px; }
+  .topnav a { color: var(--muted); text-decoration: none; font-size: 13px; font-weight: 500; padding: 6px 12px; border-radius: 7px; }
+  .topnav a:hover { color: var(--text); background: var(--panel2); }
+  .topnav a.active { color: var(--text); background: var(--panel); }
+  main { max-width: 1140px; margin: 0 auto; padding: 22px 24px 80px; }
+  .wipbanner { display: flex; gap: 10px; align-items: baseline; background: rgba(224,191,62,.08);
+    border: 1px solid rgba(224,191,62,.35); border-left: 3px solid #e0bf3e; border-radius: 10px;
+    padding: 10px 14px; font-size: 12.5px; color: var(--muted); margin-bottom: 18px; }
+  .wipbanner b { color: #e6c84e; font-weight: 700; }
+  header.page h1 { font-size: 27px; font-weight: 700; letter-spacing: -.4px; }
+  header.page h1 b { color: var(--accent); font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  header.page .sub { color: var(--muted); font-size: 13.5px; margin-top: 8px; max-width: 760px; }
+  .bandrow { margin: 12px 0 4px; display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: center; font-size: 12.5px; color: var(--muted); }
+  .bandrow .k { font-size: 9px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted2); margin-right: 5px; }
+  .bandrow b { color: var(--text); font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+  .node { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px 20px 14px; margin: 14px 0; }
+  .node.depth1 { margin-left: 0; }
+  .node.leaf { background: var(--bg); }
+  .node.wip { opacity: .72; }
+  .nhead { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .nhead h2 { font-size: 16px; font-weight: 600; letter-spacing: -.2px; }
+  .nhead .tier { font-size: 9px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted2);
+    border: 1px solid var(--border); border-radius: 6px; padding: 1px 6px; }
+  .chip { font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 100px; letter-spacing: .3px; white-space: nowrap; }
+  .chip.phase { background: rgba(0,147,253,.14); color: var(--accent); }
+  .chip.date { background: rgba(244,52,55,.13); color: var(--met); font-family: var(--mono); }
+  .chip.soon { background: var(--panel2); color: var(--muted2); }
+  .ndate { margin-left: auto; font-size: 12.5px; color: var(--muted); }
+  .ndate b { color: var(--text); font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 15px; }
+  .nbody { display: grid; grid-template-columns: 1.3fr 1fr; gap: 8px 22px; margin-top: 10px; align-items: start; }
+  @media (max-width: 760px) { .nbody { grid-template-columns: 1fr; } }
+  .ncw { position: relative; height: 200px; }
+  .ncw canvas { width: 100%; height: 200px; display: block; }
+  .nstat { font-size: 12.5px; color: var(--muted); line-height: 1.6; }
+  .nstat .row { display: flex; gap: 8px; align-items: baseline; padding: 2px 0; }
+  .nstat .k { font-size: 9px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted2); width: 92px; flex-shrink: 0; }
+  .nstat b { color: var(--text); font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  .nnote { font-size: 11.5px; color: var(--muted); line-height: 1.55; margin-top: 8px; }
+  .nnote .k { font-size: 8.5px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted2); margin-right: 4px; }
+  .legend { display: flex; gap: 14px; margin-top: 8px; color: var(--muted); font-size: 11px; flex-wrap: wrap; }
+  .legend i { display: inline-block; width: 15px; height: 3px; border-radius: 2px; margin-right: 5px; vertical-align: middle; }
+  .weights { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 10px; }
+  .weights .wl { font-size: 10px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted2); margin-bottom: 6px; }
+  .wrow { display: flex; align-items: center; gap: 10px; padding: 3px 0; font-size: 12px; }
+  .wrow label { width: 148px; flex-shrink: 0; color: var(--muted); }
+  .wrow input[type=range] { flex: 1; accent-color: var(--accent); }
+  .wrow .wv { width: 40px; text-align: right; font-family: var(--mono); color: var(--text); font-size: 11.5px; }
+  .kids { margin: 4px 0 0 16px; border-left: 2px solid var(--border); padding-left: 14px; }
+  details.notes { margin-top: 14px; font-size: 12px; color: var(--muted); }
+  details.notes summary { cursor: pointer; font-weight: 600; color: var(--muted); padding: 4px 0; }
+  details.notes ul { margin: 4px 0 6px 18px; }
+  details.notes li { margin: 3px 0; line-height: 1.5; }
+  a.inline { color: var(--accent); text-decoration: none; }
+  a.inline:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<div id="topbar">
+  <div class="mark">AI</div>
+  <div class="brand">Bubble Oracle</div>
+  <nav class="topnav">
+    <a href="dashboard.html">Dashboard</a>
+    <a href="datasources.html">Data Sources</a>
+    <a href="about.html">About</a>
+  </nav>
+</div>
+<main id="main">
+  <div class="wipbanner"><b>WIP</b><span id="wiptext"></span></div>
+  <header class="page">
+    <h1 id="headline"></h1>
+    <div class="sub">Where today's AI boom sits on the dot-com clock, one metric at a time, rolled up into a single projected top. Each box is one graph and one date; a parent blends its children (weights adjustable). This is a working prototype, not a forecast.</div>
+    <div class="bandrow" id="bandrow"></div>
+  </header>
+  <div id="tree"></div>
+  <details class="notes" id="assumptions"></details>
+  <details class="notes" id="limitations"></details>
+</main>
+<script>
+const DATA = __DATA__;
+
+/* ---------- shared constants + tiny date math ---------- */
+const DAYMS = 86400000;
+const ord = iso => Math.round(Date.parse(iso + "T00:00:00Z") / DAYMS);
+const isoFromOrd = n => new Date(n * DAYMS).toISOString().slice(0, 10);
+const RAMP = DATA.ramp;
+const DOT_START = ord(DATA.dotcomStart), DOT_PEAK = ord(DATA.dotcomPeak);
+const AI_START = ord(DATA.aiStart), TODAY = ord(DATA.asOf);
+const PROG_DOT = DATA.progDot, PROG_AI = DATA.progAi;
+const BOUNDS = DATA.phaseBounds, PHASES = DATA.phases;
+const r2 = x => Math.round(x * 100) / 100, r3 = x => Math.round(x * 1000) / 1000;
+
+/* ---------- the analog engine, mirrored from oracle/thennow.py ---------- */
+function phaseOf(p) { let l = PHASES[0]; BOUNDS.forEach((e, i) => { if (p >= e) l = PHASES[i]; }); return l; }
+
+function match(target, prog, inten) {
+  const ramp = [];
+  for (let i = 0; i < prog.length; i++) if (inten[i] != null && prog[i] <= 100) ramp.push([prog[i], inten[i]]);
+  if (!ramp.length) return { progress: 0, beyond: false };
+  const last = ramp[ramp.length - 1];
+  if (target >= last[1]) return { progress: last[0], beyond: target > last[1] };
+  if (target <= ramp[0][1]) return { progress: ramp[0][0], beyond: false };
+  for (let i = 1; i < ramp.length; i++) {
+    const [p0, v0] = ramp[i - 1], [p1, v1] = ramp[i];
+    if (v1 === v0) continue;
+    if ((v0 - target) * (v1 - target) <= 0) { const f = (target - v0) / (v1 - v0); return { progress: p0 + f * (p1 - p0), beyond: false }; }
+  }
+  return { progress: last[0], beyond: false };
+}
+
+function evaluate(intDot, intAi) {
+  let aiNow = 0;
+  for (let i = intAi.length - 1; i >= 0; i--) if (intAi[i] != null) { aiNow = intAi[i]; break; }
+  const m = match(aiNow, PROG_DOT, intDot), eq = m.progress;
+  const equivOrd = DOT_START + Math.round(eq / 100 * RAMP);
+  const aiElapsed = TODAY - AI_START;
+  const dotDone = Math.max(eq, 0) / 100 * RAMP;
+  const ratio = dotDone > 0 ? aiElapsed / dotDone : 1;
+  const dotLeft = Math.max(100 - eq, 0) / 100 * RAMP;
+  const projOrd = TODAY + Math.round(ratio * dotLeft);
+  return {
+    intensityNow: r3(aiNow), equivProg: eq, equivalentDotcomDate: isoFromOrd(equivOrd),
+    daysFromPeak: equivOrd - DOT_PEAK, compression: r2(ratio),
+    projectedPeakDate: isoFromOrd(projOrd), phase: phaseOf(eq), beyondDotcomPeak: m.beyond,
+    equiv: { progress: eq, intensity: aiNow }, aiNow: { progress: PROG_AI[PROG_AI.length - 1], intensity: aiNow },
+  };
+}
+
+function blend(arrays, weights) {
+  const n = arrays[0].length, out = [];
+  for (let i = 0; i < n; i++) {
+    let num = 0, den = 0;
+    arrays.forEach((a, k) => { if (a[i] != null) { num += weights[k] * a[i]; den += weights[k]; } });
+    out.push(den ? num / den : null);
+  }
+  return out;
+}
+
+/* Recompute a parent (and its ancestors) from live children + current weights. */
+function liveKids(node) { return (node.children || []).filter(c => !c.wip && c.intensityDot); }
+
+function recompute(node) {
+  const kids = liveKids(node);
+  if (!kids.length) return;
+  const w = node._weights || kids.map(() => 1);
+  node.intensityDot = blend(kids.map(c => c.intensityDot), w);
+  node.intensityAi = blend(kids.map(c => c.intensityAi), w);
+  Object.assign(node, evaluate(node.intensityDot, node.intensityAi));
+}
+
+const PARENT = {};   // childKey -> parent node
+(function link(n) { (n.children || []).forEach(c => { PARENT[c.key] = n; link(c); }); })(DATA.tree);
+
+function recomputeUp(node) {
+  let cur = PARENT[node.key];
+  while (cur) { recompute(cur); redrawNode(cur); cur = PARENT[cur.key]; }
+}
+
+/* ---------- rendering ---------- */
+const CARDS = {};   // key -> {canvas, node, els}
+
+function fmtDays(d) {
+  if (d === 0) return "at the 2000 peak";
+  return d < 0 ? `${Math.abs(d)} days before the peak` : `${d} days after the peak`;
+}
+
+function nodeCard(node, depth) {
+  const el = document.createElement("section");
+  el.className = "node depth" + depth + (node.leaf ? " leaf" : "") + (node.wip ? " wip" : "");
+  el.id = "card-" + node.key;
+  if (node.wip) {
+    el.innerHTML = `<div class="nhead"><h2>${node.label}</h2><span class="chip soon">WIP</span>
+      <span class="ndate">not wired yet</span></div>
+      <div class="nnote">Ingestion and dot-com alignment for this branch arrive in a later phase; it does not affect the projection yet.</div>`;
+    return el;
+  }
+  const tier = node.leaf ? "leaf · " + (node.leaf === "price" ? "Nasdaq index" : "Shiller CAPE") : "roll-up";
+  const head = document.createElement("div");
+  head.className = "nhead";
+  head.innerHTML = `<h2>${node.label}</h2><span class="tier">${tier}</span>
+    <span class="chip phase" data-el="phase">${node.phase}</span>
+    <span class="ndate">projected top <b data-el="date">${node.projectedPeakDate}</b></span>`;
+  el.appendChild(head);
+
+  const body = document.createElement("div");
+  body.className = "nbody";
+  const cw = document.createElement("div");
+  cw.className = "ncw";
+  const canvas = document.createElement("canvas");
+  cw.appendChild(canvas);
+  const legend = document.createElement("div");
+  legend.className = "legend";
+  legend.innerHTML = `<span><i style="background:var(--ath)"></i>Dot-com path</span>
+    <span><i style="background:var(--accent)"></i>AI path (dot-com clock)</span>
+    <span><i style="background:var(--trigger)"></i>2000 peak</span>`;
+  const left = document.createElement("div");
+  left.appendChild(cw); left.appendChild(legend);
+
+  const stat = document.createElement("div");
+  stat.className = "nstat";
+  stat.innerHTML = statRows(node);
+  body.appendChild(left); body.appendChild(stat);
+  el.appendChild(body);
+
+  if (node.leaf) {
+    const note = document.createElement("div");
+    note.className = "nnote";
+    note.innerHTML = `<div><span class="k">similar</span>${node.similar}</div>
+      <div><span class="k">different</span>${node.different}</div>`;
+    el.appendChild(note);
+  }
+
+  const kids = liveKids(node);
+  if (kids.length >= 2) el.appendChild(weightsBlock(node, kids));
+
+  CARDS[node.key] = { canvas, node, els: {
+    phase: head.querySelector('[data-el=phase]'), date: head.querySelector('[data-el=date]'), stat } };
+
+  if (node.children) {
+    const wrap = document.createElement("div");
+    wrap.className = "kids";
+    node.children.forEach(c => wrap.appendChild(nodeCard(c, depth + 1)));
+    el.appendChild(wrap);
+  }
+  return el;
+}
+
+function statRows(node) {
+  const rows = [
+    ["intensity now", `<b>${(node.intensityNow * 100).toFixed(0)}%</b> of the way to the dot-com peak`],
+    ["matches dot-com", `<b>${node.equivalentDotcomDate}</b> · ${node.phase}`],
+    ["from 2000 peak", fmtDays(node.daysFromPeak)],
+    ["pace vs dot-com", `<b>${node.compression}×</b> ${node.compression < 1 ? "(faster)" : "(slower)"}`],
+    ["projected top", `<b>${node.projectedPeakDate}</b>`],
+  ];
+  if (node.display && node.display !== "blended") rows.unshift(["today", node.display]);
+  return rows.map(([k, v]) => `<div class="row"><span class="k">${k}</span><span>${v}</span></div>`).join("");
+}
+
+function weightsBlock(node, kids) {
+  node._weights = node._weights || kids.map(() => 1);
+  const box = document.createElement("div");
+  box.className = "weights";
+  box.innerHTML = `<div class="wl">Weights (how much each child counts toward ${node.label})</div>`;
+  kids.forEach((c, i) => {
+    const row = document.createElement("div");
+    row.className = "wrow";
+    row.innerHTML = `<label>${c.label}</label>
+      <input type="range" min="0" max="100" value="${Math.round(node._weights[i] * 50)}">
+      <span class="wv"></span>`;
+    const input = row.querySelector("input"), wv = row.querySelector(".wv");
+    const sync = () => { const tot = node._weights.reduce((a, b) => a + b, 0) || 1;
+      wv.textContent = Math.round(node._weights[i] / tot * 100) + "%"; };
+    input.addEventListener("input", () => {
+      node._weights[i] = Math.max(0.0001, +input.value / 50);
+      recompute(node); redrawNode(node); recomputeUp(node);
+      box.querySelectorAll(".wrow").forEach((r, j) => {
+        const tot = node._weights.reduce((a, b) => a + b, 0) || 1;
+        r.querySelector(".wv").textContent = Math.round(node._weights[j] / tot * 100) + "%";
+      });
+      refreshHeadline();
+    });
+    box.appendChild(row); sync();
+  });
+  return box;
+}
+
+function redrawNode(node) {
+  const c = CARDS[node.key];
+  if (!c) return;
+  drawNode(c.canvas, node);
+  if (c.els.phase) c.els.phase.textContent = node.phase;
+  if (c.els.date) c.els.date.textContent = node.projectedPeakDate;
+  if (c.els.stat) c.els.stat.innerHTML = statRows(node);
+}
+
+function refreshHeadline() {
+  const root = DATA.tree;
+  document.getElementById("headline").innerHTML =
+    `The AI bubble bursts on <b>${root.projectedPeakDate}</b>`;
+  const dates = []; (function walk(n){ if(n.wip) return; if(n.leaf) dates.push(n.projectedPeakDate); (n.children||[]).forEach(walk); })(root);
+  const lo = dates.slice().sort()[0], hi = dates.slice().sort()[dates.length - 1];
+  document.getElementById("bandrow").innerHTML =
+    `<span><span class="k">range</span><b>${lo}</b> to <b>${hi}</b></span>
+     <span><span class="k">as of</span><b>${DATA.asOf}</b></span>
+     <span><span class="k">metrics live</span><b>1</b> of 4 (valuation)</span>`;
+}
+
+/* ---------- canvas: the shared progress-axis renderer ---------- */
+const PAD = { l: 36, r: 12, t: 20, b: 18 }, XMAX = 150;
+function setup(canvas) {
+  const dpr = window.devicePixelRatio || 1, w = canvas.clientWidth || 360, h = canvas.clientHeight || 200;
+  canvas.width = w * dpr; canvas.height = h * dpr;
+  const ctx = canvas.getContext("2d"); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return { ctx, w, h };
+}
+const xPx = (p, w) => PAD.l + (w - PAD.l - PAD.r) * p / XMAX;
+function ticks(min, max, n) {
+  const span = max - min || 1, s0 = span / n, mag = Math.pow(10, Math.floor(Math.log10(s0)));
+  const step = [1, 2, 2.5, 5, 10].map(m => m * mag).find(s => span / s <= n) || 10 * mag;
+  const out = []; for (let v = Math.ceil(min / step) * step; v <= max + 1e-9; v += step) out.push(v);
+  return out;
+}
+function line(ctx, xs, ys, x2px, y2px, color, width, dash) {
+  ctx.strokeStyle = color; ctx.lineWidth = width; ctx.setLineDash(dash || []); ctx.beginPath();
+  let pen = false;
+  for (let i = 0; i < xs.length; i++) {
+    if (ys[i] == null || xs[i] > XMAX) { pen = false; continue; }
+    const x = x2px(xs[i]), y = y2px(ys[i]); pen ? ctx.lineTo(x, y) : ctx.moveTo(x, y); pen = true;
+  }
+  ctx.stroke(); ctx.setLineDash([]);
+}
+function mark(ctx, x, y, color) {
+  ctx.fillStyle = "#12202e"; ctx.beginPath(); ctx.arc(x, y, 5, 0, 6.2832); ctx.fill();
+  ctx.strokeStyle = color; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.arc(x, y, 5, 0, 6.2832); ctx.stroke();
+}
+function drawNode(canvas, node) {
+  const { ctx, w, h } = setup(canvas);
+  const css = getComputedStyle(document.documentElement);
+  const all = node.intensityDot.concat(node.intensityAi).filter(v => v != null);
+  const yMax = Math.max(1.15, Math.max(...all) * 1.08), yMin = Math.min(0, Math.min(...all));
+  const y2px = v => PAD.t + (h - PAD.t - PAD.b) * (1 - (v - yMin) / (yMax - yMin || 1));
+  const x2px = p => xPx(p, w);
+  ctx.clearRect(0, 0, w, h);
+  ctx.font = "10px 'Segoe UI', sans-serif";
+  ctx.textAlign = "right"; ctx.textBaseline = "middle";
+  for (const t of ticks(yMin, yMax, 4)) {
+    const y = y2px(t);
+    ctx.strokeStyle = css.getPropertyValue("--border"); ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(PAD.l, y); ctx.lineTo(w - PAD.r, y); ctx.stroke();
+    ctx.fillStyle = css.getPropertyValue("--muted"); ctx.fillText((t * 100).toFixed(0) + "%", PAD.l - 5, y);
+  }
+  ctx.textAlign = "center"; ctx.textBaseline = "top";
+  for (let i = 0; i < BOUNDS.length; i++) {
+    const lo = BOUNDS[i], hi = i + 1 < BOUNDS.length ? BOUNDS[i + 1] : XMAX;
+    if (lo > 0 && lo <= XMAX) {
+      const x = x2px(lo);
+      ctx.strokeStyle = "#2a3340"; ctx.setLineDash([3, 4]); ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(x, PAD.t); ctx.lineTo(x, h - PAD.b); ctx.stroke(); ctx.setLineDash([]);
+    }
+    ctx.fillStyle = css.getPropertyValue("--muted2"); ctx.font = "8px 'Segoe UI', sans-serif";
+    ctx.fillText(PHASES[i], x2px((Math.min(hi, XMAX) + lo) / 2), 2);
+  }
+  const xpk = x2px(100);
+  ctx.strokeStyle = css.getPropertyValue("--trigger"); ctx.setLineDash([2, 3]); ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(xpk, PAD.t); ctx.lineTo(xpk, h - PAD.b); ctx.stroke(); ctx.setLineDash([]);
+  line(ctx, PROG_DOT, node.intensityDot, x2px, y2px, css.getPropertyValue("--ath"), 1.4, [5, 3]);
+  line(ctx, PROG_AI, node.intensityAi, x2px, y2px, css.getPropertyValue("--accent"), 1.9);
+  if (node.equiv && node.aiNow) {
+    ctx.strokeStyle = "rgba(153,161,175,.45)"; ctx.setLineDash([2, 3]); ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(x2px(node.equiv.progress), y2px(node.equiv.intensity));
+    ctx.lineTo(x2px(node.aiNow.progress), y2px(node.aiNow.intensity)); ctx.stroke(); ctx.setLineDash([]);
+    mark(ctx, x2px(node.equiv.progress), y2px(node.equiv.intensity), css.getPropertyValue("--ath"));
+    mark(ctx, x2px(node.aiNow.progress), y2px(node.aiNow.intensity), css.getPropertyValue("--accent"));
+  }
+}
+
+/* ---------- boot ---------- */
+document.getElementById("wiptext").innerHTML =
+  "Prototype. Not linked from the site nav, not indexed. Method and copy will change.";
+document.getElementById("tree").appendChild(nodeCard(DATA.tree, 1));
+refreshHeadline();
+function fillNotes(id, title, items) {
+  const d = document.getElementById(id);
+  d.innerHTML = `<summary>${title}</summary><ul>` + items.map(x => `<li>${x}</li>`).join("") + `</ul>`;
+}
+fillNotes("assumptions", "How this is built", DATA.assumptions);
+fillNotes("limitations", "Limitations and notes", DATA.limitations);
+function redrawAll() { Object.values(CARDS).forEach(c => drawNode(c.canvas, c.node)); }
+requestAnimationFrame(redrawAll);
+window.addEventListener("resize", () => requestAnimationFrame(redrawAll));
+</script>
+</body>
+</html>

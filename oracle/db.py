@@ -90,6 +90,13 @@ CREATE TABLE IF NOT EXISTS buzz_events (
     related INTEGER DEFAULT 1,
     PRIMARY KEY (entity, date)
 );
+
+-- Shiller CAPE (S&P 500 cyclically-adjusted P/E), monthly, for the Then-and-Now
+-- valuation-multiple leaf. Reaches back to the 1870s, covering both cycles.
+CREATE TABLE IF NOT EXISTS cape_history (
+    date TEXT PRIMARY KEY,
+    cape REAL NOT NULL
+);
 """
 
 
@@ -134,6 +141,18 @@ def load_prices(conn, ticker):
 def has_prices(conn, ticker):
     row = conn.execute("SELECT 1 FROM prices WHERE ticker = ? LIMIT 1", (ticker,)).fetchone()
     return row is not None
+
+
+def upsert_cape(conn, rows):
+    """rows: iterable of (date_iso, cape_float)."""
+    conn.executemany(
+        "INSERT OR REPLACE INTO cape_history (date, cape) VALUES (?, ?)", list(rows)
+    )
+    conn.commit()
+
+
+def load_cape(conn):
+    return conn.execute("SELECT date, cape FROM cape_history ORDER BY date").fetchall()
 
 
 def replace_events(conn, events):

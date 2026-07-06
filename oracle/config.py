@@ -23,6 +23,12 @@ CONFIRMED_BANKRUPTCIES = {}
 # Broad-market context series (not a condition): the S&P 500 index.
 SP500_TICKER = "^GSPC"
 
+# Extra long-history series pulled purely for the "Then and Now" section (not
+# conditions). ^IXIC (Nasdaq Composite) reaches back to 1971 via the Yahoo tap,
+# covering both the dot-com and AI cycles. Concentration/speculation phases add
+# more tickers here (baskets, ^VIX).
+THENNOW_TICKERS = ["^IXIC"]
+
 # Key AI-era / macro events overlaid on the S&P 500 context chart.
 # Editable list: (date, short label). Keep labels tight, they render as a
 # numbered legend under the chart.

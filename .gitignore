@@ -8,3 +8,6 @@ __pycache__/
 .vercel/
 
 .vercel
+
+# Local Claude Code preview/launch config (dev-only)
+.claude/
