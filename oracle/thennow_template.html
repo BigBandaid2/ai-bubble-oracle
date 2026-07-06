@@ -16,67 +16,105 @@
   }
   * { box-sizing: border-box; margin: 0; }
   html, body { height: 100%; }
-  body { background: var(--bg); color: var(--text); font: 14px/1.5 var(--font); }
+  body { background: var(--bg); color: var(--text); font: 14px/1.5 var(--font); overflow: hidden; }
+  * { scrollbar-width: thin; scrollbar-color: #2a3340 transparent; }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-thumb { background: #2a3340; border-radius: 6px; border: 2px solid transparent; background-clip: padding-box; }
+  ::-webkit-scrollbar-track { background: transparent; }
+
   #topbar { display: flex; align-items: center; gap: 12px; padding: 0 24px; height: 56px;
-    background: var(--bg); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 10; }
+    background: var(--bg); border-bottom: 1px solid var(--border); z-index: 10; }
   #topbar .mark { width: 26px; height: 26px; border-radius: 6px; background: var(--text);
     color: var(--bg); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 15px; }
   #topbar .brand { font-size: 16px; font-weight: 700; letter-spacing: -.2px; }
   .topnav { display: flex; gap: 4px; margin-left: 18px; }
   .topnav a { color: var(--muted); text-decoration: none; font-size: 13px; font-weight: 500; padding: 6px 12px; border-radius: 7px; }
   .topnav a:hover { color: var(--text); background: var(--panel2); }
-  .topnav a.active { color: var(--text); background: var(--panel); }
-  main { max-width: 1140px; margin: 0 auto; padding: 22px 24px 80px; }
-  .wipbanner { display: flex; gap: 10px; align-items: baseline; background: rgba(224,191,62,.08);
-    border: 1px solid rgba(224,191,62,.35); border-left: 3px solid #e0bf3e; border-radius: 10px;
-    padding: 10px 14px; font-size: 12.5px; color: var(--muted); margin-bottom: 18px; }
-  .wipbanner b { color: #e6c84e; font-weight: 700; }
-  header.page h1 { font-size: 27px; font-weight: 700; letter-spacing: -.4px; }
+  #topbar .wiptag { margin-left: auto; font-size: 11px; font-weight: 700; letter-spacing: .5px; color: #e6c84e;
+    background: rgba(224,191,62,.1); border: 1px solid rgba(224,191,62,.35); border-radius: 100px; padding: 3px 11px; }
+
+  #app { display: flex; height: calc(100vh - 56px); }
+  main { flex: 1; padding: 20px 24px; min-width: 0; overflow-y: auto; }
+  header.page { margin: 4px 2px 16px; }
+  header.page h1 { font-size: 25px; font-weight: 700; letter-spacing: -.4px; }
   header.page h1 b { color: var(--accent); font-family: var(--mono); font-variant-numeric: tabular-nums; }
   header.page .sub { color: var(--muted); font-size: 13.5px; margin-top: 8px; max-width: 760px; }
-  .bandrow { margin: 12px 0 4px; display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: center; font-size: 12.5px; color: var(--muted); }
+  .bandrow { margin: 12px 0 2px; display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: center; font-size: 12.5px; color: var(--muted); }
   .bandrow .k { font-size: 9px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted2); margin-right: 5px; }
   .bandrow b { color: var(--text); font-family: var(--mono); font-variant-numeric: tabular-nums; }
 
-  .node { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px 20px 14px; margin: 14px 0; }
-  .node.depth1 { margin-left: 0; }
-  .node.leaf { background: var(--bg); }
-  .node.wip { opacity: .72; }
-  .nhead { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-  .nhead h2 { font-size: 16px; font-weight: 600; letter-spacing: -.2px; }
-  .nhead .tier { font-size: 9px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted2);
-    border: 1px solid var(--border); border-radius: 6px; padding: 1px 6px; }
+  #cardgrid { display: grid; grid-template-columns: 1fr; gap: 16px; }
+  @media (min-width: 1240px) { #cardgrid { grid-template-columns: 1fr 1fr; } }
+  section.chartcard { background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+    padding: 16px 20px 14px; scroll-margin-top: 72px; min-width: 0; position: relative; display: flex; flex-direction: column; }
+  section.chartcard.flash { animation: flash 1.6s ease-out; }
+  @keyframes flash { 0% { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(0,147,253,.30); } 100% { border-color: var(--border); box-shadow: none; } }
+  section.chartcard h2 { font-size: 16px; font-weight: 600; letter-spacing: -.2px; display: flex; align-items: center; gap: 9px; flex-wrap: wrap; padding-right: 26px; }
+  .tier { font-size: 9px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted2); border: 1px solid var(--border); border-radius: 6px; padding: 1px 6px; }
   .chip { font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 100px; letter-spacing: .3px; white-space: nowrap; }
   .chip.phase { background: rgba(0,147,253,.14); color: var(--accent); }
-  .chip.date { background: rgba(244,52,55,.13); color: var(--met); font-family: var(--mono); }
   .chip.soon { background: var(--panel2); color: var(--muted2); }
-  .ndate { margin-left: auto; font-size: 12.5px; color: var(--muted); }
-  .ndate b { color: var(--text); font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 15px; }
-  .nbody { display: grid; grid-template-columns: 1.3fr 1fr; gap: 8px 22px; margin-top: 10px; align-items: start; }
-  @media (max-width: 760px) { .nbody { grid-template-columns: 1fr; } }
-  .ncw { position: relative; height: 200px; }
-  .ncw canvas { width: 100%; height: 200px; display: block; }
-  .nstat { font-size: 12.5px; color: var(--muted); line-height: 1.6; }
+  .cdate { margin-left: auto; font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .cdate b { color: var(--text); font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 14px; }
+  .hidebtn { position: absolute; top: 12px; right: 13px; width: 20px; height: 20px; padding: 0;
+    border: 1px solid var(--border); background: var(--panel2); color: var(--muted2); border-radius: 6px;
+    font-size: 13px; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  .hidebtn:hover { color: var(--text); border-color: var(--accent); background: var(--panel); }
+  #cardgrid-empty { grid-column: 1 / -1; text-align: center; color: var(--muted); padding: 40px 0; font-size: 13px; }
+
+  .cbody { display: grid; grid-template-columns: 1.25fr 1fr; gap: 8px 20px; margin-top: 10px; align-items: start; flex: 1; }
+  @media (max-width: 1500px) { .cbody { grid-template-columns: 1fr; } }
+  .ncw { position: relative; height: 190px; }
+  .ncw canvas { width: 100%; height: 190px; display: block; }
+  .legend { display: flex; gap: 13px; margin-top: 8px; color: var(--muted); font-size: 11px; flex-wrap: wrap; }
+  .legend i { display: inline-block; width: 15px; height: 3px; border-radius: 2px; margin-right: 5px; vertical-align: middle; }
+  .nstat { font-size: 12.5px; color: var(--muted); line-height: 1.5; }
   .nstat .row { display: flex; gap: 8px; align-items: baseline; padding: 2px 0; }
-  .nstat .k { font-size: 9px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted2); width: 92px; flex-shrink: 0; }
+  .nstat .k { font-size: 9px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted2); width: 96px; flex-shrink: 0; }
   .nstat b { color: var(--text); font-family: var(--mono); font-variant-numeric: tabular-nums; }
   .nnote { font-size: 11.5px; color: var(--muted); line-height: 1.55; margin-top: 8px; }
   .nnote .k { font-size: 8.5px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted2); margin-right: 4px; }
-  .legend { display: flex; gap: 14px; margin-top: 8px; color: var(--muted); font-size: 11px; flex-wrap: wrap; }
-  .legend i { display: inline-block; width: 15px; height: 3px; border-radius: 2px; margin-right: 5px; vertical-align: middle; }
+  .soonbody { color: var(--muted2); font-size: 12.5px; padding: 26px 4px; }
   .weights { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 10px; }
   .weights .wl { font-size: 10px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted2); margin-bottom: 6px; }
   .wrow { display: flex; align-items: center; gap: 10px; padding: 3px 0; font-size: 12px; }
-  .wrow label { width: 148px; flex-shrink: 0; color: var(--muted); }
+  .wrow label { width: 140px; flex-shrink: 0; color: var(--muted); }
   .wrow input[type=range] { flex: 1; accent-color: var(--accent); }
   .wrow .wv { width: 40px; text-align: right; font-family: var(--mono); color: var(--text); font-size: 11.5px; }
-  .kids { margin: 4px 0 0 16px; border-left: 2px solid var(--border); padding-left: 14px; }
-  details.notes { margin-top: 14px; font-size: 12px; color: var(--muted); }
-  details.notes summary { cursor: pointer; font-weight: 600; color: var(--muted); padding: 4px 0; }
-  details.notes ul { margin: 4px 0 6px 18px; }
-  details.notes li { margin: 3px 0; line-height: 1.5; }
-  a.inline { color: var(--accent); text-decoration: none; }
-  a.inline:hover { text-decoration: underline; }
+
+  aside { width: 340px; flex-shrink: 0; background: var(--bg); border-left: 1px solid var(--border); padding: 16px 12px; overflow-y: auto; }
+  .sidehead { display: flex; align-items: center; justify-content: space-between; margin: 4px 8px 10px; }
+  aside h3 { font-size: 11px; text-transform: uppercase; letter-spacing: 1.2px; color: var(--muted); font-weight: 600; margin: 0; }
+  .hideall { font-size: 10.5px; font-weight: 600; letter-spacing: .3px; color: var(--muted); background: var(--panel2);
+    border: 1px solid var(--border); border-radius: 6px; padding: 3px 9px; cursor: pointer; }
+  .hideall:hover { color: var(--text); border-color: var(--accent); }
+  .snode { margin: 1px 0; }
+  .srow { display: flex; align-items: center; gap: 8px; padding: 8px 8px; border-radius: 8px; cursor: pointer; }
+  .srow:hover { background: var(--panel2); }
+  .srow.off .slabel, .srow.off .sdate { opacity: .45; }
+  .caret { width: 16px; height: 16px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+    color: var(--muted2); font-size: 9px; cursor: pointer; border-radius: 4px; user-select: none; }
+  .caret:hover { background: var(--border); color: var(--text); }
+  .caret.leafpad { visibility: hidden; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; box-sizing: border-box; }
+  .dot.live { background: var(--accent); box-shadow: 0 0 7px rgba(0,147,253,.5); }
+  .dot.wip { background: transparent; border: 2px solid var(--muted2); }
+  .slabel { flex: 1; min-width: 0; font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sdate { color: var(--muted); font-size: 10.5px; flex-shrink: 0; text-align: right; line-height: 1.25; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  .sdate .lbl { display: block; font-size: 8.5px; text-transform: uppercase; letter-spacing: .6px; font-family: var(--font); }
+  .schildren { margin-left: 17px; border-left: 1px solid var(--border); padding-left: 5px; }
+  .schildren.collapsed { display: none; }
+  aside h3.mt { margin-top: 22px; border-top: 1px solid var(--border); padding-top: 16px; }
+  .siglegend { margin: 2px 8px; font-size: 11.5px; color: var(--muted); }
+  .siglegend .row { display: flex; align-items: center; gap: 9px; padding: 4px 0; }
+
+  @media (max-width: 820px) {
+    html, body { overflow: auto; }
+    #app { flex-direction: column; height: auto; }
+    main { height: auto; overflow: visible; padding: 16px 16px 40px; }
+    aside { width: auto; height: auto; overflow: visible; border-left: none; border-top: 1px solid var(--border); }
+    .cbody { grid-template-columns: 1fr; }
+  }
 </style>
 </head>
 <body>
@@ -88,20 +126,33 @@
     <a href="datasources.html">Data Sources</a>
     <a href="about.html">About</a>
   </nav>
+  <span class="wiptag">THEN &amp; NOW · WIP</span>
 </div>
-<main id="main">
-  <div class="wipbanner"><b>WIP</b><span id="wiptext"></span></div>
-  <header class="page">
-    <h1 id="headline"></h1>
-    <div class="sub">Where today's AI boom sits on the dot-com clock, one metric at a time, rolled up into a single projected top. Each box is one graph and one date; a parent blends its children (weights adjustable). This is a working prototype, not a forecast.</div>
-    <div class="bandrow" id="bandrow"></div>
-  </header>
-  <div id="tree"></div>
-  <details class="notes" id="assumptions"></details>
-  <details class="notes" id="limitations"></details>
-</main>
+<div id="app">
+  <main id="charts">
+    <header class="page">
+      <h1 id="headline"></h1>
+      <div class="sub">Where today's AI boom sits on the dot-com clock, one metric at a time, rolled up into a single projected top. Each graph is one node in the tree; a parent blends its children (weights adjustable). A working prototype, not a forecast.</div>
+      <div class="bandrow" id="bandrow"></div>
+    </header>
+    <div id="cardgrid"></div>
+  </main>
+  <aside>
+    <div class="sidehead">
+      <h3>Then and Now tree</h3>
+      <button id="hideall" class="hideall" title="Show or hide every graph">Hide all</button>
+    </div>
+    <div id="tree"></div>
+    <h3 class="mt">Legend</h3>
+    <div class="siglegend">
+      <div class="row"><span class="dot live"></span> Wired metric (has a graph and a date)</div>
+      <div class="row"><span class="dot wip"></span> Not wired yet (WIP branch)</div>
+    </div>
+  </aside>
+</div>
 <script>
 const DATA = __DATA__;
+const $ = (s, el) => (el || document).querySelector(s);
 
 /* ---------- shared constants + tiny date math ---------- */
 const DAYMS = 86400000;
@@ -160,9 +211,7 @@ function blend(arrays, weights) {
   return out;
 }
 
-/* Recompute a parent (and its ancestors) from live children + current weights. */
 function liveKids(node) { return (node.children || []).filter(c => !c.wip && c.intensityDot); }
-
 function recompute(node) {
   const kids = liveKids(node);
   if (!kids.length) return;
@@ -171,84 +220,61 @@ function recompute(node) {
   node.intensityAi = blend(kids.map(c => c.intensityAi), w);
   Object.assign(node, evaluate(node.intensityDot, node.intensityAi));
 }
-
-const PARENT = {};   // childKey -> parent node
+const PARENT = {};
 (function link(n) { (n.children || []).forEach(c => { PARENT[c.key] = n; link(c); }); })(DATA.tree);
+function recomputeUp(node) { let cur = PARENT[node.key]; while (cur) { recompute(cur); redrawNode(cur); cur = PARENT[cur.key]; } }
 
-function recomputeUp(node) {
-  let cur = PARENT[node.key];
-  while (cur) { recompute(cur); redrawNode(cur); cur = PARENT[cur.key]; }
+/* ---------- ordering + hide state (mirrors dashboard.html) ---------- */
+// A node "has data" if it is not a WIP branch. Data-backed first, WIP last;
+// order preserved within each group. Used by BOTH the grid and the sidebar.
+function hasData(node) { return !node.wip; }
+function orderedChildren(node) {
+  return (node.children || []).slice().sort((a, b) => (hasData(a) ? 0 : 1) - (hasData(b) ? 0 : 1));
+}
+function flatten() {
+  const out = [];
+  (function walk(n, depth) { out.push({ node: n, depth }); orderedChildren(n).forEach(c => walk(c, depth + 1)); })(DATA.tree, 0);
+  return out;
+}
+const hidden = new Set();
+const collapsed = new Set();
+
+function hideBtn(key) {
+  const b = document.createElement("button");
+  b.className = "hidebtn"; b.innerHTML = "&times;";
+  b.title = "Hide this graph (click it in the tree to bring it back)";
+  b.onclick = () => { hidden.add(key); refreshVisibility(); };
+  return b;
+}
+function jumpToCard(key) {
+  if (hidden.has(key)) { hidden.delete(key); refreshVisibility(); }
+  const card = document.getElementById("card-" + key);
+  if (!card) return;
+  card.scrollIntoView({ behavior: "smooth", block: "start" });
+  card.classList.remove("flash");
+  requestAnimationFrame(() => card.classList.add("flash"));
+}
+function refreshVisibility() {
+  const main = document.getElementById("charts"), y = main.scrollTop;
+  renderCards(); renderSidebar(); syncHideAll();
+  main.scrollTop = y;
+}
+function syncHideAll() {
+  const btn = document.getElementById("hideall");
+  if (btn) btn.textContent = hidden.size === 0 ? "Hide all" : "Show all";
 }
 
-/* ---------- rendering ---------- */
-const CARDS = {};   // key -> {canvas, node, els}
+/* ---------- rendering: cards ---------- */
+const CARDS = {};
 
 function fmtDays(d) {
   if (d === 0) return "at the 2000 peak";
   return d < 0 ? `${Math.abs(d)} days before the peak` : `${d} days after the peak`;
 }
-
-function nodeCard(node, depth) {
-  const el = document.createElement("section");
-  el.className = "node depth" + depth + (node.leaf ? " leaf" : "") + (node.wip ? " wip" : "");
-  el.id = "card-" + node.key;
-  if (node.wip) {
-    el.innerHTML = `<div class="nhead"><h2>${node.label}</h2><span class="chip soon">WIP</span>
-      <span class="ndate">not wired yet</span></div>
-      <div class="nnote">Ingestion and dot-com alignment for this branch arrive in a later phase; it does not affect the projection yet.</div>`;
-    return el;
-  }
-  const tier = node.leaf ? "leaf · " + (node.leaf === "price" ? "Nasdaq index" : "Shiller CAPE") : "roll-up";
-  const head = document.createElement("div");
-  head.className = "nhead";
-  head.innerHTML = `<h2>${node.label}</h2><span class="tier">${tier}</span>
-    <span class="chip phase" data-el="phase">${node.phase}</span>
-    <span class="ndate">projected top <b data-el="date">${node.projectedPeakDate}</b></span>`;
-  el.appendChild(head);
-
-  const body = document.createElement("div");
-  body.className = "nbody";
-  const cw = document.createElement("div");
-  cw.className = "ncw";
-  const canvas = document.createElement("canvas");
-  cw.appendChild(canvas);
-  const legend = document.createElement("div");
-  legend.className = "legend";
-  legend.innerHTML = `<span><i style="background:var(--ath)"></i>Dot-com path</span>
-    <span><i style="background:var(--accent)"></i>AI path (dot-com clock)</span>
-    <span><i style="background:var(--trigger)"></i>2000 peak</span>`;
-  const left = document.createElement("div");
-  left.appendChild(cw); left.appendChild(legend);
-
-  const stat = document.createElement("div");
-  stat.className = "nstat";
-  stat.innerHTML = statRows(node);
-  body.appendChild(left); body.appendChild(stat);
-  el.appendChild(body);
-
-  if (node.leaf) {
-    const note = document.createElement("div");
-    note.className = "nnote";
-    note.innerHTML = `<div><span class="k">similar</span>${node.similar}</div>
-      <div><span class="k">different</span>${node.different}</div>`;
-    el.appendChild(note);
-  }
-
-  const kids = liveKids(node);
-  if (kids.length >= 2) el.appendChild(weightsBlock(node, kids));
-
-  CARDS[node.key] = { canvas, node, els: {
-    phase: head.querySelector('[data-el=phase]'), date: head.querySelector('[data-el=date]'), stat } };
-
-  if (node.children) {
-    const wrap = document.createElement("div");
-    wrap.className = "kids";
-    node.children.forEach(c => wrap.appendChild(nodeCard(c, depth + 1)));
-    el.appendChild(wrap);
-  }
-  return el;
+function tierOf(node) {
+  if (node.leaf) return "leaf · " + (node.leaf === "price" ? "Nasdaq index" : "Shiller CAPE");
+  return PARENT[node.key] ? "roll-up" : "root · all metrics";
 }
-
 function statRows(node) {
   const rows = [
     ["intensity now", `<b>${(node.intensityNow * 100).toFixed(0)}%</b> of the way to the dot-com peak`],
@@ -260,35 +286,86 @@ function statRows(node) {
   if (node.display && node.display !== "blended") rows.unshift(["today", node.display]);
   return rows.map(([k, v]) => `<div class="row"><span class="k">${k}</span><span>${v}</span></div>`).join("");
 }
-
 function weightsBlock(node, kids) {
   node._weights = node._weights || kids.map(() => 1);
   const box = document.createElement("div");
   box.className = "weights";
   box.innerHTML = `<div class="wl">Weights (how much each child counts toward ${node.label})</div>`;
+  const syncAll = () => box.querySelectorAll(".wrow").forEach((r, j) => {
+    const tot = node._weights.reduce((a, b) => a + b, 0) || 1;
+    r.querySelector(".wv").textContent = Math.round(node._weights[j] / tot * 100) + "%";
+  });
   kids.forEach((c, i) => {
     const row = document.createElement("div");
     row.className = "wrow";
-    row.innerHTML = `<label>${c.label}</label>
-      <input type="range" min="0" max="100" value="${Math.round(node._weights[i] * 50)}">
-      <span class="wv"></span>`;
-    const input = row.querySelector("input"), wv = row.querySelector(".wv");
-    const sync = () => { const tot = node._weights.reduce((a, b) => a + b, 0) || 1;
-      wv.textContent = Math.round(node._weights[i] / tot * 100) + "%"; };
-    input.addEventListener("input", () => {
-      node._weights[i] = Math.max(0.0001, +input.value / 50);
+    row.innerHTML = `<label>${c.label}</label><input type="range" min="0" max="100" value="${Math.round(node._weights[i] * 50)}"><span class="wv"></span>`;
+    row.querySelector("input").addEventListener("input", e => {
+      node._weights[i] = Math.max(0.0001, +e.target.value / 50);
       recompute(node); redrawNode(node); recomputeUp(node);
-      box.querySelectorAll(".wrow").forEach((r, j) => {
-        const tot = node._weights.reduce((a, b) => a + b, 0) || 1;
-        r.querySelector(".wv").textContent = Math.round(node._weights[j] / tot * 100) + "%";
-      });
-      refreshHeadline();
+      syncAll(); refreshHeadline(); renderSidebar();
     });
-    box.appendChild(row); sync();
+    box.appendChild(row);
   });
+  syncAll();
   return box;
 }
+function nodeCard(node) {
+  const sec = document.createElement("section");
+  sec.className = "chartcard"; sec.id = "card-" + node.key;
+  if (node.wip) {
+    const h = document.createElement("h2");
+    h.innerHTML = `${node.label} <span class="chip soon">WIP</span><span class="cdate">not wired yet</span>`;
+    sec.appendChild(h); sec.appendChild(hideBtn(node.key));
+    const body = document.createElement("div");
+    body.className = "soonbody";
+    body.textContent = "Ingestion and dot-com alignment for this branch arrive in a later phase. It does not affect the projection yet.";
+    sec.appendChild(body);
+    return sec;
+  }
+  const h = document.createElement("h2");
+  h.innerHTML = `${node.label} <span class="tier">${tierOf(node)}</span>` +
+    `<span class="chip phase" data-el="phase">${node.phase}</span>` +
+    `<span class="cdate">projected top <b data-el="date">${node.projectedPeakDate}</b></span>`;
+  sec.appendChild(h); sec.appendChild(hideBtn(node.key));
 
+  const body = document.createElement("div");
+  body.className = "cbody";
+  const left = document.createElement("div");
+  const cw = document.createElement("div"); cw.className = "ncw";
+  const canvas = document.createElement("canvas"); cw.appendChild(canvas);
+  const leg = document.createElement("div"); leg.className = "legend";
+  leg.innerHTML = `<span><i style="background:var(--ath)"></i>Dot-com path</span>` +
+    `<span><i style="background:var(--accent)"></i>AI path (dot-com clock)</span>` +
+    `<span><i style="background:var(--trigger)"></i>2000 peak</span>`;
+  left.appendChild(cw); left.appendChild(leg);
+  const stat = document.createElement("div");
+  stat.className = "nstat"; stat.innerHTML = statRows(node);
+  body.appendChild(left); body.appendChild(stat);
+  sec.appendChild(body);
+
+  if (node.leaf) {
+    const note = document.createElement("div");
+    note.className = "nnote";
+    note.innerHTML = `<div><span class="k">similar</span>${node.similar}</div><div><span class="k">different</span>${node.different}</div>`;
+    sec.appendChild(note);
+  }
+  const kids = liveKids(node);
+  if (kids.length >= 2) sec.appendChild(weightsBlock(node, kids));
+
+  CARDS[node.key] = { canvas, node, els: {
+    phase: h.querySelector('[data-el=phase]'), date: h.querySelector('[data-el=date]'), stat } };
+  requestAnimationFrame(() => drawNode(canvas, node));
+  return sec;
+}
+function renderCards() {
+  const grid = $("#cardgrid");
+  grid.innerHTML = "";
+  for (const k in CARDS) delete CARDS[k];
+  flatten().forEach(({ node }) => { if (!hidden.has(node.key)) grid.appendChild(nodeCard(node)); });
+  if (!grid.children.length) {
+    grid.innerHTML = `<div id="cardgrid-empty">All graphs are hidden. Click any item in the tree, or "Show all", to bring them back.</div>`;
+  }
+}
 function redrawNode(node) {
   const c = CARDS[node.key];
   if (!c) return;
@@ -298,22 +375,69 @@ function redrawNode(node) {
   if (c.els.stat) c.els.stat.innerHTML = statRows(node);
 }
 
+/* ---------- rendering: sidebar tree ---------- */
+function sidebarNode(node) {
+  const wrap = document.createElement("div"); wrap.className = "snode";
+  const row = document.createElement("div");
+  row.className = "srow" + (hidden.has(node.key) ? " off" : "");
+  const kids = orderedChildren(node), hasKids = kids.length > 0;
+
+  const caret = document.createElement("span");
+  caret.className = "caret" + (hasKids ? "" : " leafpad");
+  caret.textContent = collapsed.has(node.key) ? "▶" : "▼";
+  row.appendChild(caret);
+
+  const dot = document.createElement("span");
+  dot.className = "dot " + (node.wip ? "wip" : "live");
+  row.appendChild(dot);
+
+  const label = document.createElement("span");
+  label.className = "slabel"; label.textContent = node.label; label.title = node.label;
+  row.appendChild(label);
+
+  const date = document.createElement("span");
+  date.className = "sdate";
+  date.innerHTML = node.wip ? `<span class="lbl">status</span>WIP`
+    : `<span class="lbl">projected</span>${node.projectedPeakDate}`;
+  row.appendChild(date);
+  wrap.appendChild(row);
+
+  if (hasKids) {
+    const box = document.createElement("div");
+    box.className = "schildren" + (collapsed.has(node.key) ? " collapsed" : "");
+    kids.forEach(c => box.appendChild(sidebarNode(c)));
+    wrap.appendChild(box);
+    caret.addEventListener("click", e => {
+      e.stopPropagation();
+      const now = box.classList.toggle("collapsed");
+      caret.textContent = now ? "▶" : "▼";
+      if (now) collapsed.add(node.key); else collapsed.delete(node.key);
+    });
+  }
+  row.addEventListener("click", () => jumpToCard(node.key));
+  return wrap;
+}
+function renderSidebar() {
+  const host = $("#tree"); host.innerHTML = "";
+  host.appendChild(sidebarNode(DATA.tree));
+}
+
+/* ---------- headline ---------- */
 function refreshHeadline() {
   const root = DATA.tree;
-  document.getElementById("headline").innerHTML =
-    `The AI bubble bursts on <b>${root.projectedPeakDate}</b>`;
+  $("#headline").innerHTML = `The AI bubble bursts on <b>${root.projectedPeakDate}</b>`;
   const dates = []; (function walk(n){ if(n.wip) return; if(n.leaf) dates.push(n.projectedPeakDate); (n.children||[]).forEach(walk); })(root);
   const lo = dates.slice().sort()[0], hi = dates.slice().sort()[dates.length - 1];
-  document.getElementById("bandrow").innerHTML =
-    `<span><span class="k">range</span><b>${lo}</b> to <b>${hi}</b></span>
-     <span><span class="k">as of</span><b>${DATA.asOf}</b></span>
-     <span><span class="k">metrics live</span><b>1</b> of 4 (valuation)</span>`;
+  $("#bandrow").innerHTML =
+    `<span><span class="k">range</span><b>${lo}</b> to <b>${hi}</b></span>` +
+    `<span><span class="k">as of</span><b>${DATA.asOf}</b></span>` +
+    `<span><span class="k">metrics live</span><b>1</b> of 4 (valuation)</span>`;
 }
 
 /* ---------- canvas: the shared progress-axis renderer ---------- */
 const PAD = { l: 36, r: 12, t: 20, b: 18 }, XMAX = 150;
 function setup(canvas) {
-  const dpr = window.devicePixelRatio || 1, w = canvas.clientWidth || 360, h = canvas.clientHeight || 200;
+  const dpr = window.devicePixelRatio || 1, w = canvas.clientWidth || 360, h = canvas.clientHeight || 190;
   canvas.width = w * dpr; canvas.height = h * dpr;
   const ctx = canvas.getContext("2d"); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   return { ctx, w, h };
@@ -334,14 +458,16 @@ function line(ctx, xs, ys, x2px, y2px, color, width, dash) {
   }
   ctx.stroke(); ctx.setLineDash([]);
 }
-function mark(ctx, x, y, color) {
+function pt(ctx, x, y, color) {
   ctx.fillStyle = "#12202e"; ctx.beginPath(); ctx.arc(x, y, 5, 0, 6.2832); ctx.fill();
   ctx.strokeStyle = color; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.arc(x, y, 5, 0, 6.2832); ctx.stroke();
 }
 function drawNode(canvas, node) {
+  if (!node.intensityDot) return;
   const { ctx, w, h } = setup(canvas);
   const css = getComputedStyle(document.documentElement);
   const all = node.intensityDot.concat(node.intensityAi).filter(v => v != null);
+  if (!all.length) return;
   const yMax = Math.max(1.15, Math.max(...all) * 1.08), yMin = Math.min(0, Math.min(...all));
   const y2px = v => PAD.t + (h - PAD.t - PAD.b) * (1 - (v - yMin) / (yMax - yMin || 1));
   const x2px = p => xPx(p, w);
@@ -374,22 +500,20 @@ function drawNode(canvas, node) {
     ctx.strokeStyle = "rgba(153,161,175,.45)"; ctx.setLineDash([2, 3]); ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(x2px(node.equiv.progress), y2px(node.equiv.intensity));
     ctx.lineTo(x2px(node.aiNow.progress), y2px(node.aiNow.intensity)); ctx.stroke(); ctx.setLineDash([]);
-    mark(ctx, x2px(node.equiv.progress), y2px(node.equiv.intensity), css.getPropertyValue("--ath"));
-    mark(ctx, x2px(node.aiNow.progress), y2px(node.aiNow.intensity), css.getPropertyValue("--accent"));
+    pt(ctx, x2px(node.equiv.progress), y2px(node.equiv.intensity), css.getPropertyValue("--ath"));
+    pt(ctx, x2px(node.aiNow.progress), y2px(node.aiNow.intensity), css.getPropertyValue("--accent"));
   }
 }
 
 /* ---------- boot ---------- */
-document.getElementById("wiptext").innerHTML =
-  "Prototype. Not linked from the site nav, not indexed. Method and copy will change.";
-document.getElementById("tree").appendChild(nodeCard(DATA.tree, 1));
+document.getElementById("hideall").addEventListener("click", () => {
+  if (hidden.size === 0) flatten().forEach(({ node }) => hidden.add(node.key));
+  else hidden.clear();
+  refreshVisibility();
+});
+renderCards();
+renderSidebar();
 refreshHeadline();
-function fillNotes(id, title, items) {
-  const d = document.getElementById(id);
-  d.innerHTML = `<summary>${title}</summary><ul>` + items.map(x => `<li>${x}</li>`).join("") + `</ul>`;
-}
-fillNotes("assumptions", "How this is built", DATA.assumptions);
-fillNotes("limitations", "Limitations and notes", DATA.limitations);
 function redrawAll() { Object.values(CARDS).forEach(c => drawNode(c.canvas, c.node)); }
 requestAnimationFrame(redrawAll);
 window.addEventListener("resize", () => requestAnimationFrame(redrawAll));
