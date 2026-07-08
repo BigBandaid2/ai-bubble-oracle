@@ -21,11 +21,11 @@
 <style>
   /* Palette lifted from polymarket.com dark theme design tokens */
   :root {
-    --bg: #0a0b10; --panel: #1a1f23; --panel2: #242b32; --border: #1f2937;
-    --text: #f4f4f6; --muted: #80838e; --muted2: #6b6e7a; --accent: #0093fd;
-    --met: #f55b55; --met-strong: #f43437; --notmet: #2bae4c; --notmet-text: #34c759;
-    --unknown: #6b6e7a;
-    --ath: #99a1af; --trigger: #f43437; --price: #0093fd;
+    --bg: #0a0d13; --panel: #12161f; --panel2: #1b212c; --border: #242c39; --border2: #313a49;
+    --text: #eef1f6; --muted: #9aa4b3; --muted2: #6a7484; --accent: #1677ff; --accent-hi: #57a6ff;
+    --met: #f0655e; --met-strong: #ff5a44; --notmet: #35c07a; --notmet-text: #46d08a;
+    --unknown: #6a7484;
+    --ath: #8b93a3; --trigger: #ff5a44; --price: #1677ff;
     --font: Inter, "Open Sauce One", "Segoe UI", system-ui, -apple-system, sans-serif;
     --mono: "Geist Mono", "SF Mono", Consolas, monospace;
   }
@@ -35,9 +35,9 @@
      scroll inside their own pane, so their scrollbars are never adjacent. */
   body { background: var(--bg); color: var(--text); font: 14px/1.5 var(--font); overflow: hidden; }
   /* subtle scrollbars */
-  * { scrollbar-width: thin; scrollbar-color: #2a3340 transparent; }
+  * { scrollbar-width: thin; scrollbar-color: #2c3646 transparent; }
   ::-webkit-scrollbar { width: 10px; height: 10px; }
-  ::-webkit-scrollbar-thumb { background: #2a3340; border-radius: 6px; border: 2px solid transparent; background-clip: padding-box; }
+  ::-webkit-scrollbar-thumb { background: #2c3646; border-radius: 6px; border: 2px solid transparent; background-clip: padding-box; }
   ::-webkit-scrollbar-thumb:hover { background: #3a4453; background-clip: padding-box; }
   ::-webkit-scrollbar-track { background: transparent; }
 
@@ -109,7 +109,7 @@
   .evlegend { list-style: none; padding: 0; margin: 10px 0 0; columns: 2; column-gap: 26px; font-size: 11.5px; color: var(--muted); }
   .evlegend li { margin: 3px 0; break-inside: avoid; display: flex; align-items: baseline; gap: 7px; }
   .evnum { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 50%;
-    background: rgba(0,147,253,.14); color: var(--accent); font-size: 9.5px; font-weight: 700; flex-shrink: 0; align-self: center; }
+    background: rgba(22,119,255,.14); color: var(--accent); font-size: 9.5px; font-weight: 700; flex-shrink: 0; align-self: center; }
   .evlegend .evdate { color: var(--muted2); font-family: var(--mono); font-size: 10.5px; white-space: nowrap; }
   .evlegend a { color: var(--muted); text-decoration: none; }
   .evlegend a:hover { color: var(--accent); text-decoration: underline; }
@@ -133,7 +133,7 @@
   section.chartcard .chartwrap { min-height: 240px; }
   section.chartcard .chartwrap canvas { height: 100%; }
   section.chartcard.flash { animation: flash 1.6s ease-out; }
-  @keyframes flash { 0% { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(0,147,253,.30); } 100% { border-color: var(--border); box-shadow: none; } }
+  @keyframes flash { 0% { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(22,119,255,.30); } 100% { border-color: var(--border); box-shadow: none; } }
   section.chartcard h2 { font-size: 16px; font-weight: 600; letter-spacing: -.2px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding-right: 26px; }
   /* per-card hide button (top-right corner) */
   .hidebtn { position: absolute; top: 12px; right: 13px; width: 20px; height: 20px; padding: 0;
@@ -147,7 +147,7 @@
   .chip.met { background: rgba(244,52,55,.14); color: var(--met); }
   .chip.not_met { background: rgba(43,174,76,.14); color: var(--notmet-text); }
   .chip.unknown { background: rgba(107,110,122,.16); color: var(--muted); }
-  .chip.market { background: rgba(0,147,253,.15); color: var(--accent); }
+  .chip.market { background: rgba(22,119,255,.15); color: var(--accent); }
 
   .optchips { display: flex; gap: 6px; margin: 8px 0 2px; flex-wrap: wrap; }
   .optchip {
@@ -160,7 +160,7 @@
   .optchip[data-opt] { cursor: pointer; }
   .optchip[data-opt]:hover { border-color: var(--accent); }
   .optchip[data-opt]:hover b { color: var(--accent); }
-  @keyframes optpulse { 0% { background: rgba(0,147,253,.20); } 100% { background: transparent; } }
+  @keyframes optpulse { 0% { background: rgba(22,119,255,.20); } 100% { background: transparent; } }
   .optgroup.pulse { animation: optpulse 1.4s ease-out; border-radius: 10px; }
 
   .meta { color: var(--muted); font-size: 12.5px; margin: 8px 0 12px; }
@@ -830,10 +830,10 @@ function drawHover(i) {
     x2.font = "10.5px 'Geist Mono', Consolas, monospace";
     const tw = x2.measureText(dateStr).width + 12;
     const bx = (px + 8 + tw > w - PAD.r) ? px - tw - 8 : px + 8;
-    x2.fillStyle = "#242b32";
+    x2.fillStyle = "#1b212c";
     x2.beginPath(); x2.roundRect(bx, PAD.t, tw, 17, 4); x2.fill();
     x2.strokeStyle = "#3a4453"; x2.stroke();
-    x2.fillStyle = "#f4f4f6"; x2.textAlign = "left"; x2.textBaseline = "middle";
+    x2.fillStyle = "#eef1f6"; x2.textAlign = "left"; x2.textBaseline = "middle";
     x2.fillText(dateStr, bx + 6, PAD.t + 9);
     x2.textBaseline = "alphabetic";
   });

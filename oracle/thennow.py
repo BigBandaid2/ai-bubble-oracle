@@ -371,6 +371,7 @@ def compute_thennow(conn):
     return {
         "headlineDate": root["projectedPeakDate"],
         "bandLow": band_low, "bandHigh": band_high,
+        "updated": db.get_meta(conn, "last_update"),
         "dotcomStart": DOTCOM["start"], "dotcomStartEvent": DOTCOM["startEvent"],
         "dotcomPeak": ax["peakDate"], "aiStart": AI["start"],
         "aiStartEvent": AI["startEvent"], "ramp": ax["ramp"], "asOf": today.isoformat(),

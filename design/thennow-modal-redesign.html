@@ -1,0 +1,527 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Then &amp; Now — page + detail redesign (design study) · AI Bubble Oracle</title>
+<meta name="robots" content="noindex, nofollow">
+<!--
+  PURE DESIGN STUDY — not wired to main.py. Ports a subset of the engine (blend/match/
+  evaluate) so parent nodes are computed from the two real leaves (Price appreciation,
+  Valuation multiple). Shows the intended structure: hero → (metric cards + roll-up tree
+  sidebar) → per-metric full-size modal. Reference for editing thennow_template.html.
+-->
+<style>
+  :root {
+    --bg: #0a0d13; --panel: #12161f; --panel2: #1b212c; --panel3: #222a37;
+    --border: #242c39; --border2: #313a49;
+    --text: #eef1f6; --muted: #9aa4b3; --muted2: #6a7484;
+    --accent: #1677ff; --accent-hi: #57a6ff; --accent-dim: rgba(87,166,255,.14);
+    --then: #8b93a3; --peak: #ff5a44; --bottom: #3fb27f;
+    --font: Inter, "Open Sauce One", "Segoe UI", system-ui, -apple-system, sans-serif;
+    --mono: "Geist Mono", "SF Mono", Consolas, ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 14px/1.5 var(--font); -webkit-font-smoothing: antialiased; }
+  * { scrollbar-width: thin; scrollbar-color: #2c3646 transparent; }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-thumb { background: #2c3646; border-radius: 6px; border: 2px solid transparent; background-clip: padding-box; }
+  b { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+  #topbar { display: flex; align-items: center; gap: 12px; padding: 0 24px; height: 56px;
+    background: var(--bg); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 20; }
+  #topbar .mark { width: 26px; height: 26px; border-radius: 6px; background: var(--text); color: var(--bg);
+    display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 15px; }
+  #topbar .brand { font-size: 16px; font-weight: 700; letter-spacing: -.2px; }
+  #topbar nav { display: flex; gap: 4px; margin-left: 16px; }
+  #topbar nav a { color: var(--muted); text-decoration: none; font-size: 13px; font-weight: 500; padding: 6px 12px; border-radius: 7px; }
+  #topbar nav a:hover { color: var(--text); background: var(--panel2); }
+  #topbar .wiptag { margin-left: 14px; font-size: 11px; font-weight: 700; letter-spacing: .5px; color: #e0bf3e;
+    background: rgba(224,191,62,.1); border: 1px solid rgba(224,191,62,.35); border-radius: 100px; padding: 3px 11px; }
+
+  #app { display: flex; height: calc(100vh - 56px); }
+  main.content { flex: 1; overflow-y: auto; padding: 0 28px 60px; min-width: 0; }
+  .wrap { max-width: 1080px; margin: 0 auto; }
+
+  /* HERO */
+  .hero { padding: 44px 0 30px; border-bottom: 1px solid var(--border); }
+  .hero .eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: 2px; text-transform: uppercase;
+    color: var(--accent-hi); margin-bottom: 14px; display: flex; align-items: center; gap: 10px; }
+  .hero .eyebrow::before { content: ""; width: 26px; height: 1px; background: var(--accent-hi); }
+  .hero .lead { font-size: clamp(16px, 2vw, 21px); font-weight: 500; color: var(--muted); max-width: 580px; }
+  .hero .bigdate { font-size: clamp(46px, 8vw, 92px); font-weight: 800; letter-spacing: -2.5px; line-height: 1;
+    color: var(--text); margin: 6px 0 2px; }
+  .hero .arc { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 18px; font-size: 14px; color: var(--muted); }
+  .hero .arc .seg { display: inline-flex; align-items: center; gap: 7px; }
+  .hero .arc .dot { width: 8px; height: 8px; border-radius: 50%; }
+  .hero .arc b { color: var(--text); } .hero .arc .to { color: var(--muted2); }
+  .hero .chips { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 20px; }
+  .hero .chip { font-size: 13px; color: var(--muted); background: var(--panel2); border: 1px solid var(--border); border-radius: 8px; padding: 7px 13px; }
+  .hero .chip b { color: var(--text); }
+
+  .sectitle { font-family: var(--mono); font-size: 11px; letter-spacing: 1.4px; text-transform: uppercase;
+    color: var(--muted2); margin: 30px 0 14px; }
+
+  /* METRIC CARDS */
+  .cardgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .mcard { background: var(--panel); border: 1px solid var(--border); border-radius: 13px; padding: 16px 18px 14px;
+    cursor: pointer; transition: border-color .14s, transform .14s; display: flex; flex-direction: column; }
+  .mcard:hover { border-color: var(--accent); transform: translateY(-1px); }
+  .mcard .top { display: flex; align-items: center; gap: 8px; }
+  .mcard .name { font-size: 16.5px; font-weight: 600; letter-spacing: -.2px; }
+  .mcard .tier { font-family: var(--mono); font-size: 9.5px; letter-spacing: .5px; text-transform: uppercase;
+    color: var(--muted2); border: 1px solid var(--border2); border-radius: 5px; padding: 1px 6px; }
+  .mcard .open { margin-left: auto; font-size: 12px; color: var(--muted2); }
+  .mcard:hover .open { color: var(--accent-hi); }
+  .mcard .lbl { font-family: var(--mono); font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: var(--peak); margin: 13px 0 3px; }
+  .mcard .date { font-size: 31px; font-weight: 800; letter-spacing: -1px; line-height: 1; }
+  .mcard .mini { height: 78px; margin: 12px 0 4px; position: relative; }
+  .mcard .mini svg { width: 100%; height: 100%; display: block; }
+  .mcard .foot { display: flex; align-items: center; justify-content: space-between; margin-top: 8px;
+    padding-top: 10px; border-top: 1px solid var(--border); font-size: 12.5px; color: var(--muted); }
+  .mcard .foot .phase { color: var(--accent-hi); font-weight: 600; }
+  .mcard .foot .int b { color: var(--text); }
+  .mcard.wip { cursor: default; opacity: .72; }
+  .mcard.wip:hover { border-color: var(--border); transform: none; }
+  .mcard.wip .soon { color: var(--muted2); font-size: 12.5px; padding: 20px 0 8px; }
+
+  /* SIDEBAR TREE (roll-up hierarchy) */
+  aside.tree { width: 316px; flex-shrink: 0; border-left: 1px solid var(--border); overflow-y: auto; padding: 18px 14px; }
+  .tree h3 { font-size: 11.5px; text-transform: uppercase; letter-spacing: 1.2px; color: var(--muted); font-weight: 600; margin: 4px 8px 4px; }
+  .tree .hint { font-size: 12px; color: var(--muted2); margin: 0 8px 12px; line-height: 1.5; }
+  .snode { margin: 1px 0; }
+  .srow { display: flex; align-items: center; gap: 8px; padding: 7px 8px; border-radius: 8px; cursor: pointer; }
+  .srow:hover { background: var(--panel2); }
+  .srow.wip { cursor: default; }
+  .srow.wip:hover { background: transparent; }
+  .caret { width: 14px; text-align: center; color: var(--muted2); font-size: 9px; user-select: none; }
+  .caret.leaf { visibility: hidden; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+  .dot.live { background: var(--accent-hi); }
+  .dot.wip { background: transparent; border: 2px solid var(--muted2); }
+  .slabel { flex: 1; min-width: 0; font-size: 13.5px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sdate { color: var(--muted); font-size: 11.5px; text-align: right; line-height: 1.2; font-family: var(--mono); }
+  .sdate .l { display: block; font-size: 9px; text-transform: uppercase; letter-spacing: .5px; font-family: var(--font); color: var(--muted2); }
+  .schildren { margin-left: 15px; border-left: 1px solid var(--border); padding-left: 5px; }
+  .tree .legend2 { margin: 16px 8px 0; padding-top: 14px; border-top: 1px solid var(--border); font-size: 12.5px; color: var(--muted); }
+  .tree .legend2 .r { display: flex; align-items: center; gap: 9px; padding: 3px 0; }
+
+  /* MODAL */
+  #scrim { position: fixed; inset: 0; background: rgba(4,6,10,.72); z-index: 40; opacity: 0; pointer-events: none; transition: opacity .18s; }
+  #scrim.open { opacity: 1; pointer-events: auto; }
+  #modal { position: fixed; inset: 2.4vh 2.4vw; z-index: 41; background: var(--panel); border: 1px solid var(--border2);
+    border-radius: 16px; display: flex; flex-direction: column; padding: 20px 24px 20px; opacity: 0; transform: scale(.99);
+    pointer-events: none; transition: opacity .18s, transform .18s; box-shadow: 0 24px 70px -12px rgba(0,0,0,.7); }
+  #modal.open { opacity: 1; transform: none; pointer-events: auto; }
+  .crumb { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--muted2); font-family: var(--mono); }
+  .crumb .sep { opacity: .5; } .crumb .here { color: var(--accent-hi); }
+  .m-head { display: flex; align-items: flex-end; gap: 16px; margin: 9px 0 4px; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
+  .m-head .lbl { font-family: var(--mono); font-size: 12px; letter-spacing: 1.2px; text-transform: uppercase; color: var(--peak); margin-bottom: 5px; }
+  .m-head .d { font-size: clamp(30px, 3.8vw, 46px); font-weight: 800; letter-spacing: -1.2px; line-height: 1; }
+  .m-head .sub { font-size: 13.5px; color: var(--muted); margin-top: 8px; max-width: 560px; line-height: 1.5; }
+  .m-head .sub b { color: var(--accent-hi); }
+  .m-head .act { margin-left: auto; display: flex; gap: 8px; }
+  .btn { background: var(--panel2); border: 1px solid var(--border2); color: var(--muted); font: inherit; font-size: 13px;
+    font-weight: 500; padding: 8px 14px; border-radius: 9px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+  .btn:hover { border-color: var(--accent); color: var(--text); }
+  .btn.dl { color: var(--accent-hi); border-color: rgba(22,119,255,.35); }
+  .btn.close { font-size: 19px; line-height: 1; padding: 5px 12px; color: var(--muted2); }
+
+  .m-body { flex: 1; display: flex; gap: 22px; min-height: 0; margin-top: 14px; }
+  .m-main { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+  .ribbon { display: flex; height: 26px; border-radius: 7px; overflow: hidden; border: 1px solid var(--border); font-size: 11px; margin-bottom: 9px; position: relative; }
+  .ribbon .seg { display: flex; align-items: center; justify-content: center; color: var(--muted2); border-right: 1px solid var(--border);
+    white-space: nowrap; overflow: hidden; text-transform: uppercase; font-weight: 600; letter-spacing: .3px; }
+  .ribbon .seg:last-child { border-right: none; } .ribbon .seg.on { color: var(--accent-hi); background: var(--accent-dim); }
+  .ribbon .youare { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--accent-hi); }
+  .legend { display: flex; flex-wrap: wrap; gap: 7px 15px; margin-bottom: 8px; font-size: 12px; }
+  .legend .lg { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); }
+  .legend i { width: 15px; height: 3px; border-radius: 2px; flex-shrink: 0; }
+  .legend i.dash { background: none !important; border-top: 2px dashed currentColor; height: 0; }
+  .legend i.vline { width: 0; height: 12px; border-left: 2px solid currentColor; border-radius: 0; }
+  .legend i.mk { width: 9px; height: 9px; border-radius: 50%; }
+  .chartwrap { flex: 1; position: relative; min-height: 0; overflow: hidden; background: rgba(0,0,0,.22); border: 1px solid var(--border); border-radius: 11px; }
+  .chartwrap svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  #mklayer { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
+  .mkchip { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+  .mkchip .eb { font-family: var(--mono); font-size: 9.5px; font-weight: 700; letter-spacing: .8px; text-transform: uppercase; }
+  .mkchip .ai { font-size: 12.5px; font-weight: 700; color: var(--text); margin-top: 2px; }
+  .mkchip .dc { font-size: 11.5px; color: var(--then); font-family: var(--mono); margin-top: 1px; }
+  .mkchip .caret2 { position: absolute; left: 50%; bottom: -6px; transform: translateX(-50%); font-size: 8px; }
+  #hoverchip { position: absolute; z-index: 3; pointer-events: none; display: none; background: rgba(12,16,24,.96);
+    border: 1px solid var(--border2); border-radius: 9px; padding: 9px 12px; font-size: 12.5px; color: var(--text); line-height: 1.55; min-width: 148px; }
+  #hoverchip .hr { font-family: var(--mono); font-size: 11px; color: var(--muted2); letter-spacing: .5px; text-transform: uppercase; margin-bottom: 5px; }
+  #hoverchip .row { display: flex; align-items: center; gap: 7px; } #hoverchip .row .sw { width: 9px; height: 9px; border-radius: 2px; } #hoverchip .row b { margin-left: auto; }
+  .evidence { margin-top: 14px; }
+  .evTitle { font-family: var(--mono); font-size: 11px; letter-spacing: 1.2px; text-transform: uppercase; color: var(--muted2); margin-bottom: 9px; }
+  .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 9px; }
+  .tile { background: var(--panel2); border: 1px solid var(--border); border-radius: 9px; padding: 9px 12px; display: flex; flex-direction: column; justify-content: center; }
+  .tile .k { font-size: 9.5px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted2); margin-bottom: 5px; }
+  .tile .v { font-size: 18px; font-weight: 700; font-family: var(--mono); font-variant-numeric: tabular-nums; letter-spacing: -.3px; }
+  .tile .sub { font-size: 12px; color: var(--muted); margin-top: 4px; line-height: 1.35; }
+
+  .m-side { width: 340px; flex-shrink: 0; overflow-y: auto; border-left: 1px solid var(--border); padding-left: 18px; font-size: 13.5px; color: var(--muted); line-height: 1.62; }
+  .m-side h4 { font-size: 11px; text-transform: uppercase; letter-spacing: .7px; color: var(--accent-hi); margin: 0 0 13px; font-weight: 600; display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+  .m-side h4.mt { margin-top: 20px; border-top: 1px solid var(--border); padding-top: 16px; color: var(--muted2); }
+  .steps { list-style: none; margin: 0; padding: 0; }
+  .steps li { position: relative; padding: 0 0 15px 28px; }
+  .steps li:last-child { padding-bottom: 0; }
+  .steps li::before { content: attr(data-n); position: absolute; left: 0; top: -1px; width: 19px; height: 19px; border-radius: 50%;
+    background: var(--panel2); border: 1px solid var(--border2); color: var(--accent-hi); font-family: var(--mono); font-size: 10.5px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+  .steps li::after { content: ""; position: absolute; left: 9px; top: 20px; bottom: 2px; width: 1px; background: var(--border2); }
+  .steps li:last-child::after { display: none; }
+  .steps b { color: var(--text); }
+  .assump { margin: 0 0 15px; padding-left: 12px; border-left: 2px solid var(--border2); }
+  .assump .at { color: var(--text); font-weight: 600; font-size: 13px; }
+  .assump .ad { color: var(--muted); font-size: 12.5px; line-height: 1.55; }
+
+  /* top-right corner actions, options button, summary link, drawer */
+  .m-corner { position: absolute; top: 15px; right: 17px; display: flex; gap: 8px; z-index: 3; }
+  #opts-btn { margin-left: auto; background: var(--panel); border: 1px solid var(--border); color: var(--text);
+    font: inherit; font-size: 13px; padding: 6px 12px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+  #opts-btn:hover { background: var(--panel2); }
+  #topbar .sub { color: var(--muted); font-size: 12.5px; text-align: right; }
+  .m-side .more { font-family: var(--font); font-size: 12px; font-weight: 500; white-space: nowrap; }
+  .m-side .more a { color: var(--accent-hi); text-decoration: none; }
+  .m-side .more a:hover { text-decoration: underline; }
+  .m-side .dcnote { margin-top: 14px; padding-top: 13px; border-top: 1px solid var(--border); font-size: 13px; color: var(--muted); line-height: 1.55; }
+  .m-side .dcnote .k { font-family: var(--mono); font-size: 9.5px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted2); display: block; margin-bottom: 4px; }
+  #drawer-scrim { position: fixed; inset: 0; background: rgba(4,6,10,.6); z-index: 50; opacity: 0; pointer-events: none; transition: opacity .2s; }
+  #drawer-scrim.open { opacity: 1; pointer-events: auto; }
+  #drawer { position: fixed; top: 0; right: 0; bottom: 0; width: 420px; max-width: 92vw; background: var(--panel);
+    border-left: 1px solid var(--border2); z-index: 51; transform: translateX(100%); transition: transform .22s ease;
+    padding: 20px 26px 40px; overflow-y: auto; box-shadow: -20px 0 50px rgba(0,0,0,.5); }
+  #drawer.open { transform: none; }
+  .drawer-head { display: flex; align-items: center; justify-content: space-between; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
+  .drawer-head h3 { font-size: 16px; font-weight: 700; letter-spacing: -.2px; }
+  .drawer-note { font-size: 13px; color: var(--muted2); margin: 13px 0 18px; line-height: 1.5; }
+
+  @media (max-width: 1000px) {
+    #topbar .sub { display: none; } #topbar .wiptag { display: none; } #opts-btn { padding: 6px 10px; }
+    #app { flex-direction: column; height: auto; } main.content { overflow: visible; }
+    aside.tree { width: auto; border-left: none; border-top: 1px solid var(--border); }
+    .cardgrid { grid-template-columns: 1fr; }
+    .m-body { flex-direction: column; } .m-side { width: auto; border-left: none; border-top: 1px solid var(--border); padding-left: 0; padding-top: 14px; }
+    .tiles { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+<div id="topbar">
+  <div class="mark">AI</div><div class="brand">Bubble Oracle</div>
+  <nav><a href="#">Dashboard</a><a href="#">Data Sources</a><a href="#">About</a></nav>
+  <span class="wiptag">THEN &amp; NOW · WIP</span>
+  <button id="opts-btn" aria-label="Options">&#9881; Options</button>
+  <div class="sub" id="topsub" style="margin-left:16px">Last update: Jul 7, 2026, 7:29 PM EDT</div>
+</div>
+
+<div id="app">
+  <main class="content">
+    <div class="wrap">
+      <section class="hero" id="hero"></section>
+      <div class="sectitle">Metrics — each rolls up to the headline · click any card for the full view</div>
+      <section class="cardgrid" id="cardgrid"></section>
+    </div>
+  </main>
+  <aside class="tree">
+    <h3>Roll-up hierarchy</h3>
+    <div class="hint">How each metric feeds the headline date. Click a wired node for its full detail.</div>
+    <div id="tree"></div>
+    <div class="legend2">
+      <div class="r"><span class="dot live"></span> Wired metric (has a graph)</div>
+      <div class="r"><span class="dot wip"></span> Not wired yet (WIP branch)</div>
+    </div>
+  </aside>
+</div>
+
+<div id="scrim"></div>
+<div id="modal" role="dialog" aria-modal="true" aria-label="Metric detail">
+  <div class="m-corner">
+    <button class="btn dl">&#10515; Download CSV</button>
+    <button class="btn close" id="m-close" aria-label="Close">&times;</button>
+  </div>
+  <div class="crumb" id="m-crumb"></div>
+  <div class="m-head">
+    <div class="lead">
+      <div class="lbl" id="m-lbl">Projected peak</div>
+      <div class="d" id="m-date"></div>
+      <div class="sub" id="m-sub"></div>
+    </div>
+  </div>
+  <div class="m-body">
+    <div class="m-main">
+      <div class="ribbon" id="m-ribbon"></div>
+      <div class="legend" id="m-legend"></div>
+      <div class="chartwrap" id="chartwrap"><svg id="chart"></svg><div id="mklayer"></div><div id="hoverchip"></div></div>
+      <div class="evidence"><div class="evTitle">Supporting evidence for the peak date</div><div class="tiles" id="m-tiles"></div></div>
+    </div>
+    <div class="m-side"><div id="m-deriv"></div></div>
+  </div>
+</div>
+
+<div id="drawer-scrim"></div>
+<aside id="drawer" aria-label="Options and assumptions">
+  <div class="drawer-head"><h3>Options &amp; assumptions</h3><button class="btn close" id="drawer-close" aria-label="Close">&times;</button></div>
+  <p class="drawer-note">These apply to every metric on this page — the shared method behind every projected date.</p>
+  <div class="drawer-body" id="drawer-body"></div>
+</aside>
+
+<script>
+/* ---------- shared engine constants (from oracle/thennow.py, mirrored) ---------- */
+const PROG_DOT=[0.0,1.88,3.71,5.59,7.42,9.3,11.19,12.95,14.83,16.66,18.54,20.36,22.25,24.13,25.96,27.84,29.67,31.55,33.43,35.14,37.02,38.84,40.73,42.55,44.44,46.32,48.15,50.03,51.85,53.74,55.62,57.33,59.21,61.03,62.92,64.74,66.63,68.51,70.33,72.22,74.04,75.93,77.81,79.51,81.4,83.22,85.11,86.93,88.81,90.7,92.52,94.41,96.23,98.12,100.0,101.76,103.65,105.47,107.36,109.18,111.06,112.95,114.77,116.66,118.48,120.36,122.25,123.95,125.84,127.66,129.54,131.37,133.25,135.14,136.96,138.84,140.67,142.55,144.44,146.14,148.02,149.85,151.73,153.56,155.44,157.33,159.15];
+const PROG_AI=[0.0,1.82,3.71,5.59,7.29,9.18,11.0,12.89,14.71,16.6,18.48,20.3,22.19,24.01,25.9,27.78,29.54,31.43,33.25,35.14,36.96,38.84,40.73,42.55,44.44,46.26,48.15,50.03,51.73,53.62,55.44,57.33,59.15,61.03,62.92,64.74,66.63,68.45,70.33,72.22,73.92,75.81,77.63,79.51,81.34];
+const BOUNDS=[0,35,85,100,160], PHASES=["Early Ramp","Acceleration","Late Bubble","Crash & Bottom","Recovery"];
+const RAMP=1645, XMAX=162, BOTTOM_P=159.15, DAYMS=86400000, NS="http://www.w3.org/2000/svg";
+const ord=iso=>Math.round(Date.parse(iso+"T00:00:00Z")/DAYMS), isoFromOrd=n=>new Date(n*DAYMS).toISOString().slice(0,10);
+const DOT_START=ord("1995-08-01"), DOT_PEAK=ord("2000-02-01"), AI_START=ord("2022-11-01"), TODAY=ord("2026-07-08");
+const r2=x=>Math.round(x*100)/100, r3=x=>Math.round(x*1000)/1000;
+const MON=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const el=id=>document.getElementById(id), mk=(t,a)=>{const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);return e;};
+const fmtNice=iso=>{const d=new Date(iso+"T00:00:00Z");return MON[d.getUTCMonth()]+" "+d.getUTCDate()+", "+d.getUTCFullYear();};
+const fmtMY=dt=>MON[dt.getUTCMonth()]+" "+dt.getUTCFullYear(), fmtMYs=dt=>MON[dt.getUTCMonth()]+" '"+String(dt.getUTCFullYear()).slice(2);
+
+/* ---------- the two real leaves ---------- */
+const PRICE_DOT=[0.0,0.0004,0.0043,0.0051,0.0075,0.0115,0.0164,0.0293,0.0435,0.0518,0.0409,0.0308,0.035,0.0489,0.0638,0.0702,0.0858,0.0874,0.0806,0.0688,0.0778,0.0996,0.1326,0.151,0.1751,0.1751,0.1764,0.165,0.1676,0.1844,0.2106,0.2352,0.236,0.2419,0.2423,0.2146,0.1948,0.1848,0.2293,0.2786,0.3512,0.3847,0.4113,0.4149,0.433,0.4552,0.4647,0.4912,0.4972,0.5296,0.5886,0.7194,0.8157,0.9502,1.0,0.9921,0.864,0.804,0.7948,0.8744,0.8454,0.8061,0.6471,0.5282,0.4692,0.4251,0.3628,0.2979,0.2938,0.3255,0.3166,0.2865,0.2211,0.1877,0.2001,0.2448,0.2689,0.2492,0.2388,0.2145,0.2031,0.1653,0.1297,0.0999,0.0712,0.0713,0.065];
+const PRICE_AI=[0.0,0.0057,0.0056,0.022,0.0279,0.0417,0.0563,0.076,0.0862,0.0809,0.067,0.0688,0.0855,0.107,0.1243,0.1371,0.1416,0.1476,0.1602,0.1783,0.1874,0.1916,0.1962,0.2102,0.2207,0.2349,0.2315,0.2128,0.1925,0.1949,0.2235,0.2577,0.2795,0.3008,0.325,0.3428,0.3482,0.3457,0.3392,0.3239,0.3372,0.3772,0.4202,0.429,0.4201];
+const CAPE_DOT=[0.0,0.0055,0.0238,0.0425,0.0567,0.0845,0.0948,0.1061,0.1034,0.109,0.0994,0.0926,0.0878,0.1155,0.1527,0.1877,0.2194,0.2482,0.2667,0.2539,0.2653,0.3073,0.3961,0.4415,0.4657,0.4681,0.4638,0.4702,0.4695,0.5103,0.5662,0.6418,0.6802,0.6889,0.7059,0.6796,0.6236,0.5466,0.58,0.6707,0.7873,0.8392,0.8826,0.9191,0.9559,0.9702,0.9895,0.9789,0.9642,0.908,0.9299,0.9791,1.0343,1.0166,1.0,0.9959,0.9921,0.9846,0.9712,0.9868,0.9715,0.9136,0.8435,0.7643,0.7233,0.6728,0.5879,0.5055,0.4753,0.4882,0.488,0.4422,0.3497,0.2883,0.2645,0.313,0.3421,0.3264,0.3228,0.301,0.2845,0.2177,0.1226,0.0447,-0.0243,-0.0501,-0.0746];
+const CAPE_AI=[0.2437,0.2436,0.2528,0.2463,0.2537,0.2509,0.2852,0.3216,0.3444,0.342,0.3044,0.3031,0.3313,0.3874,0.4393,0.4789,0.4971,0.5098,0.5278,0.5698,0.592,0.6073,0.6263,0.6654,0.7,0.7095,0.7065,0.6563,0.579,0.5429,0.5656,0.6488,0.6963,0.7386,0.77,0.7945,0.8159,0.8282,0.8325,0.7952,0.7763,0.8032,0.866,0.9117,0.9179];
+
+const TREE={key:"ai_peak",label:"AI bubble bursts",children:[
+  {key:"valuation",label:"Valuation",children:[
+    {key:"price_appreciation",label:"Price appreciation",leaf:"price",unit:"Nasdaq index",intensityDot:PRICE_DOT,intensityAi:PRICE_AI,
+     display:"up 2.4× since ChatGPT",
+     different:"Up about 2.4× since ChatGPT vs roughly 4.3× for the dot-com Nasdaq into 2000, so on price alone AI reads earlier and less stretched."},
+    {key:"valuation_multiple",label:"Valuation multiple",leaf:"cape",unit:"Shiller CAPE",intensityDot:CAPE_DOT,intensityAi:CAPE_AI,
+     display:"CAPE 41",
+     different:"CAPE is about 41 now against roughly 43 at the 2000 peak, so on valuation multiple AI is already close to dot-com's top."}]},
+  {key:"market_concentration",label:"Market concentration",wip:true},
+  {key:"capex",label:"Infrastructure / capex",wip:true},
+  {key:"speculation",label:"Speculative activity",wip:true}]};
+
+/* ---------- engine subset ---------- */
+function phaseOf(p){let l=PHASES[0];BOUNDS.forEach((e,i)=>{if(p>=e)l=PHASES[i];});return l;}
+function match(target,prog,inten){const ramp=[];for(let i=0;i<prog.length;i++)if(inten[i]!=null&&prog[i]<=100)ramp.push([prog[i],inten[i]]);
+  if(!ramp.length)return{progress:0};const last=ramp[ramp.length-1];if(target>=last[1])return{progress:last[0]};if(target<=ramp[0][1])return{progress:ramp[0][0]};
+  for(let i=1;i<ramp.length;i++){const[p0,v0]=ramp[i-1],[p1,v1]=ramp[i];if(v1===v0)continue;if((v0-target)*(v1-target)<=0){const f=(target-v0)/(v1-v0);return{progress:p0+f*(p1-p0)};}}return{progress:last[0]};}
+function evaluate(intDot,intAi){let aiNow=0;for(let i=intAi.length-1;i>=0;i--)if(intAi[i]!=null){aiNow=intAi[i];break;}
+  const eq=match(aiNow,PROG_DOT,intDot).progress, equivOrd=DOT_START+Math.round(eq/100*RAMP), aiElapsed=TODAY-AI_START;
+  const dotDone=Math.max(eq,0)/100*RAMP, ratio=dotDone>0?aiElapsed/dotDone:1, dotLeft=Math.max(100-eq,0)/100*RAMP, projOrd=TODAY+Math.round(ratio*dotLeft);
+  return{intensityNow:r3(aiNow),equivProg:eq,equivalentDotcomDate:isoFromOrd(equivOrd),daysFromPeak:equivOrd-DOT_PEAK,
+    compression:r2(ratio),projectedPeakDate:isoFromOrd(projOrd),phase:phaseOf(eq)};}
+function blend(arrays){const n=arrays[0].length,out=[];for(let i=0;i<n;i++){let s=0,d=0;arrays.forEach(a=>{if(a[i]!=null){s+=a[i];d++;}});out.push(d?s/d:null);}return out;}
+function liveKids(n){return(n.children||[]).filter(c=>!c.wip);}
+function compute(node){
+  if(node.leaf){Object.assign(node,evaluate(node.intensityDot,node.intensityAi));return;}
+  const kids=liveKids(node);kids.forEach(compute);if(!kids.length)return;
+  node.intensityDot=blend(kids.map(c=>c.intensityDot));node.intensityAi=blend(kids.map(c=>c.intensityAi));
+  Object.assign(node,evaluate(node.intensityDot,node.intensityAi));}
+compute(TREE);
+const PARENT={};(function link(n){(n.children||[]).forEach(c=>{PARENT[c.key]=n;link(c);});})(TREE);
+const NODES={};(function idx(n){NODES[n.key]=n;(n.children||[]).forEach(idx);})(TREE);
+function tierOf(n){return n.leaf?("leaf · "+n.unit):PARENT[n.key]?"roll-up":"root · all metrics";}
+function crumbOf(n){const p=[];let c=n;while(c){p.unshift(c);c=PARENT[c.key];}return p;}
+
+/* projected bottom (extend the arc past the peak at the node's pace) */
+function bottomDate(node){const d=TODAY+Math.round(node.compression*(BOTTOM_P-node.equivProg)/100*RAMP);return isoFromOrd(d);}
+function aiDateFor(node,p){const aiK=node.equivProg/PROG_AI[PROG_AI.length-1],TD=TODAY-AI_START;
+  const d=p<=node.equivProg?p/aiK*RAMP/100:TD+node.compression*(p-node.equivProg)/100*RAMP;return new Date((AI_START+d)*DAYMS);}
+function aiDaysToProg(node,d){const aiK=node.equivProg/PROG_AI[PROG_AI.length-1],TD=TODAY-AI_START;
+  return d<=TD?d*aiK*100/RAMP:node.equivProg+(d-TD)/(node.compression*RAMP)*100;}
+const interp=(xs,ys,x)=>{if(x<=xs[0])return ys[0];for(let i=1;i<xs.length;i++){if(x<=xs[i]){const a=ys[i-1],b=ys[i];return a+(x-xs[i-1])/((xs[i]-xs[i-1])||1)*(b-a);}}return ys[ys.length-1];};
+
+/* ---------- HERO ---------- */
+function renderHero(){
+  const root=TREE, leaves=[NODES.price_appreciation,NODES.valuation_multiple];
+  const dates=leaves.map(l=>l.projectedPeakDate).sort();
+  el("hero").innerHTML=
+    `<div class="eyebrow">Projected · AI era peak</div>`+
+    `<div class="lead">Blended across the wired metrics, the AI bubble tops out on</div>`+
+    `<div class="bigdate">${fmtNice(root.projectedPeakDate)}</div>`+
+    `<div class="arc">`+
+      `<span class="seg"><span class="dot" style="background:var(--then)"></span>Started <b>Nov 2022</b></span><span class="to">→</span>`+
+      `<span class="seg"><span class="dot" style="background:var(--accent-hi)"></span>Today <b>${(root.intensityNow*100).toFixed(0)}%</b> of the way</span><span class="to">→</span>`+
+      `<span class="seg"><span class="dot" style="background:var(--peak)"></span>Peak <b>${fmtMY(new Date(root.projectedPeakDate+"T00:00:00Z"))}</b></span><span class="to">→</span>`+
+      `<span class="seg"><span class="dot" style="background:var(--bottom)"></span>Bottom <b>${fmtMY(new Date(bottomDate(root)+"T00:00:00Z"))}</b></span>`+
+    `</div>`+
+    `<div class="chips"><span class="chip">Range <b>${fmtNice(dates[0])} – ${fmtNice(dates[dates.length-1])}</b></span>`+
+      `<span class="chip">Metrics live <b>1 of 4</b></span><span class="chip">As of <b>2026-07-08</b></span></div>`;
+}
+
+/* ---------- mini card sparkline ---------- */
+function drawMini(node,svg){const w=svg.clientWidth||300,h=78;svg.setAttribute("viewBox",`0 0 ${w} ${h}`);svg.innerHTML="";
+  const P={l:2,r:2,t:8,b:8},all=node.intensityDot.concat(node.intensityAi),yMax=Math.max(1.05,Math.max(...all)),yMin=Math.min(0,Math.min(...all));
+  const X=p=>P.l+(w-P.l-P.r)*p/XMAX,Y=v=>P.t+(h-P.t-P.b)*(1-(v-yMin)/(yMax-yMin));
+  const aiK=node.equivProg/PROG_AI[PROG_AI.length-1],aiP=PROG_AI.map(p=>p*aiK);
+  const line=(pts,c,wd,dash)=>{let d="";pts.forEach(([p,v],i)=>d+=(i?"L":"M")+` ${X(p)} ${Y(v)} `);const a={d,fill:"none",stroke:c,"stroke-width":wd};if(dash)a["stroke-dasharray"]=dash;svg.appendChild(mk("path",a));};
+  if(yMin<0){const y0=Y(0);svg.appendChild(mk("line",{x1:P.l,y1:y0,x2:w-P.r,y2:y0,stroke:"var(--border)","stroke-width":1}));}
+  const dc=PROG_DOT.map((p,i)=>[p,node.intensityDot[i]]).filter(pt=>pt[0]<=node.equivProg);dc.push([node.equivProg,interp(PROG_DOT,node.intensityDot,node.equivProg)]);
+  line(dc,"var(--then)",1.2,"4 3");
+  const proj=[[node.equivProg,node.intensityNow]];for(let i=0;i<PROG_DOT.length;i++)if(PROG_DOT[i]>node.equivProg)proj.push([PROG_DOT[i],node.intensityDot[i]]);
+  line(proj,"var(--accent-hi)",1.4,"4 3");
+  line(aiP.map((p,i)=>[p,node.intensityAi[i]]),"var(--accent-hi)",2);
+  svg.appendChild(mk("circle",{cx:X(node.equivProg),cy:Y(node.intensityNow),r:3,fill:"var(--accent-hi)",stroke:"var(--bg)","stroke-width":1}));
+}
+
+/* ---------- CARDS ---------- */
+function renderCards(){
+  const grid=el("cardgrid");grid.innerHTML="";
+  (function walk(n){(n.children||[]).forEach(c=>{addCard(c);walk(c);});})(TREE);
+  // order: put root card first
+  grid.insertBefore(makeCard(TREE),grid.firstChild);
+  document.querySelectorAll(".mcard[data-key]").forEach(c=>{const k=c.getAttribute("data-key");const s=c.querySelector("svg");if(s&&NODES[k].intensityDot)drawMini(NODES[k],s);});
+}
+function addCard(n){el("cardgrid").appendChild(makeCard(n));}
+function makeCard(n){
+  const c=document.createElement("div");c.className="mcard"+(n.wip?" wip":"");c.setAttribute("data-key",n.key);
+  if(n.wip){c.innerHTML=`<div class="top"><span class="name">${n.label}</span><span class="tier">WIP</span></div>`+
+    `<div class="soon">Ingestion and dot-com alignment for this branch arrive later. It doesn't affect the projection yet.</div>`+
+    `<div class="foot"><span>not wired</span><span class="int">—</span></div>`;return c;}
+  c.innerHTML=`<div class="top"><span class="name">${n.label}</span><span class="tier">${tierOf(n)}</span><span class="open">expand ↗</span></div>`+
+    `<div class="lbl">Projected peak</div><div class="date">${fmtNice(n.projectedPeakDate)}</div>`+
+    `<div class="mini"><svg></svg></div>`+
+    `<div class="foot"><span class="phase">${n.phase}</span><span class="int">Intensity <b>${(n.intensityNow*100).toFixed(0)}%</b></span></div>`;
+  c.addEventListener("click",()=>openNode(n.key));
+  return c;
+}
+
+/* ---------- SIDEBAR TREE ---------- */
+function renderTree(){el("tree").innerHTML="";el("tree").appendChild(treeNode(TREE));}
+function treeNode(n){
+  const wrap=document.createElement("div");wrap.className="snode";
+  const row=document.createElement("div");row.className="srow"+(n.wip?" wip":"");
+  const kids=(n.children||[]);
+  row.innerHTML=`<span class="caret${kids.length?"":" leaf"}">▾</span><span class="dot ${n.wip?"wip":"live"}"></span>`+
+    `<span class="slabel">${n.label}</span>`+
+    `<span class="sdate"><span class="l">${n.wip?"status":"peak"}</span>${n.wip?"WIP":fmtNice(n.projectedPeakDate)}</span>`;
+  if(!n.wip)row.addEventListener("click",()=>openNode(n.key));
+  wrap.appendChild(row);
+  if(kids.length){const box=document.createElement("div");box.className="schildren";kids.forEach(c=>box.appendChild(treeNode(c)));wrap.appendChild(box);}
+  return wrap;
+}
+
+/* ---------- MODAL ---------- */
+let CUR=null;
+const LEG=`<span class="lg" style="color:var(--then)"><i class="dash"></i>Dot-com (past)</span>`+
+  `<span class="lg" style="color:var(--accent-hi)"><i style="background:var(--accent-hi)"></i>AI path (actual)</span>`+
+  `<span class="lg" style="color:var(--accent-hi)"><i class="dash"></i>AI projection</span>`+
+  `<span class="lg" style="color:var(--text)"><i class="vline"></i>Today</span>`+
+  `<span class="lg" style="color:var(--peak)"><i class="mk" style="background:var(--peak)"></i>Peak</span>`+
+  `<span class="lg" style="color:var(--bottom)"><i class="mk" style="background:var(--bottom)"></i>Bottom</span>`;
+function openNode(key){
+  const n=NODES[key];if(!n||n.wip)return;CUR=n;
+  el("m-crumb").innerHTML=crumbOf(n).map((c,i,a)=>`${i?'<span class="sep">›</span>':''}<span class="${i===a.length-1?'here':''}">${c.label}</span>`).join("");
+  el("m-lbl").textContent=n.leaf?"Projected peak — "+n.label:"Projected peak — "+n.label+" (blended)";
+  el("m-date").textContent=fmtNice(n.projectedPeakDate);
+  const bd=bottomDate(n);
+  el("m-sub").innerHTML=`Today it's <b>${(n.intensityNow*100).toFixed(0)}%</b> of the way to the 2000 peak (${n.phase}); if the arc holds, a projected bottom around <b>${fmtMY(new Date(bd+"T00:00:00Z"))}</b>.`;
+  el("m-legend").innerHTML=LEG;
+  el("m-tiles").innerHTML=tilesHtml(n);
+  el("m-deriv").innerHTML=derivHtml(n);
+  buildRibbon(n);
+  el("scrim").classList.add("open");el("modal").classList.add("open");
+  requestAnimationFrame(()=>drawBig(n));
+}
+function closeModal(){el("scrim").classList.remove("open");el("modal").classList.remove("open");CUR=null;}
+function tilesHtml(n){const before=n.daysFromPeak<0;const t=[
+  ["intensity now",`${(n.intensityNow*100).toFixed(0)}%`,"of the run to the peak"],
+  ["today",n.display||"blended",n.leaf?n.unit:"weighted mean"],
+  ["matches dot-com",n.equivalentDotcomDate,n.phase],
+  ["pace vs dot-com",`${n.compression}×`,n.compression<1?"faster":"slower"]];
+  return t.map(([k,v,s])=>`<div class="tile"><span class="k">${k}</span><span class="v">${v}</span><span class="sub">${s}</span></div>`).join("");}
+function derivHtml(n){const bd=bottomDate(n);
+  const lead=n.leaf
+    ? `Today's reading is <b>${(n.intensityNow*100).toFixed(0)}%</b> of the way to the 2000 peak (${n.display}).`
+    : `Equal-weight blend of ${liveKids(n).map(c=>c.label).join(" + ")} → <b>${(n.intensityNow*100).toFixed(0)}%</b>.`;
+  const rows=[lead,
+    `Matches the dot-com path at <b>${n.equivProg.toFixed(1)}%</b> — <b>${n.equivalentDotcomDate}</b> (${n.phase}), ${Math.abs(n.daysFromPeak)} days ${n.daysFromPeak<0?"before":"after"} the peak.`,
+    `Extending that arc at <b>${n.compression}×</b> pace projects the peak on <b>${n.projectedPeakDate}</b> and the bottom around <b>${bd}</b>.`];
+  return `<h4>How this date is derived <span class="more"><a href="datasources.html">full method &amp; sources ↗</a></span></h4>`+
+    `<ol class="steps">${rows.map((r,i)=>`<li data-n="${i+1}">${r}</li>`).join("")}</ol>`+
+    (n.leaf&&n.different?`<div class="dcnote"><span class="k">vs dot-com</span>${n.different}</div>`:"");
+}
+/* global options & assumptions — one shared drawer for every chart */
+const DRAWER_ITEMS=[
+  ["Cycle anchors","The AI era starts Nov 2022 (ChatGPT launch); the dot-com era starts Aug 1995 (Netscape IPO). Both are pinned to a single defining launch so the origins line up."],
+  ["Peak (100%)","The month the smoothed Nasdaq tops out, Feb 2000 — a hair earlier than the intraday 2000-03-10 high because of smoothing."],
+  ["Bottom","The dot-com low, Oct 2002. On the AI clock each metric's projected bottom scales by its own measured pace."],
+  ["Smoothing","A centered 3-month average on each monthly series, so the matching point reads cleanly."],
+  ["Matching point","Today's level maps to the first date the dot-com path reached it on the way up; if it crosses that level twice, the earliest wins."],
+  ["Phase bands","Editorial splits on the Netscape-to-peak clock; they set the phase label, not the projected date."],
+  ["Projection","Past today, AI is assumed to trace the remaining dot-com shape at the measured pace — a transparent method, not a forecast."],
+  ["Weighting","Parents blend their children (equal weight by default). Change the weights and every date downstream moves."]
+];
+function renderDrawer(){el("drawer-body").innerHTML=DRAWER_ITEMS.map(([t,d])=>`<div class="assump"><div class="at">${t}</div><div class="ad">${d}</div></div>`).join("");}
+function openDrawer(){el("drawer-scrim").classList.add("open");el("drawer").classList.add("open");}
+function closeDrawer(){el("drawer-scrim").classList.remove("open");el("drawer").classList.remove("open");}
+function buildRibbon(n){const r=el("m-ribbon");r.innerHTML="";
+  [["Early Ramp",0,35],["Acceleration",35,85],["Late Bubble",85,100],["Crash & Bottom",100,162]].forEach(([nm,lo,hi])=>{
+    const s=document.createElement("div");s.className="seg"+(n.equivProg>=lo&&n.equivProg<hi?" on":"");s.style.flex=(hi-lo)/162;s.textContent=nm;r.appendChild(s);});
+  const y=document.createElement("div");y.className="youare";y.style.left=(n.equivProg/162*100)+"%";r.appendChild(y);}
+
+let MAP=null;
+function drawBig(n){
+  const wrap=el("chartwrap"),svg=el("chart"),W=wrap.clientWidth,H=wrap.clientHeight;if(!W||!H)return;
+  svg.setAttribute("viewBox",`0 0 ${W} ${H}`);svg.innerHTML="";
+  const PAD={l:56,r:34,t:90,b:62},plotW=W-PAD.l-PAD.r,plotH=H-PAD.t-PAD.b;
+  const all=n.intensityDot.concat(n.intensityAi),yMax=Math.max(1.12,Math.max(...all)*1.06),yMin=Math.min(0,Math.min(...all));
+  const X=p=>PAD.l+plotW*p/XMAX,Y=v=>PAD.t+plotH*(1-(v-yMin)/(yMax-yMin));
+  const aiK=n.equivProg/PROG_AI[PROG_AI.length-1],aiP=PROG_AI.map(p=>p*aiK),yb=H-PAD.b;
+  MAP={X,Y,aiP,PAD,W,H,n};
+  const defs=mk("defs");defs.innerHTML=`<linearGradient id="aiFill" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stop-color="#57a6ff" stop-opacity=".2"/><stop offset="100%" stop-color="#57a6ff" stop-opacity="0"/></linearGradient>`;svg.appendChild(defs);
+  [0,0.25,0.5,0.75,1.0].forEach(v=>{if(v<yMin||v>yMax)return;const y=Y(v);svg.appendChild(mk("line",{x1:PAD.l,y1:y,x2:W-PAD.r,y2:y,stroke:"var(--border)","stroke-width":1}));
+    const t=mk("text",{x:PAD.l-8,y:y+4,fill:"var(--muted2)","font-size":12.5,"text-anchor":"end","font-family":"var(--mono)"});t.textContent=(v*100).toFixed(0)+"%";svg.appendChild(t);});
+  if(yMin<0){const y0=Y(0);svg.appendChild(mk("line",{x1:PAD.l,y1:y0,x2:W-PAD.r,y2:y0,stroke:"var(--border2)","stroke-width":1}));}
+  // AI month-year axis
+  svg.appendChild(mk("line",{x1:PAD.l,y1:yb,x2:X(n.equivProg),y2:yb,stroke:"var(--muted2)","stroke-width":1.2}));
+  svg.appendChild(mk("line",{x1:X(n.equivProg),y1:yb,x2:W-PAD.r,y2:yb,stroke:"var(--muted2)","stroke-width":1.2,"stroke-dasharray":"4 4","stroke-opacity":.7}));
+  for(let yr=2022;yr<=2031;yr++){const d=(Date.UTC(yr,10,1)/DAYMS)-AI_START,p=aiDaysToProg(n,d);if(p<0||p>XMAX)continue;const x=X(p);
+    svg.appendChild(mk("line",{x1:x,y1:yb,x2:x,y2:yb+5,stroke:"var(--muted2)","stroke-width":1}));
+    const t=mk("text",{x:x,y:yb+19,fill:"var(--muted)","font-size":12,"text-anchor":"middle","font-family":"var(--mono)"});t.textContent=fmtMYs(new Date(Date.UTC(yr,10,1)));svg.appendChild(t);}
+  const axl=mk("text",{x:PAD.l,y:yb+36,fill:"var(--accent-hi)","font-size":11,"font-family":"var(--mono)"});axl.textContent="AI ERA · ACTUAL → PROJECTED";svg.appendChild(axl);
+  const poly=(pts,c,w,dash)=>{let d="";pts.forEach(([p,v],i)=>d+=(i?"L":"M")+` ${X(p)} ${Y(v)} `);const a={d,fill:"none",stroke:c,"stroke-width":w,"stroke-linejoin":"round","stroke-linecap":"round"};if(dash)a["stroke-dasharray"]=dash;svg.appendChild(mk("path",a));};
+  const projPts=[[n.equivProg,n.intensityNow]];for(let i=0;i<PROG_DOT.length;i++)if(PROG_DOT[i]>n.equivProg)projPts.push([PROG_DOT[i],n.intensityDot[i]]);
+  let aa=`M ${X(aiP[0])} ${Y(0)} `;for(let i=0;i<aiP.length;i++)aa+=`L ${X(aiP[i])} ${Y(n.intensityAi[i])} `;aa+=`L ${X(aiP[aiP.length-1])} ${Y(0)} Z`;svg.appendChild(mk("path",{d:aa,fill:"url(#aiFill)"}));
+  // dot-com: grey dashed (the past), only up to convergence — past today it's the blue dashed line that carries it
+  const dcPts=PROG_DOT.map((p,i)=>[p,n.intensityDot[i]]).filter(pt=>pt[0]<=n.equivProg);
+  dcPts.push([n.equivProg,interp(PROG_DOT,n.intensityDot,n.equivProg)]);
+  poly(dcPts,"var(--then)",1.8,"5 4");
+  poly(projPts,"var(--accent-hi)",2.4,"7 5");
+  poly(aiP.map((p,i)=>[p,n.intensityAi[i]]),"var(--accent-hi)",2.9);
+  const MARKS=[{id:"begin",p:0,eb:"START",ebc:"var(--then)",col:"var(--then)",dash:"",dc:"Aug 1995 · Netscape IPO",evt:" · ChatGPT",row:0,align:"L"},
+    {id:"today",p:n.equivProg,eb:"TODAY",ebc:"var(--text)",col:"var(--text)",dash:"3 4",dc:n.equivalentDotcomDate.slice(0,7),evt:"",row:1,align:"C"},
+    {id:"peak",p:100,eb:"PROJECTED PEAK",ebc:"var(--peak)",col:"var(--peak)",dash:"3 3",dc:"Feb 2000",evt:"",row:0,align:"C"},
+    {id:"bottom",p:BOTTOM_P,eb:"PROJECTED BOTTOM",ebc:"var(--bottom)",col:"var(--bottom)",dash:"3 3",dc:"Oct 2002",evt:"",row:1,align:"R"}];
+  MARKS.forEach(m=>{const x=X(m.p);svg.appendChild(mk("line",{x1:x,y1:PAD.t,x2:x,y2:yb,stroke:m.col,"stroke-width":m.id==="today"?1.6:1.4,"stroke-dasharray":m.dash,"stroke-opacity":m.id==="begin"?.55:.9}));});
+  svg.appendChild(mk("circle",{cx:X(n.equivProg),cy:Y(n.intensityNow),r:6,fill:"var(--then)"}));
+  svg.appendChild(mk("circle",{cx:X(n.equivProg),cy:Y(n.intensityNow),r:3.8,fill:"var(--accent-hi)",stroke:"var(--bg)","stroke-width":1.5}));
+  svg.appendChild(mk("circle",{cx:X(100),cy:Y(interp(PROG_DOT,n.intensityDot,100)),r:5,fill:"var(--peak)",stroke:"var(--bg)","stroke-width":1.5}));
+  svg.appendChild(mk("circle",{cx:X(BOTTOM_P),cy:Y(interp(PROG_DOT,n.intensityDot,BOTTOM_P)),r:5,fill:"var(--bottom)",stroke:"var(--bg)","stroke-width":1.5}));
+  const layer=el("mklayer");layer.innerHTML="";
+  MARKS.forEach(m=>{const x=X(m.p),c=document.createElement("div");c.className="mkchip";
+    c.style.left=x+"px";c.style.top=(m.row===0?6:44)+"px";
+    c.style.transform=m.align==="L"?"translateX(-10px)":m.align==="R"?"translateX(calc(-100% + 10px))":"translateX(-50%)";
+    c.innerHTML=`<div class="eb" style="color:${m.ebc}">${m.eb}</div><div class="ai">${fmtMY(aiDateFor(n,m.p))}${m.evt}</div><div class="dc">${m.dc}</div><div class="caret2" style="color:${m.col}">▼</div>`;
+    layer.appendChild(c);});
+}
+function onMove(e){if(!MAP)return;const svg=el("chart"),chip=el("hoverchip"),r=svg.getBoundingClientRect(),n=MAP.n;
+  let x=Math.max(MAP.PAD.l,Math.min(MAP.W-MAP.PAD.r,e.clientX-r.left));const p=(x-MAP.PAD.l)/((MAP.W-MAP.PAD.l-MAP.PAD.r)||1)*XMAX;
+  drawBig(n);el("chart").appendChild(mk("line",{x1:x,y1:MAP.PAD.t,x2:x,y2:MAP.H-MAP.PAD.b,stroke:"rgba(238,241,246,.5)","stroke-width":1}));
+  const dotV=interp(PROG_DOT,n.intensityDot,p),proj=p>n.equivProg,aiV=proj?dotV:interp(MAP.aiP,n.intensityAi,p);
+  chip.style.display="block";chip.innerHTML=`<div class="hr">${fmtMY(aiDateFor(n,p))} · ${p.toFixed(0)}%</div>`+
+    `<div class="row"><span class="sw" style="background:var(--then)"></span>Dot-com<b>${(dotV*100).toFixed(0)}%</b></div>`+
+    `<div class="row"><span class="sw" style="background:var(--accent-hi)"></span>AI${proj?" (proj)":""}<b>${(aiV*100).toFixed(0)}%</b></div>`;
+  const cw=chip.offsetWidth;let cx=x+14;if(cx+cw>MAP.W-8)cx=x-cw-14;chip.style.left=cx+"px";chip.style.top=(MAP.PAD.t+10)+"px";}
+
+renderHero();renderCards();renderTree();renderDrawer();
+el("m-close").addEventListener("click",closeModal);
+el("scrim").addEventListener("click",closeModal);
+el("opts-btn").addEventListener("click",openDrawer);
+el("drawer-close").addEventListener("click",closeDrawer);
+el("drawer-scrim").addEventListener("click",closeDrawer);
+document.addEventListener("keydown",e=>{if(e.key==="Escape"){closeModal();closeDrawer();}});
+el("chart").addEventListener("mousemove",onMove);
+el("chart").addEventListener("mouseleave",()=>{el("hoverchip").style.display="none";if(CUR)drawBig(CUR);});
+window.addEventListener("resize",()=>{document.querySelectorAll(".mcard[data-key]").forEach(c=>{const k=c.getAttribute("data-key"),s=c.querySelector("svg");if(s&&NODES[k].intensityDot)drawMini(NODES[k],s);});if(CUR)drawBig(CUR);});
+</script>
+</body>
+</html>
