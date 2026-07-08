@@ -226,6 +226,14 @@
     .m-body { flex-direction: column; } .m-side { width: auto; border-left: none; border-top: 1px solid var(--border); padding-left: 0; padding-top: 14px; }
     .chartwrap { min-height: 320px; } .tiles { grid-template-columns: 1fr 1fr; }
   }
+  /* Narrow widths: markers can crowd, so drop the dual chip to a single line
+     (AI date + label only) and tighten it. The dot-com date stays in the hover. */
+  @media (max-width: 640px) {
+    .mkchip .dc { display: none; }
+    .mkchip .ai { font-size: 11px; }
+    .mkchip .eb { font-size: 8px; letter-spacing: .5px; }
+    .tiles { grid-template-columns: 1fr; }
+  }
 </style>
 </head>
 <body>
@@ -308,6 +316,8 @@ let MATCH_MODE = "dominant";
 // Which materialized smoothing window the graphs read: "90" (3-month, default) or
 // "30" (1-month). The drawer toggle swaps it and every date recomputes.
 let SMOOTH = "90";
+// The declared 2002-low progress %, canonical from the engine payload.
+const BOTTOM_PROG = DATA.bottomProgress;
 const DOT_START = ord(DATA.dotcomStart), DOT_PEAK = ord(DATA.dotcomPeak);
 const AI_START = ord(DATA.aiStart), TODAY = ord(DATA.asOf);
 const PROG_DOT = DATA.progDot, PROG_AI = DATA.progAi;
@@ -345,8 +355,9 @@ function evaluate(intDot, intAi) {
   const eq = match(aiNow, PROG_DOT, intDot, MATCH_MODE).progress, equivOrd = DOT_START + Math.round(eq / 100 * RAMP);
   const aiElapsed = TODAY - AI_START, dotDone = Math.max(eq, 0) / 100 * RAMP;
   const ratio = dotDone > 0 ? aiElapsed / dotDone : 1, dotLeft = Math.max(100 - eq, 0) / 100 * RAMP, projOrd = TODAY + Math.round(ratio * dotLeft);
+  const bottomOrd = TODAY + Math.round(ratio * Math.max(BOTTOM_PROG - eq, 0) / 100 * RAMP);
   return { intensityNow: r3(aiNow), equivProg: eq, equivalentDotcomDate: isoFromOrd(equivOrd), daysFromPeak: equivOrd - DOT_PEAK,
-    compression: r2(ratio), projectedPeakDate: isoFromOrd(projOrd), phase: phaseOf(eq),
+    compression: r2(ratio), projectedPeakDate: isoFromOrd(projOrd), projectedBottomDate: isoFromOrd(bottomOrd), phase: phaseOf(eq),
     equiv: { progress: eq, intensity: aiNow } };
 }
 function blend(arrays, weights) {
@@ -380,13 +391,6 @@ function tierOf(n) { return n.leaf ? ("leaf · " + (n.unitLabel || "index")) : P
 function crumbOf(n) { const p = []; let c = n; while (c) { p.unshift(c); c = PARENT[c.key]; } return p; }
 
 /* the real dot-com crash low (recompute BOTTOM_P now that arrays exist) */
-const BOTTOM_PROG = (function () {
-  const arr = NODES.price_appreciation ? NODES.price_appreciation.intensityDot : DATA.tree.intensityDot;
-  let bi = arr.length - 1, bv = Infinity;
-  for (let i = 0; i < arr.length; i++) if (PROG_DOT[i] > 100 && arr[i] != null && arr[i] < bv) { bv = arr[i]; bi = i; }
-  return PROG_DOT[bi];
-})();
-
 const interp = (xs, ys, x) => { if (x <= xs[0]) return ys[0];
   for (let i = 1; i < xs.length; i++) { if (x <= xs[i]) { const a = ys[i - 1], b = ys[i]; if (a == null) return b; if (b == null) return a; return a + (x - xs[i - 1]) / ((xs[i] - xs[i - 1]) || 1) * (b - a); } }
   return ys[ys.length - 1]; };
@@ -400,7 +404,6 @@ function aiOrdAt(n, p) { const k = aiK(n), TD = TODAY - AI_START;
   return AI_START + Math.round(days); }
 function aiProgFromDays(n, d) { const k = aiK(n), TD = TODAY - AI_START;
   return d <= TD ? d * k * 100 / RAMP : n.equiv.progress + (d - TD) / (n.compression * RAMP) * 100; }
-function bottomIso(n) { return isoFromOrd(aiOrdAt(n, BOTTOM_PROG)); }
 function leafVals(n) {
   if (!n.leaf) return null;
   const dotStart = n.smoothedDot[0], aiStart = n.smoothedAi[0], peakMult = n.smoothedDot[PEAK_IDX] / dotStart;
@@ -427,10 +430,10 @@ function renderHero() {
       `<span class="seg"><span class="adot" style="background:var(--then)"></span>Started <b>${fmtMY(DATA.aiStart)}</b></span><span class="to">→</span>` +
       `<span class="seg"><span class="adot" style="background:var(--accent-hi)"></span>Today <b>${(root.intensityNow * 100).toFixed(0)}%</b> of the way</span><span class="to">→</span>` +
       `<span class="seg"><span class="adot" style="background:var(--peak)"></span>Peak <b>${fmtMY(root.projectedPeakDate)}</b></span><span class="to">→</span>` +
-      `<span class="seg"><span class="adot" style="background:var(--bottom)"></span>Bottom <b>${fmtMY(bottomIso(root))}</b></span>` +
+      `<span class="seg"><span class="adot" style="background:var(--bottom)"></span>Bottom <b>${fmtMY(root.projectedBottomDate)}</b></span>` +
     `</div>` +
     `<div class="chips"><span class="chip">Range <b>${fmtNice(leaves[0])} – ${fmtNice(leaves[leaves.length - 1])}</b></span>` +
-      `<span class="chip">Metrics live <b>${(root.children || []).filter(c => !c.wip).length} of ${(root.children || []).length}</b></span><span class="chip">As of <b>${DATA.asOf}</b></span></div>`;
+      `<span class="chip">Metrics live <b>${liveLeaves(root).filter(l => l.valid !== false).length}</b></span><span class="chip">As of <b>${DATA.asOf}</b></span></div>`;
 }
 function liveLeaves(root) { const out = []; (function w(n) { if (n.wip) return; if (n.leaf) out.push(n); (n.children || []).forEach(w); })(root); return out; }
 
@@ -555,7 +558,7 @@ function peakDisplay(n) {
   return lv.ratio ? `up ${lv.peakMult.toFixed(1)}x` : `${n.unitLabel} ${Math.round(n.smoothedDot[PEAK_IDX])}`;
 }
 function derivHtml(n) {
-  const bd = bottomIso(n);
+  const bd = n.projectedBottomDate;
   const lead = n.leaf
     ? `Today's reading is <b>${(n.intensityNow * 100).toFixed(0)}%</b> of the way to the 2000 peak (${n.display}).`
     : `Equal-weight blend of ${liveKids(n).map(c => c.label).join(" + ")} → <b>${(n.intensityNow * 100).toFixed(0)}%</b>.`;
@@ -611,7 +614,7 @@ function setHead(n) {
   el("m-lbl").textContent = (ok ? "Projected peak — " : "No projection — ") + n.label + (n.leaf ? "" : " (blended)");
   el("m-date").textContent = ok ? fmtNice(n.projectedPeakDate) : "—";
   el("m-sub").innerHTML = ok
-    ? `Today it's <b>${(n.intensityNow * 100).toFixed(0)}%</b> of the way to the 2000 peak (${n.phase}); if the arc holds, a projected bottom around <b>${fmtMY(bottomIso(n))}</b>.`
+    ? `Today it's <b>${(n.intensityNow * 100).toFixed(0)}%</b> of the way to the 2000 peak (${n.phase}); if the arc holds, a projected bottom around <b>${fmtMY(n.projectedBottomDate)}</b>.`
     : `This metric does not fit the rise-peak-fall analog, so no peak date is projected from it. Today it sits at <b>${(n.intensityNow * 100).toFixed(0)}%</b> of the 2000 peak level (${n.phase}); the curve is shown for context.`;
 }
 function buildRibbon(n) {
@@ -696,7 +699,7 @@ function placeMarkers(n, X, wrap) {
     { p: 0, eb: "START", ebc: "var(--then)", col: "var(--then)", ai: fmtMY(DATA.aiStart) + " · " + DATA.aiStartEvent, dc: dcMonth(DATA.dotcomStart) + " · " + DATA.dotcomStartEvent, row: 0, align: "L" },
     { p: n.equiv.progress, eb: "TODAY", ebc: "var(--text)", col: "var(--text)", ai: fmtMY(DATA.asOf), dc: dcMonth(n.equivalentDotcomDate), row: 1, align: "C" },
     { p: 100, eb: "PROJECTED PEAK", ebc: "var(--peak)", col: "var(--peak)", ai: fmtMY(n.projectedPeakDate), dc: dcMonth(DATA.dotcomPeak), row: 0, align: "C" },
-    { p: BOTTOM_PROG, eb: "PROJECTED BOTTOM", ebc: "var(--bottom)", col: "var(--bottom)", ai: fmtMY(bottomIso(n)), dc: dcMonth(DOT_END_ISO), row: 1, align: "R" }];
+    { p: BOTTOM_PROG, eb: "PROJECTED BOTTOM", ebc: "var(--bottom)", col: "var(--bottom)", ai: fmtMY(n.projectedBottomDate), dc: dcMonth(DOT_END_ISO), row: 1, align: "R" }];
   (ok ? MK : MK.slice(0, 2)).forEach(m => { const c = document.createElement("div"); c.className = "mkchip"; c.style.left = X(m.p) + "px"; c.style.top = (m.row === 0 ? 4 : 40) + "px";
     c.style.transform = m.align === "L" ? "translateX(-8px)" : m.align === "R" ? "translateX(calc(-100% + 8px))" : "translateX(-50%)";
     c.innerHTML = `<div class="eb" style="color:${m.ebc}">${m.eb}</div><div class="ai">${m.ai}</div><div class="dc">${m.dc}</div><div class="caret2" style="color:${m.col}">▼</div>`;

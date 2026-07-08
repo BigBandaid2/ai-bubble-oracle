@@ -63,19 +63,20 @@ thennow / datasources / dashboard.
 - **Weights control placement** — put in the parent's modal side panel (the mock
   didn't re-mock the control). Works and restyled; trivial to relocate.
 
-## (c) Open questions for you
+## (c) Open questions — resolved
 
-1. **Bottom date source of truth.** Keep the client-side derivation, or make it
-   canonical in `oracle/thennow.py` (so it's in the payload and CSV headers)? Both
-   produce the same number.
-2. **Data Sources "full method".** Want a concise prose method section added to
-   `datasources.html` (anchors / smoothing / matching / projection) for the link to
-   target, instead of the per-pipeline anchor? Happy to write it.
-3. **Marker crowding.** Today and peak markers can sit close; the two-row stagger
-   handles current widths. At very narrow widths, prefer dropping the dual labels to
-   single, or hiding the least-important marker?
-4. **"Metrics live 1 of 4"** counts top-level branches (Valuation wired;
-   concentration / capex / speculation WIP). Confirm that framing vs. counting
-   leaves (which would read "2").
-5. **Peak label.** The peak marker reads "Feb 2000" (the smoothed monthly top); the
-   famous intraday high was 2000-03-10. The drawer explains the smoothing. OK as is?
+1. **Bottom date source of truth.** RESOLVED: made canonical. `oracle/thennow.py`
+   now defines `BOTTOM_PROG` (the declared 2002 low as a progress %, a pure clock
+   constant), `_evaluate` emits `projectedBottomDate` per node, and the payload
+   carries top-level `bottomProgress`. The client reads `DATA.bottomProgress` and its
+   own `evaluate` recomputes `projectedBottomDate`, so the bottom stays live under
+   weights / match mode / smoothing. `bottomIso` + the empirical-argmin IIFE removed.
+2. **Data Sources "full method".** RESOLVED: kept the per-pipeline anchors
+   (`datasources.html#src:tn_*`). No dedicated cross-cutting method section added.
+3. **Marker crowding.** RESOLVED: added a `max-width: 640px` rule that drops each
+   marker chip's second line (the dot-com date) and shrinks it to label + AI date;
+   the dot-com value stays available in the hover readout. Tiles go single-column too.
+4. **"Metrics live".** RESOLVED: switched to counting wired leaf metrics, so the hero
+   chip reads "Metrics live **3**" (Nasdaq + S&P + CAPE) rather than "1 of 4" branches.
+5. **Peak label.** RESOLVED: kept as is. The peak marker uses the declared 2000-03-10
+   peak (shown "Mar 2000") and the Options drawer explains the smoothing nuance.

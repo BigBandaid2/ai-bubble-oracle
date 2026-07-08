@@ -52,6 +52,9 @@ def _today():
 
 
 RAMP = _days(CLOCK["start"], CLOCK["peak"])   # days from cycle start to the peak
+# The declared 2002 low as a progress % (past 100%), a pure clock constant. It places
+# the projected-bottom marker and scales each metric's projected bottom by its pace.
+BOTTOM_PROG = _days(CLOCK["start"], CLOCK["bottom"]) / RAMP * 100.0
 
 
 # ---------------------------------------------------------------- metric registry
@@ -222,6 +225,10 @@ def _evaluate(int_dot, int_ai, today):
     ratio = ai_elapsed / dot_done if dot_done > 0 else 1.0
     dot_left = max(100.0 - eq, 0.0) / 100 * RAMP
     proj = date.fromordinal(today.toordinal() + round(ratio * dot_left))
+    # Projected bottom: the remaining distance to the declared 2002 low, at this
+    # node's own measured pace (same rate-scaling as the peak).
+    bottom_left = max(BOTTOM_PROG - eq, 0.0) / 100 * RAMP
+    bottom = date.fromordinal(today.toordinal() + round(ratio * bottom_left))
     ramp_max = max((v for v in int_dot[:min(len(int_dot), RAMP + 1)] if v is not None), default=1.0)
     return {
         "intensityNow": round(ai_now, 4),
@@ -230,6 +237,7 @@ def _evaluate(int_dot, int_ai, today):
         "daysFromPeak": (equiv_date - _d(CLOCK["peak"])).days,
         "compression": round(ratio, 2),
         "projectedPeakDate": proj.isoformat(),
+        "projectedBottomDate": bottom.isoformat(),
         "phase": _phase_of(eq),
         "beyondDotcomPeak": ai_now > ramp_max,
     }
@@ -451,7 +459,7 @@ def _emit(node, dw, aw):
            "valid": node.get("valid", True), "validation": node.get("validation"),
            "intensityDot": _pick(node["_intDot"], dw), "intensityAi": _pick(node["_intAi"], aw)}
     for k in ("intensityNow", "equiv", "equivalentDotcomDate", "daysFromPeak",
-              "compression", "projectedPeakDate", "phase", "beyondDotcomPeak"):
+              "compression", "projectedPeakDate", "projectedBottomDate", "phase", "beyondDotcomPeak"):
         out[k] = node[k]
     if "leaf" in node:
         out["leaf"] = node["leaf"]; out["unit"] = node["unit"]; out["unitLabel"] = node["unitLabel"]
@@ -505,6 +513,7 @@ def compute_thennow(conn):
         "dotcomStart": CLOCK["start"], "dotcomStartEvent": CLOCK["startEvent"],
         "dotcomPeak": CLOCK["peak"], "aiStart": CLOCK["aiStart"], "aiStartEvent": CLOCK["aiStartEvent"],
         "phases": PHASES, "phaseBounds": PHASE_BOUNDS, "peakIdx": peak_idx,
+        "bottomProgress": round(BOTTOM_PROG, 2),
         "progDot": prog_dot, "progAi": prog_ai,
         "dotMonths": [dot_dates[i] for i in dw], "aiMonths": [ai_dates[i] for i in aw],
         "headlineDate": tree["projectedPeakDate"],
