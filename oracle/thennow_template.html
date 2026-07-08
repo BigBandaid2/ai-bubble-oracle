@@ -349,7 +349,7 @@ function recompute(node) {
 const PARENT = {}, NODES = {};
 (function link(n) { NODES[n.key] = n; (n.children || []).forEach(c => { PARENT[c.key] = n; link(c); }); })(DATA.tree);
 function recomputeUp(node) { let cur = PARENT[node.key]; while (cur) { recompute(cur); cur = PARENT[cur.key]; } }
-function tierOf(n) { return n.leaf ? ("leaf · " + (n.unit === "shiller_cape" ? "Shiller CAPE" : "Nasdaq index")) : PARENT[n.key] ? "roll-up" : "root · all metrics"; }
+function tierOf(n) { return n.leaf ? ("leaf · " + (n.unitLabel || "index")) : PARENT[n.key] ? "roll-up" : "root · all metrics"; }
 function crumbOf(n) { const p = []; let c = n; while (c) { p.unshift(c); c = PARENT[c.key]; } return p; }
 
 /* the real dot-com crash low (recompute BOTTOM_P now that arrays exist) */
@@ -509,7 +509,7 @@ function closeModal() { el("scrim").classList.remove("open"); el("modal").classL
 function tilesHtml(n) {
   const before = n.daysFromPeak < 0, t = [
     ["intensity now", `${(n.intensityNow * 100).toFixed(0)}%`, "accent", "of the run to the peak"],
-    ["today", n.display || "blended", "", n.leaf ? (n.unit === "shiller_cape" ? "Shiller CAPE" : "Nasdaq index") : "weighted mean"],
+    ["today", n.display || "blended", "", n.leaf ? n.unitLabel : "weighted mean"],
     ["matches dot-com", n.equivalentDotcomDate, "", n.phase],
     ["from 2000 peak", `${Math.abs(n.daysFromPeak)}d`, "", n.daysFromPeak === 0 ? "at the peak" : before ? "before the peak" : "after the peak"],
     ["pace vs dot-com", `${n.compression}×`, "", n.compression < 1 ? "faster" : "slower"]];
@@ -523,7 +523,8 @@ function derivHtml(n) {
   const rows = [lead,
     `Matches the dot-com path at <b>${n.equiv.progress.toFixed(1)}%</b> — <b>${n.equivalentDotcomDate}</b> (${n.phase}), ${Math.abs(n.daysFromPeak)} days ${n.daysFromPeak < 0 ? "before" : "after"} the peak.`,
     `Extending that arc at <b>${n.compression}×</b> pace projects the peak on <b>${n.projectedPeakDate}</b> and the bottom around <b>${bd}</b>.`];
-  const src = n.leaf === "price" ? "tn_price" : n.leaf === "cape" ? "tn_cape" : "tn_valuation";
+  const src = n.leaf === "price" ? "tn_price" : n.leaf === "sp500" ? "tn_sp500" : n.leaf === "cape" ? "tn_cape"
+    : n.key === "price_appreciation" ? "tn_price_appreciation" : "tn_valuation";
   const ok = n.valid !== false;
   const steps = ok ? `<ol class="steps">${rows.map((r, i) => `<li data-n="${i + 1}">${r}</li>`).join("")}</ol>`
     : `<div class="dcnote">This metric does not fit the rise-peak-fall analog, so no date is projected from it. The curves below are shown for context only.</div>`;
@@ -670,7 +671,7 @@ function onMove(e) {
   const lv = leafVals(n), dotV = interp(PROG_DOT, n.intensityDot, p), proj = p > n.equiv.progress;
   chip.style.display = "block";
   let html = `<div class="hr">${fmtMY(isoFromOrd(aiOrdAt(n, p)))} · ${p.toFixed(0)}%</div>`;
-  if (lv) { const unit = n.unit === "shiller_cape" ? "CAPE" : "Nasdaq";
+  if (lv) { const unit = n.unitLabel || "level";
     html += `<div class="row"><span class="sw" style="background:var(--then)"></span>Dot-com ${unit}<b>${fmtNum(lv.dotValAt(p))}</b></div>` +
       `<div class="row"><span class="sw" style="background:var(--accent-hi)"></span>AI ${unit}${proj ? " (proj)" : ""}<b>${fmtNum(lv.aiValAt(p))}</b></div>`;
   } else {

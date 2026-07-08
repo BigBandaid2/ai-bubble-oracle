@@ -59,17 +59,30 @@ PRICE = {
     "kind": "price", "source": ("prices", "^IXIC"), "columns": ["close"],
     "formula": lambda r: r["close"], "cadence": "daily",
     "type": "ratio_from_start", "direction": "up", "unit": "nasdaq_close",
+    "unitLabel": "Nasdaq",
+}
+SP500 = {
+    "kind": "sp500", "source": ("prices", "^GSPC"), "columns": ["close"],
+    "formula": lambda r: r["close"], "cadence": "daily",
+    "type": "ratio_from_start", "direction": "up", "unit": "sp500_close",
+    "unitLabel": "S&P 500",
 }
 CAPE = {
     "kind": "cape", "source": ("cape", None), "columns": ["cape"],
     "formula": lambda r: r["cape"], "cadence": "monthly",
     "type": "absolute_level", "direction": "up", "unit": "shiller_cape",
+    "unitLabel": "CAPE",
 }
 
 THENNOW_TREE = {
     "key": "ai_peak", "label": "AI bubble bursts", "children": [
         {"key": "valuation", "label": "Valuation", "children": [
-            {"key": "price_appreciation", "label": "Price appreciation", "metric": PRICE},
+            # Price appreciation is now a sub-blend of two indices (Phase 3), so no
+            # single index carries the whole "price" argument on its own.
+            {"key": "price_appreciation", "label": "Price appreciation", "children": [
+                {"key": "nasdaq", "label": "Nasdaq", "metric": PRICE},
+                {"key": "sp500", "label": "S&P 500", "metric": SP500},
+            ]},
             {"key": "valuation_multiple", "label": "Valuation multiple", "metric": CAPE},
         ]},
         {"key": "market_concentration", "label": "Market concentration", "wip": True},
@@ -342,17 +355,18 @@ def _build_leaf(conn, node, dot_dates, ai_dates, today):
     if m["type"] == "ratio_from_start":
         ai_mult = sm_ai[-1] / sm_ai[0]
         peak_mult = sm_dot[RAMP] / sm_dot[0]
+        name = node["label"]
         display = f"up {ai_mult:.1f}x since ChatGPT"
-        different = (f"Up about {ai_mult:.1f}x since ChatGPT vs roughly {peak_mult:.1f}x for "
-                     "the dot-com Nasdaq into 2000, so on price alone AI reads earlier and "
-                     "less stretched.")
+        different = (f"{name} is up about {ai_mult:.1f}x since ChatGPT against roughly "
+                     f"{peak_mult:.1f}x for the same index into 2000, so on price alone it "
+                     "reads earlier and less stretched than the dot-com run.")
     else:
         display = f"CAPE {sm_ai[-1]:.0f}"
         different = (f"CAPE is about {sm_ai[-1]:.0f} now against roughly {sm_dot[RAMP]:.0f} at "
                      "the 2000 peak, so on valuation multiple AI is already close to dot-com's top.")
 
     return {"key": node["key"], "label": node["label"], "leaf": m["kind"], "unit": m["unit"],
-            "type": m["type"], "display": display, "different": different,
+            "unitLabel": m["unitLabel"], "type": m["type"], "display": display, "different": different,
             "valid": validation["valid"], "validation": validation,
             "_intDot": int_dot, "_intAi": int_ai, "_smDot": sm_dot, "_smAi": sm_ai,
             "_rawDot": raw_dot, "_rawAi": raw_ai, **result}
@@ -408,7 +422,8 @@ def _emit(node, dw, aw):
               "compression", "projectedPeakDate", "phase", "beyondDotcomPeak"):
         out[k] = node[k]
     if "leaf" in node:
-        out["leaf"] = node["leaf"]; out["unit"] = node["unit"]; out["type"] = node["type"]; out["different"] = node["different"]
+        out["leaf"] = node["leaf"]; out["unit"] = node["unit"]; out["unitLabel"] = node["unitLabel"]
+        out["type"] = node["type"]; out["different"] = node["different"]
         out["smoothedDot"] = _pick(node["_smDot"], dw, 2); out["smoothedAi"] = _pick(node["_smAi"], aw, 2)
         out["rawDot"] = _pick(node["_rawDot"], dw, 2); out["rawAi"] = _pick(node["_rawAi"], aw, 2)
     if "children" in node:

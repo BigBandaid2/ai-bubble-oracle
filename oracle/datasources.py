@@ -120,9 +120,11 @@ def _thennow_example(conn):
         return {}
 
     root, pk = t["tree"], t["peakIdx"]
-    price, cape, val = (find(root, "price_appreciation"),
-                        find(root, "valuation_multiple"),
-                        find(root, "valuation"))
+    # price = the Nasdaq leaf (feeds tn_price); sp = the S&P leaf (tn_sp500);
+    # pa = the Price-appreciation sub-blend of the two; val = the Valuation roll-up.
+    price, sp = find(root, "nasdaq"), find(root, "sp500")
+    cape, pa, val = (find(root, "valuation_multiple"),
+                     find(root, "price_appreciation"), find(root, "valuation"))
 
     def last(a):
         return a[-1] if a else None
@@ -149,11 +151,22 @@ def _thennow_example(conn):
         # valuation roll-up
         "valIntensity": val.get("intensityNow"), "valEquiv": val.get("equivalentDotcomDate"),
         "valProj": val.get("projectedPeakDate"), "valPhase": val.get("phase"),
+        # S&P 500 leaf (Phase 3): native look-through + scalars, its own pipeline
+        "sp500RawNow": last(sp.get("rawAi")), "sp500SmNow": last(sp.get("smoothedAi")),
+        "sp500Peak": at(sp.get("smoothedDot"), pk), "sp500Intensity": sp.get("intensityNow"),
+        "sp500Equiv": sp.get("equivalentDotcomDate"), "sp500Proj": sp.get("projectedPeakDate"),
+        "sp500Display": sp.get("display"), "sp500DaysFromPeak": sp.get("daysFromPeak"),
+        # Price-appreciation sub-blend (Nasdaq + S&P)
+        "prApprIntensity": pa.get("intensityNow"), "prApprProj": pa.get("projectedPeakDate"),
+        "prApprEquiv": pa.get("equivalentDotcomDate"), "prApprPhase": pa.get("phase"),
         # validator verdicts + checks + cached observation, per metric
         "priceValid": price.get("valid"), "capeValid": cape.get("valid"), "valValid": val.get("valid"),
+        "sp500Valid": sp.get("valid"), "prApprValid": pa.get("valid"),
         "priceChecks": (price.get("validation") or {}).get("checks", []),
         "capeChecks": (cape.get("validation") or {}).get("checks", []),
+        "sp500Checks": (sp.get("validation") or {}).get("checks", []),
         "priceObs": price.get("observations"), "capeObs": cape.get("observations"),
+        "sp500Obs": sp.get("observations"), "prApprObs": pa.get("observations"),
         "valObs": val.get("observations"),
     }
 

@@ -1036,11 +1036,11 @@ const ASSETS = [
     cardinality: "1 verdict per metric; gates the projection downstream.",
   },
   {
-    id: "graph.price_appreciation", group: "tn_price", layer: "serve", status: "live",
-    name: "graph: price_appreciation", mat: "exposure (JSON)", cadence: "on generate",
-    dagster: "thennow (exposure)", dbt: "exposure: price_appreciation",
+    id: "graph.nasdaq", group: "tn_price", layer: "serve", status: "live",
+    name: "graph: nasdaq", mat: "exposure (JSON)", cadence: "on generate",
+    dagster: "thennow (exposure)", dbt: "exposure: nasdaq",
     grain: "one leaf block on thennow.html",
-    why: "The graph the reader sees: today's price intensity matched to a dot-com date, rate-scaled to a projected top.",
+    why: "The Nasdaq leaf the reader sees: today's Nasdaq intensity matched to a dot-com date, rate-scaled to a projected top. One of the two inputs to the Price-appreciation blend.",
     desc: "Match today's intensity on the dot-com ramp → equivalent date; rate-scale the remainder → projected peak. Ships exact daily scalars + a weekly series still carrying the native Nasdaq value for hover/CSV. Projection drawn only if int_ixic_validated conforms. _evaluate + _emit.",
     upstream: ["int_ixic_validated"],
     json: `{ "intensityNow": ${TN.priceIntensity}, "equivalentDotcomDate": "${TN.priceEquiv}",
@@ -1052,6 +1052,174 @@ const ASSETS = [
       { tag: "downsample", text: "daily scalars + weekly plot series" },
     ],
     cardinality: "one leaf node on the Then-and-Now page.",
+  },
+
+  /* -------- Then and Now: S&P 500 (WIP) · independent daily chain -------- */
+  {
+    id: "raw.yahoo_gspc", group: "tn_sp500", layer: "source", status: "live",
+    name: "raw.yahoo_gspc", mat: "API response (JSON)", cadence: "daily",
+    dagster: "thennow/yahoo_gspc", dbt: "source('yahoo','gspc')",
+    grain: "one JSON document (daily bars for ^GSPC)",
+    why: "The broad-market counterpart to the Nasdaq leaf: the S&P 500, a wider read on the same price cycle.",
+    desc: "Yahoo v8 chart for ^GSPC, split-adjusted daily closes. Its own self-contained chain; it shares nothing downstream with the Nasdaq or CAPE pipelines.",
+    upstream: [],
+    transforms: [{ tag: "extract", text: "HTTP GET ^GSPC daily bars" }],
+    cardinality: "one document, full daily history since 1970.",
+  },
+  {
+    id: "gspc_prices", group: "tn_sp500", layer: "raw", status: "live",
+    name: "gspc_prices", mat: "table (^GSPC rows)", cadence: "daily",
+    dagster: "thennow/gspc_prices", dbt: "gspc_prices",
+    grain: "one row per trading day",
+    why: "The landed ^GSPC daily close.",
+    desc: "The ^GSPC slice of the prices table in oracle.db.",
+    upstream: ["raw.yahoo_gspc"],
+    schema: [
+      { col: "date", type: "TEXT", kind: "key", ex: "2000-03-24", note: "the S&P's own 2000 top" },
+      { col: "close", type: "REAL", kind: "pass", ex: TN.sp500Peak, note: "S&P close (smoothed peak shown)" },
+    ],
+    transforms: [{ tag: "flatten", text: "epoch/OHLC arrays → daily rows" }],
+    tests: ["unique: date", "not_null: close"],
+    cardinality: "daily trading days since 1970.",
+  },
+  {
+    id: "stg_gspc_filled", group: "tn_sp500", layer: "staging", status: "live",
+    name: "stg_gspc_filled", mat: "table", cadence: "on generate",
+    dagster: "thennow/stg_gspc_filled", dbt: "stg_gspc_filled",
+    grain: "one row per calendar day, per era window",
+    why: "A gap-free daily grid so the smoother sees every day, weekends and holidays included.",
+    desc: "Trims ^GSPC to the two declared era windows and forward-fills non-trading days with the last close. Identical machinery to the Nasdaq chain, run on its own data. _grid + _fill.",
+    upstream: ["gspc_prices"],
+    schema: [
+      { col: "era", type: "STRING", kind: "key", ex: "ai", note: "dotcom | ai" },
+      { col: "date", type: "DATE", kind: "key", ex: TN.asOf },
+      { col: "close", type: "NUMERIC", kind: "derived", ex: TN.sp500RawNow, note: "forward-filled" },
+    ],
+    transforms: [
+      { tag: "trim", text: "to the declared era windows" },
+      { tag: "forward-fill", text: "carry last close over non-trading days" },
+    ],
+    cardinality: `daily; ${TN.dotWk}+${TN.aiWk} weekly points shipped.`,
+  },
+  {
+    id: "int_gspc_metric", group: "tn_sp500", layer: "intermediate", status: "live",
+    name: "int_gspc_metric", mat: "table", cadence: "on generate",
+    dagster: "thennow/int_gspc_metric", dbt: "int_gspc_metric",
+    grain: "one row per (era, day)",
+    why: "Applies the declared formula. For the S&P the metric input is just the close.",
+    desc: "Registry: formula = close, type = ratio_from_start. Same declaration as Nasdaq, different source.",
+    upstream: ["stg_gspc_filled"],
+    schema: [
+      { col: "date", type: "DATE", kind: "key", ex: TN.asOf },
+      { col: "value", type: "NUMERIC", kind: "derived", ex: TN.sp500RawNow, note: "= close" },
+    ],
+    transforms: [{ tag: "formula", text: "value = close" }],
+    cardinality: "1:1 with the daily grid.",
+  },
+  {
+    id: "int_gspc_smoothed", group: "tn_sp500", layer: "intermediate", status: "live",
+    name: "int_gspc_smoothed", mat: "table", cadence: "on generate",
+    dagster: "thennow/int_gspc_smoothed", dbt: "int_gspc_smoothed",
+    grain: "one row per (era, day)",
+    why: "A centered mean so the equivalent point reads cleanly, anchored so intensity=100% lands on the declared peak.",
+    desc: "Centered 90-day moving average (the '3-month' option), edge-truncated at today. _smooth_centered.",
+    upstream: ["int_gspc_metric"],
+    schema: [
+      { col: "date", type: "DATE", kind: "key", ex: TN.asOf },
+      { col: "smoothed", type: "NUMERIC", kind: "derived", ex: TN.sp500SmNow, note: `now; smoothed peak ≈ ${TN.sp500Peak}` },
+    ],
+    transforms: [{ tag: "smooth", text: "centered 90-day mean (min-periods at the edge)" }],
+    tests: ["not_null: smoothed"],
+    cardinality: "1:1 with the daily grid.",
+  },
+  {
+    id: "int_gspc_intensity", group: "tn_sp500", layer: "intermediate", status: "live",
+    name: "int_gspc_intensity", mat: "table", cadence: "on generate",
+    dagster: "thennow/int_gspc_intensity", dbt: "int_gspc_intensity",
+    grain: "one row per (era, day)",
+    why: "The shared 0–1 intensity: 0 at the dot-com starting level, 1 at the declared peak.",
+    desc: "ratio_from_start: index each era to its own start, then map onto the dot-com appreciation range, same as Nasdaq. _normalize.",
+    upstream: ["int_gspc_smoothed"],
+    schema: [
+      { col: "date", type: "DATE", kind: "key", ex: TN.asOf },
+      { col: "progress", type: "NUMERIC", kind: "derived", ex: "days ÷ ramp × 100" },
+      { col: "intensity", type: "NUMERIC", kind: "derived", ex: TN.sp500Intensity, note: "0 start, 1 peak" },
+    ],
+    transforms: [{ tag: "normalize", text: "intensity = (appreciation − 1) / (dot-com peak appreciation − 1)" }],
+    tests: ["accepted_range: dot-com spans 0→1 to the peak"],
+    cardinality: "1:1; weekly-downsampled for the page.",
+  },
+  {
+    id: "int_gspc_validated", group: "tn_sp500", layer: "intermediate", status: "live",
+    name: "int_gspc_validated", mat: "table", cadence: "on generate",
+    dagster: "thennow/int_gspc_validated", dbt: "int_gspc_validated",
+    grain: "one verdict per metric (+ one row per check)",
+    why: "The same gate as every metric, run independently on the S&P. Earns a projection only if the S&P rises, peaks, and falls like the dot-com reference with AI below that peak and rising.",
+    desc: "Two passes over the S&P's daily curves: candidacy then shape. Emits {valid, checks[], observations}; the verdict and numbers are computed, a cached hash-gated Haiku call writes the prose (deterministic fallback). _validate + observe.refresh_observations.",
+    upstream: ["int_gspc_intensity"],
+    schema: [
+      { col: "check", type: "TEXT", kind: "key", ex: "rise, peak, fall" },
+      { col: "pass", type: "BOOLEAN", kind: "derived", ex: TN.sp500Valid, note: `${(TN.sp500Checks || []).filter(c => c.pass).length}/${(TN.sp500Checks || []).length} checks pass → ${TN.sp500Valid ? "conforms" : "suppressed"}` },
+      { col: "observations", type: "TEXT", kind: "derived", ex: "Haiku · cached", note: TN.sp500Obs },
+    ],
+    transforms: [
+      { tag: "validate", text: "candidacy + shape checks → verdict" },
+      { tag: "observe", text: "cached, hash-gated Haiku prose (deterministic fallback)" },
+    ],
+    tests: ["not_null: valid", "accepted_values: valid in (true, false)"],
+    cardinality: "1 verdict per metric; gates the projection downstream.",
+  },
+  {
+    id: "graph.sp500", group: "tn_sp500", layer: "serve", status: "live",
+    name: "graph: sp500", mat: "exposure (JSON)", cadence: "on generate",
+    dagster: "thennow (exposure)", dbt: "exposure: sp500",
+    grain: "one leaf block on thennow.html",
+    why: "The S&P leaf the reader sees, the second input to the Price-appreciation blend. Broader and less concentrated than the Nasdaq, so it usually reads a touch earlier.",
+    desc: "Same _evaluate() + _emit() as the Nasdaq leaf, run on the S&P's own intensity. Projection drawn only if int_gspc_validated conforms.",
+    upstream: ["int_gspc_validated"],
+    json: `{ "intensityNow": ${TN.sp500Intensity}, "equivalentDotcomDate": "${TN.sp500Equiv}",
+  "daysFromPeak": ${TN.sp500DaysFromPeak}, "projectedPeakDate": "${TN.sp500Proj}",
+  "sp500Now": ${TN.sp500RawNow}, "display": "${TN.sp500Display}" }`,
+    transforms: [
+      { tag: "lookup", text: "value-match on the dot-com ramp → equivalent date" },
+      { tag: "rate-scale", text: "remaining distance × AI pace → projected top" },
+      { tag: "downsample", text: "daily scalars + weekly plot series" },
+    ],
+    cardinality: "one leaf node on the Then-and-Now page.",
+  },
+
+  /* -------- Then and Now: Price appreciation (WIP) · sub-blend of Nasdaq + S&P -------- */
+  {
+    id: "int_price_blend", group: "tn_price_appreciation", layer: "intermediate", status: "live",
+    name: "int_price_blend", mat: "table", cadence: "on generate",
+    dagster: "thennow/int_price_blend", dbt: "int_price_blend",
+    grain: "one row per (era, day)",
+    why: "Price appreciation is not one index. This blends the Nasdaq and S&P intensities into one price-appreciation curve, so no single index carries the whole argument.",
+    desc: "Pointwise weighted average of int_ixic_intensity and int_gspc_intensity on the shared daily grid (equal by default, adjustable on the page). Its inputs come from the Nasdaq and S&P pipelines; they are shown dimmed in this graph. Only conforming inputs are blended. _blend.",
+    upstream: ["int_ixic_intensity", "int_gspc_intensity"],
+    schema: [
+      { col: "date", type: "DATE", kind: "key", ex: TN.asOf },
+      { col: "intensity", type: "NUMERIC", kind: "derived", ex: TN.prApprIntensity, note: "equal-weight mean of Nasdaq + S&P" },
+    ],
+    transforms: [{ tag: "blend", text: "weighted mean of the two index intensities" }],
+    tests: ["not_null: intensity"],
+    cardinality: "1:1 on the shared daily grid.",
+  },
+  {
+    id: "graph.price_appreciation", group: "tn_price_appreciation", layer: "serve", status: "live",
+    name: "graph: price_appreciation", mat: "exposure (JSON)", cadence: "on generate",
+    dagster: "thennow (exposure)", dbt: "exposure: price_appreciation",
+    grain: "one roll-up block on thennow.html",
+    why: "The Price-appreciation node the reader sees: the blended Nasdaq + S&P curve matched to a dot-com date and rate-scaled. One of the two inputs to the Valuation roll-up.",
+    desc: "Same alignment + projection as a leaf, run on the blended curve. _evaluate + _emit.",
+    upstream: ["int_price_blend"],
+    json: `{ "intensityNow": ${TN.prApprIntensity}, "equivalentDotcomDate": "${TN.prApprEquiv}",
+  "projectedPeakDate": "${TN.prApprProj}", "phase": "${TN.prApprPhase}" }`,
+    transforms: [
+      { tag: "lookup", text: "value-match on the dot-com ramp → equivalent date" },
+      { tag: "rate-scale", text: "remaining distance × AI pace → projected top" },
+    ],
+    cardinality: "one roll-up node; feeds the Valuation blend.",
   },
 
   /* -------- Then and Now: Valuation multiple (WIP) · independent daily chain -------- */
@@ -1198,8 +1366,8 @@ const ASSETS = [
     dagster: "thennow/int_valuation_blend", dbt: "int_valuation_blend",
     grain: "one row per (era, day)",
     why: "The roll-up: the two leaf intensities combined into one Valuation curve by weight.",
-    desc: "Pointwise weighted average of int_ixic_intensity and int_cape_intensity on the shared daily grid (equal by default, adjustable on the page). Its inputs come from the price and CAPE pipelines; they are shown dimmed in this graph. _blend().",
-    upstream: ["int_ixic_intensity", "int_cape_intensity"],
+    desc: "Pointwise weighted average of int_price_blend (the Nasdaq + S&P price-appreciation blend) and int_cape_intensity on the shared daily grid (equal by default, adjustable on the page). Its inputs come from the Price-appreciation and CAPE pipelines; they are shown dimmed in this graph. _blend().",
+    upstream: ["int_price_blend", "int_cape_intensity"],
     schema: [
       { col: "date", type: "DATE", kind: "key", ex: TN.asOf },
       { col: "intensity", type: "NUMERIC", kind: "derived", ex: TN.valIntensity, note: "weighted mean of children" },
@@ -1232,7 +1400,9 @@ const GROUPS = [
   { id: "polymarket", name: "Polymarket", status: "live" },
   { id: "courtlistener", name: "CourtListener", status: "live" },
   { id: "gdelt", name: "GDELT news", status: "planned" },
-  { id: "tn_price", name: "Price appreciation (WIP)", status: "live" },
+  { id: "tn_price", name: "Price · Nasdaq (WIP)", status: "live" },
+  { id: "tn_sp500", name: "Price · S&P 500 (WIP)", status: "live" },
+  { id: "tn_price_appreciation", name: "Price appreciation blend (WIP)", status: "live" },
   { id: "tn_cape", name: "Valuation multiple (WIP)", status: "live" },
   { id: "tn_valuation", name: "Valuation roll-up (WIP)", status: "live" },
 ];
@@ -1347,13 +1517,13 @@ const GRAPHS = {
       { id: "int_ixic_smoothed", cx: MX, cy: 270 },
       { id: "int_ixic_intensity", cx: MX, cy: 330 },
       { id: "int_ixic_validated", cx: MX, cy: 390 },
-      { id: "graph.price_appreciation", cx: MX, cy: 470, short: "graph: price appreciation" },
+      { id: "graph.nasdaq", cx: MX, cy: 470, short: "graph: nasdaq" },
     ],
     spine: [
       ["raw.yahoo_ixic", "ixic_prices"], ["ixic_prices", "stg_ixic_filled"],
       ["stg_ixic_filled", "int_ixic_metric"], ["int_ixic_metric", "int_ixic_smoothed"],
       ["int_ixic_smoothed", "int_ixic_intensity"], ["int_ixic_intensity", "int_ixic_validated"],
-      ["int_ixic_validated", "graph.price_appreciation"],
+      ["int_ixic_validated", "graph.nasdaq"],
     ],
     curves: [],
   },
@@ -1377,10 +1547,46 @@ const GRAPHS = {
     ],
     curves: [],
   },
-  tn_valuation: {
+  tn_sp500: {
+    viewBox: "0 0 460 512",
+    nodes: [
+      { id: "raw.yahoo_gspc", cx: MX, cy: 30, short: "raw: yahoo ^GSPC" },
+      { id: "gspc_prices", cx: MX, cy: 90 },
+      { id: "stg_gspc_filled", cx: MX, cy: 150 },
+      { id: "int_gspc_metric", cx: MX, cy: 210 },
+      { id: "int_gspc_smoothed", cx: MX, cy: 270 },
+      { id: "int_gspc_intensity", cx: MX, cy: 330 },
+      { id: "int_gspc_validated", cx: MX, cy: 390 },
+      { id: "graph.sp500", cx: MX, cy: 470, short: "graph: sp500" },
+    ],
+    spine: [
+      ["raw.yahoo_gspc", "gspc_prices"], ["gspc_prices", "stg_gspc_filled"],
+      ["stg_gspc_filled", "int_gspc_metric"], ["int_gspc_metric", "int_gspc_smoothed"],
+      ["int_gspc_smoothed", "int_gspc_intensity"], ["int_gspc_intensity", "int_gspc_validated"],
+      ["int_gspc_validated", "graph.sp500"],
+    ],
+    curves: [],
+  },
+  tn_price_appreciation: {
     viewBox: "0 0 660 300",
     nodes: [
       { id: "int_ixic_intensity", cx: 170, cy: 44, w: 210, foreign: true },
+      { id: "int_gspc_intensity", cx: 490, cy: 44, w: 210, foreign: true },
+      { id: "int_price_blend", cx: 330, cy: 150 },
+      { id: "graph.price_appreciation", cx: 330, cy: 240, short: "graph: price appreciation" },
+    ],
+    spine: [
+      ["int_price_blend", "graph.price_appreciation"],
+    ],
+    curves: [
+      "M170,67 C 170,112 280,120 300,127",   // Nasdaq intensity (dimmed, from tn_price) → blend
+      "M490,67 C 490,112 380,120 360,127",   // S&P intensity (dimmed, from tn_sp500) → blend
+    ],
+  },
+  tn_valuation: {
+    viewBox: "0 0 660 300",
+    nodes: [
+      { id: "int_price_blend", cx: 170, cy: 44, w: 210, foreign: true },
       { id: "int_cape_intensity", cx: 490, cy: 44, w: 210, foreign: true },
       { id: "int_valuation_blend", cx: 330, cy: 150 },
       { id: "graph.valuation", cx: 330, cy: 240, short: "graph: valuation" },
@@ -1389,12 +1595,14 @@ const GRAPHS = {
       ["int_valuation_blend", "graph.valuation"],
     ],
     curves: [
-      "M170,67 C 170,112 280,120 300,127",   // price intensity (dimmed, from tn_price) → blend
+      "M170,67 C 170,112 280,120 300,127",   // price-appreciation blend (dimmed) → valuation blend
       "M490,67 C 490,112 380,120 360,127",   // cape intensity (dimmed, from tn_cape) → blend
     ],
   },
 };
 
+// Nicer "FROM …" tags for dimmed cross-pipeline inputs than the raw group id.
+const FOREIGN_FROM = { tn_price: "NASDAQ", tn_sp500: "S&P 500", tn_cape: "CAPE", tn_price_appreciation: "PRICE APPR." };
 function buildGraph(groupId) {
   const G = GRAPHS[groupId];
   const byId = Object.fromEntries(G.nodes.map(n => [n.id, n]));
@@ -1414,7 +1622,7 @@ function buildGraph(groupId) {
     const op = foreign ? ` opacity="0.5"` : "";
     // foreign = an input node that belongs to another metric's pipeline; dim it
     // and label where it comes from. Clicking still jumps to its home graph.
-    const lbl = LAYER_NAMES[a.layer].toUpperCase() + (foreign ? " · FROM " + a.group.replace("tn_", "").toUpperCase() : "");
+    const lbl = LAYER_NAMES[a.layer].toUpperCase() + (foreign ? " · FROM " + (FOREIGN_FROM[a.group] || a.group.replace("tn_", "").toUpperCase()) : "");
     nodes += `<g class="gnode" data-goto="${n.id}"${op}>
       <rect class="box" x="${x}" y="${y}" width="${w}" height="${GH}" rx="8" fill="#12161f" stroke="${stroke}" stroke-width="1.4"${dash}/>
       <text class="glbl" x="${x + 9}" y="${y + 11}">${lbl}</text>
@@ -1667,12 +1875,13 @@ const SOURCE_INFO = {
     ],
   },
   tn_price: {
-    blurb: "Price appreciation (WIP): a Then-and-Now leaf on its own self-contained daily pipeline. Nasdaq (^IXIC) indexed to each era's start, so it reads 'how far the cycle has run'. On price alone AI looks earlier and less stretched than 1995–2000.",
+    blurb: "Price · Nasdaq (WIP): the Nasdaq leaf on its own self-contained daily pipeline. ^IXIC indexed to each era's start, so it reads 'how far the cycle has run'. One of the two inputs to the Price-appreciation blend; on price alone AI looks earlier and less stretched than 1995–2000.",
     options: [
       { t: "Smoothing window", d: "A centered moving average on the daily series (90-day '3-month' by default; a 30-day '1-month' option is planned), anchored so intensity=100% lands on the declared 2000 peak." },
     ],
     ambiguities: [
-      { t: "Price, not a multiple", d: "This leaf measures appreciation, not richness. Its counterweight is the Valuation multiple (CAPE) leaf, which reads late. The Valuation parent reconciles them." },
+      { t: "Price, not a multiple", d: "This leaf measures appreciation, not richness. Its counterweight is the Valuation multiple (CAPE) leaf, which reads late. The Valuation roll-up reconciles them." },
+      { t: "Nasdaq is one of two", d: "Price appreciation blends this Nasdaq leaf with the broader S&P 500 leaf, so neither index alone drives the price argument." },
     ],
     caveats: [
       { t: "WIP prototype", d: "Method and copy will change. Not linked in the site nav; reachable by direct URL only." },
@@ -1684,7 +1893,44 @@ const SOURCE_INFO = {
       { asset: "stg_ixic_filled", count: `${TN.dotWk}+${TN.aiWk}`, meaning: "Weekly plot points shipped, computed on a gap-free daily grid." },
       { asset: "int_ixic_intensity", count: "1:1", meaning: "Each day mapped to 0–1 intensity (0 dot-com start, 1 the 2000 peak)." },
       { asset: "int_ixic_validated", count: "1 verdict", meaning: `${(TN.priceChecks || []).length} checks → ${TN.priceValid ? "conforms, projection drawn" : "suppressed"}.` },
-      { asset: "graph.price_appreciation", count: "1 leaf", meaning: "The projected top for the price leaf, drawn on thennow.html." },
+      { asset: "graph.nasdaq", count: "1 leaf", meaning: "The Nasdaq leaf's projected top; one input to the Price-appreciation blend." },
+    ],
+  },
+  tn_sp500: {
+    blurb: "Price · S&P 500 (WIP): the broad-market price leaf on its own daily pipeline, wholly separate from the Nasdaq chain. ^GSPC indexed to each era's start. Wider and less tech-concentrated than the Nasdaq, so it is the second, steadier voice in the Price-appreciation blend.",
+    options: [
+      { t: "Smoothing window", d: "The same centered daily moving average as every metric (90-day default), anchored so intensity=100% lands on the declared 2000 peak." },
+    ],
+    ambiguities: [
+      { t: "Broad vs narrow", d: "The S&P captures the whole market, the Nasdaq the tech-heavy leaders. Blending them keeps the price argument from resting on one index's composition." },
+    ],
+    caveats: [
+      { t: "WIP prototype", d: "Method and copy will change. Direct URL only." },
+      { t: "Same clock, same gate", d: "Runs on the identical declared clock, centered smoothing, and two-pass validator + cached observation as the other metrics; only the source differs." },
+    ],
+    cardinality: [
+      { asset: "raw.yahoo_gspc", count: "1 doc", meaning: "Full ^GSPC daily history from Yahoo." },
+      { asset: "stg_gspc_filled", count: `${TN.dotWk}+${TN.aiWk}`, meaning: "Weekly plot points shipped, computed on a gap-free daily grid." },
+      { asset: "int_gspc_intensity", count: "1:1", meaning: "Each day mapped to 0–1 intensity (0 dot-com start, 1 the 2000 peak)." },
+      { asset: "int_gspc_validated", count: "1 verdict", meaning: `${(TN.sp500Checks || []).length} checks → ${TN.sp500Valid ? "conforms, projection drawn" : "suppressed"}.` },
+      { asset: "graph.sp500", count: "1 leaf", meaning: "The S&P leaf's projected top; the second input to the Price-appreciation blend." },
+    ],
+  },
+  tn_price_appreciation: {
+    blurb: "Price appreciation blend (WIP): the sub-roll-up that combines the Nasdaq and S&P 500 leaves into one price-appreciation curve. Its two inputs (shown dimmed, from their own pipelines) are averaged by weight, then the same alignment + projection gives one date. Its output is itself an input to the Valuation roll-up.",
+    options: [
+      { t: "Weights", d: "Each index's share of the blend, split evenly by default and adjustable with the sliders on thennow.html. The blended curve and its projected top recompute live." },
+    ],
+    ambiguities: [
+      { t: "Which index leads", d: "The Nasdaq usually reads more stretched than the broader S&P; the weights decide how much each voice counts in the combined price signal." },
+    ],
+    caveats: [
+      { t: "WIP prototype", d: "Method and copy will change. Direct URL only." },
+      { t: "Blends conforming inputs only", d: "A leaf that fails its validator is shown but left out of the blend, so a non-conforming index cannot skew the price-appreciation date." },
+    ],
+    cardinality: [
+      { asset: "int_price_blend", count: "1:1", meaning: "Equal-weight mean of the Nasdaq and S&P intensities on the shared daily grid." },
+      { asset: "graph.price_appreciation", count: "1 roll-up", meaning: "The Price-appreciation date; feeds the Valuation blend." },
     ],
   },
   tn_cape: {
@@ -1710,7 +1956,7 @@ const SOURCE_INFO = {
     ],
   },
   tn_valuation: {
-    blurb: "Valuation roll-up (WIP): how the two children become one parent. The price and CAPE intensity series (shown dimmed, drawn from their own pipelines) are combined by weight into one Valuation curve, then the same alignment + projection gives the parent's one date. Uniform for every roll-up.",
+    blurb: "Valuation roll-up (WIP): how the children become one parent. The Price-appreciation blend and the CAPE intensity series (shown dimmed, drawn from their own pipelines) are combined by weight into one Valuation curve, then the same alignment + projection gives the parent's one date. Uniform for every roll-up.",
     options: [
       { t: "Weights", d: "Each child's share of the parent, split evenly by default and adjustable with the sliders on thennow.html. The blended curve, its equivalent date, and the projected top all recompute live." },
     ],
@@ -1722,7 +1968,7 @@ const SOURCE_INFO = {
       { t: "Root is Valuation for now", d: "Concentration, capex and speculation are not wired, so the root 'AI bubble bursts' headline currently equals the Valuation roll-up." },
     ],
     cardinality: [
-      { asset: "int_valuation_blend", count: "1:1", meaning: "Equal-weight mean of the two leaf intensities on the shared daily grid." },
+      { asset: "int_valuation_blend", count: "1:1", meaning: "Equal-weight mean of the Price-appreciation blend and CAPE intensities on the shared daily grid." },
       { asset: "graph.valuation", count: "1 parent", meaning: "The Valuation date; feeds the root AI-bubble-bursts headline." },
     ],
   },
