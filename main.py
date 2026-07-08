@@ -26,6 +26,7 @@ from oracle.bankruptcy import scan_all, import_bankruptcy_csv, export_bankruptcy
 from oracle.buzz import (update_signals, import_buzz_csv, export_buzz_csv,
                          update_buzz_events, import_buzz_events_csv, export_buzz_events_csv,
                          record_gdelt_health)
+from oracle.observe import refresh_observations
 from oracle.report import status_report
 from oracle.thennow_page import write_thennow_page
 from oracle.tracker import rebuild_events
@@ -123,6 +124,12 @@ def cmd_update(conn):
     streak = record_gdelt_health()
     print(f"GDELT health: {'THROTTLED' if streak else 'ok'}"
           + (f" — {streak} consecutive throttled run(s)" if streak else ""))
+
+    # Then-and-Now LLM observations: hash-gated, so this only calls Haiku for a
+    # node whose analog state actually shifted since the last run (usually none).
+    obs_changed = refresh_observations(conn)
+    print(f"thennow observations: {obs_changed} regenerated"
+          if obs_changed else "thennow observations: unchanged")
 
     db.set_meta(conn, "last_update", datetime.now(timezone.utc).isoformat(timespec="seconds"))
 

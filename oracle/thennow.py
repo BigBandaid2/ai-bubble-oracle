@@ -16,9 +16,14 @@ Phase 1 foundation of the universal pipeline (see design/PIPELINE-PLAN.md):
 The projected date is a transparent analog, not a forecast.
 """
 
+import hashlib
+import json
 from datetime import date, datetime, timedelta, timezone
 
 from . import db
+from .config import PROJECT_DIR
+
+OBS_PATH = PROJECT_DIR / "data" / "thennow_observations.json"
 
 # ---------------------------------------------------------------- declared clock
 CLOCK = {
@@ -202,6 +207,112 @@ def _evaluate(int_dot, int_ai, today):
     }
 
 
+# ------------------------------------------------------------------- validation
+# Two passes over a leaf's daily curves. CANDIDACY: does the metric even span both
+# eras with real dynamic range? SHAPE: does the reference era actually rise, peak,
+# and fall, and is AI below that peak and moving toward it? The verdict and numbers
+# are computed here and are authoritative; observations layer cached prose on top.
+def _first(a):
+    return next((v for v in a if v is not None), None)
+
+
+def _last_val(a):
+    return next((v for v in reversed(a) if v is not None), None)
+
+
+def _validate(sm_dot, sm_ai, int_dot, int_ai, direction):
+    up = direction != "down"
+    checks = []
+
+    def add(name, ok, detail):
+        checks.append({"name": name, "pass": bool(ok), "detail": detail})
+
+    start_dot, peak_dot = sm_dot[0], sm_dot[RAMP]
+    # pass 1 — candidacy
+    covers = _first(sm_dot) is not None and _first(sm_ai) is not None
+    add("covers both eras", covers,
+        "real data at both era starts" if covers else "missing one era's start")
+    rng = abs(peak_dot - start_dot) / abs(start_dot) if start_dot else 0.0
+    add("dynamic range", rng >= 0.2, f"dot-com moved {rng * 100:.0f}% from start to peak")
+
+    # pass 2 — shape (after smoothing)
+    seq = [v for v in sm_dot if v is not None]
+    n = len(seq)
+    ext_i = (max(range(n), key=lambda i: seq[i]) if up
+             else min(range(n), key=lambda i: seq[i])) if n else 0
+    interior = bool(n) and 0.15 * n < ext_i < 0.9 * n
+    reverses = bool(n) and ((seq[-1] < seq[ext_i] * 0.92) if up else (seq[-1] > seq[ext_i] * 1.08))
+    add("rise, peak, fall", interior and reverses,
+        f"peaks near {ext_i / RAMP * 100:.0f}% then reverses" if interior and reverses
+        else "no clear interior peak in the reference era")
+    ai_now = _last_val(int_ai) or 0.0
+    add("AI below the peak", ai_now < 1.02, f"AI at {ai_now * 100:.0f}% of the dot-com peak")
+    ai_start = _first(int_ai) or 0.0
+    rising = (ai_now > ai_start) if up else (ai_now < ai_start)
+    add("AI moving toward the peak", rising,
+        "AI has risen over its era" if rising else "AI is flat or moving away from the peak")
+
+    # AI's current level crossed on the dot-com ramp (informational, not gating)
+    lim = min(len(int_dot) - 1, RAMP)
+    crossings = 0
+    for i in range(1, lim + 1):
+        v0, v1 = int_dot[i - 1], int_dot[i]
+        if v0 is None or v1 is None:
+            continue
+        if (v0 - ai_now) * (v1 - ai_now) < 0:
+            crossings += 1
+    return {"valid": all(c["pass"] for c in checks), "checks": checks, "crossings": crossings}
+
+
+# ------------------------------------------------------------------- observations
+def _load_obs_cache():
+    try:
+        return json.loads(OBS_PATH.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+
+
+def obs_hash(node):
+    """Stable signature of a node's qualitative state: verdict, phase, intensity
+    bucketed to 5%, and the check pass/fail pattern. Daily wiggles don't move it, so
+    the cached Haiku prose regenerates only on a real shift (rare, hence committable)."""
+    checks = "".join("1" if c["pass"] else "0"
+                     for c in (node.get("validation") or {}).get("checks", []))
+    sig = (f"{node.get('valid')}|{node.get('phase')}|"
+           f"{round((node.get('intensityNow') or 0) * 20)}|{checks}")
+    return hashlib.md5(sig.encode()).hexdigest()[:12]
+
+
+def obs_fallback(node):
+    """Deterministic observation from the computed checks, used when no cached LLM
+    prose matches (no API key, or the state shifted since the last refresh)."""
+    v = node.get("validation") or {}
+    eqp = (node.get("equiv") or {}).get("progress", 0) or 0
+    if node.get("valid"):
+        if node.get("children"):
+            n = sum(1 for c in node["children"] if not c.get("wip") and c.get("valid", True))
+            head = f"{node['label']} blends {n} conforming input{'s' if n != 1 else ''}"
+        else:
+            head = f"{node['label']}: {node.get('display', '')}"
+        return (f"{head}, matching the dot-com path near {eqp:.0f}% of the way to the peak "
+                f"({node.get('phase', '')}); it projects a top around {node.get('projectedPeakDate', '')}.")
+    fail = next((c for c in v.get("checks", []) if not c["pass"]), None)
+    tail = f" ({fail['detail']})" if fail else ""
+    return (f"{node['label']} does not fit the rise-peak-fall analog{tail}; "
+            "it is shown for context and its projection is suppressed.")
+
+
+def _attach_observations(node, cache):
+    if not node.get("wip"):
+        h = obs_hash(node)
+        node["obsHash"] = h
+        entry = cache.get(node["key"])
+        node["observations"] = (entry["text"] if entry and entry.get("hash") == h
+                                else obs_fallback(node))
+    for c in node.get("children", []):
+        _attach_observations(c, cache)
+
+
 def _blend(arrays):
     """Equal-weight pointwise mean of daily intensity curves."""
     n = len(arrays[0])
@@ -226,6 +337,7 @@ def _build_leaf(conn, node, dot_dates, ai_dates, today):
     sm_ai = _smooth_centered(raw_ai, SMOOTH_DAYS)
     int_dot, int_ai = _normalize(sm_dot, sm_ai, m["type"])
     result = _evaluate(int_dot, int_ai, today)
+    validation = _validate(sm_dot, sm_ai, int_dot, int_ai, m["direction"])
 
     if m["type"] == "ratio_from_start":
         ai_mult = sm_ai[-1] / sm_ai[0]
@@ -241,6 +353,7 @@ def _build_leaf(conn, node, dot_dates, ai_dates, today):
 
     return {"key": node["key"], "label": node["label"], "leaf": m["kind"], "unit": m["unit"],
             "type": m["type"], "display": display, "different": different,
+            "valid": validation["valid"], "validation": validation,
             "_intDot": int_dot, "_intAi": int_ai, "_smDot": sm_dot, "_smAi": sm_ai,
             "_rawDot": raw_dot, "_rawAi": raw_ai, **result}
 
@@ -255,10 +368,20 @@ def _build(conn, node, dot_dates, ai_dates, today):
     placeholders = [k for k in kids if k and k.get("wip")]
     if not live:
         return None
-    int_dot = _blend([k["_intDot"] for k in live])
-    int_ai = _blend([k["_intAi"] for k in live])
+    # A parent blends only its CONFORMING inputs, so a non-conforming child is shown
+    # but never drags the roll-up's projection. If none conform, fall back to the
+    # full set for a curve but mark the parent invalid (projection suppressed too).
+    valid_live = [k for k in live if k.get("valid", True)]
+    use = valid_live or live
+    int_dot = _blend([k["_intDot"] for k in use])
+    int_ai = _blend([k["_intAi"] for k in use])
     result = _evaluate(int_dot, int_ai, today)
+    valid = len(valid_live) > 0
+    validation = {"valid": valid, "crossings": 0, "checks": [
+        {"name": "conforming inputs", "pass": valid,
+         "detail": f"{len(valid_live)} of {len(live)} inputs fit the analog"}]}
     return {"key": node["key"], "label": node["label"], "display": "blended",
+            "valid": valid, "validation": validation,
             "children": live + placeholders, "_intDot": int_dot, "_intAi": int_ai, **result}
 
 
@@ -279,6 +402,7 @@ def _emit(node, dw, aw):
     if node.get("wip"):
         return {"key": node["key"], "label": node["label"], "wip": True}
     out = {"key": node["key"], "label": node["label"], "display": node["display"],
+           "valid": node.get("valid", True), "validation": node.get("validation"),
            "intensityDot": _pick(node["_intDot"], dw), "intensityAi": _pick(node["_intAi"], aw)}
     for k in ("intensityNow", "equiv", "equivalentDotcomDate", "daysFromPeak",
               "compression", "projectedPeakDate", "phase", "beyondDotcomPeak"):
@@ -293,7 +417,9 @@ def _emit(node, dw, aw):
 
 
 def _leaf_dates(node, acc):
-    if node.get("leaf"):
+    # Only conforming leaves contribute to the headline band; a non-conforming
+    # metric's projection is suppressed, so it must not widen the range either.
+    if node.get("leaf") and node.get("valid", True):
         acc.append(node["projectedPeakDate"])
     for c in node.get("children", []):
         _leaf_dates(c, acc)
@@ -313,6 +439,7 @@ def compute_thennow(conn):
     prog_ai = [round(i / RAMP * 100, 2) for i in aw]
     peak_idx = min(range(len(dw)), key=lambda k: abs(dw[k] - RAMP))
     tree = _emit(root, dw, aw)
+    _attach_observations(tree, _load_obs_cache())
 
     dates = []
     _leaf_dates(tree, dates)

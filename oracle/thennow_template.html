@@ -179,6 +179,18 @@
   .steps b { color: var(--text); }
   .m-side .dcnote { margin-top: 15px; padding-top: 13px; border-top: 1px solid var(--border); font-size: 13px; color: var(--muted); line-height: 1.55; }
   .m-side .dcnote .k { font-family: var(--mono); font-size: 9.5px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted2); display: block; margin-bottom: 4px; }
+  .valid { margin-top: 16px; border-top: 1px solid var(--border); padding-top: 13px; }
+  .vchip { font-family: var(--font); font-size: 11px; font-weight: 600; letter-spacing: 0; text-transform: none; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+  .vchip.ok { color: var(--bottom); background: rgba(63,178,127,.13); }
+  .vchip.no { color: var(--peak); background: rgba(255,90,68,.13); }
+  .vchecks { list-style: none; margin: 0 0 4px; padding: 0; }
+  .vchecks li { position: relative; padding: 3px 0 3px 20px; font-size: 12.5px; color: var(--text); }
+  .vchecks li span { display: block; font-size: 11.5px; color: var(--muted2); }
+  .vchecks li::before { position: absolute; left: 0; top: 3px; font-size: 12px; }
+  .vchecks li.p::before { content: "✓"; color: var(--bottom); }
+  .vchecks li.f::before { content: "✕"; color: var(--peak); }
+  .obs { margin-top: 12px; padding: 11px 12px; background: var(--panel2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 13px; line-height: 1.55; }
+  .obs .k { font-family: var(--mono); font-size: 9.5px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted2); display: block; margin-bottom: 5px; }
   .mweights { margin-top: 18px; border-top: 1px solid var(--border); padding-top: 14px; }
   .mweights h4 { color: var(--muted2); }
   .wrow { display: flex; align-items: center; gap: 10px; padding: 4px 0; font-size: 12.5px; }
@@ -324,7 +336,9 @@ function blend(arrays, weights) {
   for (let i = 0; i < n; i++) { let num = 0, den = 0; arrays.forEach((a, k) => { if (a[i] != null) { num += weights[k] * a[i]; den += weights[k]; } }); out.push(den ? num / den : null); }
   return out;
 }
-function liveKids(node) { return (node.children || []).filter(c => !c.wip && c.intensityDot); }
+// A non-conforming child is shown (its own card/tree row) but never blended into a
+// parent, matching the engine's `use = valid_live` roll-up. Weights track the same set.
+function liveKids(node) { return (node.children || []).filter(c => !c.wip && c.intensityDot && c.valid !== false); }
 function recompute(node) {
   const kids = liveKids(node); if (!kids.length) return;
   const w = node._weights || kids.map(() => 1);
@@ -377,7 +391,7 @@ function leafVals(n) {
 
 /* ---------- HERO ---------- */
 function renderHero() {
-  const root = DATA.tree, leaves = liveLeaves(root).map(l => l.projectedPeakDate).sort();
+  const root = DATA.tree, leaves = liveLeaves(root).filter(l => l.valid !== false).map(l => l.projectedPeakDate).sort();
   el("hero").innerHTML =
     `<div class="eyebrow">Projected · AI era peak</div>` +
     `<div class="lead">Blended across the wired metrics, the AI bubble tops out on</div>` +
@@ -437,10 +451,12 @@ function makeCard(n) {
       `<div class="foot"><span>not wired</span><span class="int">—</span></div>`;
     return c;
   }
+  const ok = n.valid !== false;
   c.innerHTML = `<div class="top"><span class="name">${n.label}</span><span class="tier">${tierOf(n)}</span><span class="open">expand ↗</span></div>` +
-    `<div class="lbl">Projected peak</div><div class="date">${fmtNice(n.projectedPeakDate)}</div>` +
+    `<div class="lbl">${ok ? "Projected peak" : "Projection"}</div>` +
+    `<div class="date"${ok ? "" : ' style="color:var(--muted2);font-size:26px"'}>${ok ? fmtNice(n.projectedPeakDate) : "suppressed"}</div>` +
     `<div class="mini"><canvas></canvas></div>` +
-    `<div class="foot"><span class="phase">${n.phase}</span><span class="int">Intensity <b>${(n.intensityNow * 100).toFixed(0)}%</b></span></div>`;
+    `<div class="foot"><span class="phase">${ok ? n.phase : "does not fit the analog"}</span><span class="int">Intensity <b>${(n.intensityNow * 100).toFixed(0)}%</b></span></div>`;
   c.addEventListener("click", () => openNode(n.key));
   MINIS.push([c.querySelector("canvas"), n]);
   return c;
@@ -455,7 +471,7 @@ function treeNode(n) {
   const kids = orderedChildren(n), hasKids = kids.length > 0;
   row.innerHTML = `<span class="caret${hasKids ? "" : " leaf"}">${collapsed.has(n.key) ? "▸" : "▾"}</span><span class="sdot ${n.wip ? "wip" : "live"}"></span>` +
     `<span class="slabel">${n.label}</span>` +
-    `<span class="sdate"><span class="l">${n.wip ? "status" : "peak"}</span>${n.wip ? "WIP" : fmtNice(n.projectedPeakDate)}</span>`;
+    `<span class="sdate"><span class="l">${n.wip ? "status" : n.valid === false ? "analog" : "peak"}</span>${n.wip ? "WIP" : n.valid === false ? "no fit" : fmtNice(n.projectedPeakDate)}</span>`;
   if (!n.wip) row.addEventListener("click", e => { if (!e.target.classList.contains("caret")) openNode(n.key); });
   wrap.appendChild(row);
   if (hasKids) {
@@ -479,9 +495,7 @@ const LEG =
 function openNode(key) {
   const n = NODES[key]; if (!n || n.wip) return; CUR = n;
   el("m-crumb").innerHTML = crumbOf(n).map((c, i, a) => `${i ? '<span class="sep">›</span>' : ''}<span class="${i === a.length - 1 ? 'here' : ''}">${c.label}</span>`).join("");
-  el("m-lbl").textContent = "Projected peak — " + n.label + (n.leaf ? "" : " (blended)");
-  el("m-date").textContent = fmtNice(n.projectedPeakDate);
-  el("m-sub").innerHTML = `Today it's <b>${(n.intensityNow * 100).toFixed(0)}%</b> of the way to the 2000 peak (${n.phase}); if the arc holds, a projected bottom around <b>${fmtMY(bottomIso(n))}</b>.`;
+  setHead(n);
   el("m-legend").innerHTML = LEG;
   el("m-tiles").innerHTML = tilesHtml(n);
   el("m-deriv").innerHTML = derivHtml(n);
@@ -510,9 +524,23 @@ function derivHtml(n) {
     `Matches the dot-com path at <b>${n.equiv.progress.toFixed(1)}%</b> — <b>${n.equivalentDotcomDate}</b> (${n.phase}), ${Math.abs(n.daysFromPeak)} days ${n.daysFromPeak < 0 ? "before" : "after"} the peak.`,
     `Extending that arc at <b>${n.compression}×</b> pace projects the peak on <b>${n.projectedPeakDate}</b> and the bottom around <b>${bd}</b>.`];
   const src = n.leaf === "price" ? "tn_price" : n.leaf === "cape" ? "tn_cape" : "tn_valuation";
+  const ok = n.valid !== false;
+  const steps = ok ? `<ol class="steps">${rows.map((r, i) => `<li data-n="${i + 1}">${r}</li>`).join("")}</ol>`
+    : `<div class="dcnote">This metric does not fit the rise-peak-fall analog, so no date is projected from it. The curves below are shown for context only.</div>`;
   return `<h4>How this date is derived <span class="more"><a href="datasources.html#src:${src}" target="_blank" rel="noopener">full method &amp; sources ↗</a></span></h4>` +
-    `<ol class="steps">${rows.map((r, i) => `<li data-n="${i + 1}">${r}</li>`).join("")}</ol>` +
-    (n.leaf && n.different ? `<div class="dcnote"><span class="k">vs dot-com</span>${n.different}</div>` : "");
+    steps +
+    (ok && n.leaf && n.different ? `<div class="dcnote"><span class="k">vs dot-com</span>${n.different}</div>` : "") +
+    validationHtml(n);
+}
+// Validator verdict + the checks that produced it + the cached (or fallback)
+// observation. The numbers are authoritative; the observation is prose on top.
+function validationHtml(n) {
+  const v = n.validation || {}, checks = v.checks || [], ok = n.valid !== false;
+  const chip = `<span class="vchip ${ok ? "ok" : "no"}">${ok ? "✓ fits the analog" : "⚠ does not fit"}</span>`;
+  const list = checks.map(c => `<li class="${c.pass ? "p" : "f"}">${c.name}<span>${c.detail}</span></li>`).join("");
+  const obs = n.observations ? `<div class="obs"><span class="k">Observation</span>${n.observations}</div>` : "";
+  return `<div class="valid"><h4 style="text-transform:none;letter-spacing:0">Validation ${chip}</h4>` +
+    (list ? `<ul class="vchecks">${list}</ul>` : "") + obs + `</div>`;
 }
 function weightsBlock(node, kids) {
   node._weights = node._weights || kids.map(() => 1);
@@ -532,10 +560,19 @@ function weightsBlock(node, kids) {
   sync(); return box;
 }
 function refreshMetric(n) {
-  el("m-date").textContent = fmtNice(n.projectedPeakDate);
-  el("m-sub").innerHTML = `Today it's <b>${(n.intensityNow * 100).toFixed(0)}%</b> of the way to the 2000 peak (${n.phase}); if the arc holds, a projected bottom around <b>${fmtMY(bottomIso(n))}</b>.`;
+  setHead(n);
   el("m-tiles").innerHTML = tilesHtml(n); el("m-deriv").innerHTML = derivHtml(n);
   buildRibbon(n); drawBig(n);
+}
+// Modal headline. A non-conforming metric has no projected date, so the date
+// reads as suppressed and the copy says why, rather than showing a made-up peak.
+function setHead(n) {
+  const ok = n.valid !== false;
+  el("m-lbl").textContent = (ok ? "Projected peak — " : "No projection — ") + n.label + (n.leaf ? "" : " (blended)");
+  el("m-date").textContent = ok ? fmtNice(n.projectedPeakDate) : "—";
+  el("m-sub").innerHTML = ok
+    ? `Today it's <b>${(n.intensityNow * 100).toFixed(0)}%</b> of the way to the 2000 peak (${n.phase}); if the arc holds, a projected bottom around <b>${fmtMY(bottomIso(n))}</b>.`
+    : `This metric does not fit the rise-peak-fall analog, so no peak date is projected from it. Today it sits at <b>${(n.intensityNow * 100).toFixed(0)}%</b> of the 2000 peak level (${n.phase}); the curve is shown for context.`;
 }
 function buildRibbon(n) {
   const r = el("m-ribbon"); r.innerHTML = "";
@@ -553,6 +590,7 @@ function drawBig(n) {
   const all = n.intensityDot.concat(n.intensityAi), yMax = Math.max(1.12, Math.max(...all) * 1.06), yMin = Math.min(0, Math.min(...all));
   const X = p => PAD.l + plotW * p / XMAX, Y = v => PAD.t + plotH * (1 - (v - yMin) / (yMax - yMin || 1));
   const aiP = aiPlot(n), yb = h - PAD.b, eqx = X(n.equiv.progress), eqy = Y(n.intensityNow);
+  const ok = n.valid !== false;   // non-conforming metric: no projection drawn
   RC = { X, Y, PAD, w, h, n, px2prog: x => (x - PAD.l) / (plotW || 1) * XMAX };
   ctx.clearRect(0, 0, w, h);
 
@@ -584,37 +622,42 @@ function drawBig(n) {
   const dc = []; for (let i = 0; i < PROG_DOT.length; i++) if (PROG_DOT[i] <= n.equiv.progress && n.intensityDot[i] != null) dc.push([PROG_DOT[i], n.intensityDot[i]]);
   dc.push([n.equiv.progress, interp(PROG_DOT, n.intensityDot, n.equiv.progress)]);
   poly(ctx, dc, X, Y, getCss("--then"), 1.8, [5, 4]);
-  // blue dashed projection: convergence → peak → bottom (traces the remaining dot-com shape)
-  const proj = [[n.equiv.progress, n.intensityNow]]; for (let i = 0; i < PROG_DOT.length; i++) if (PROG_DOT[i] > n.equiv.progress && n.intensityDot[i] != null) proj.push([PROG_DOT[i], n.intensityDot[i]]);
-  poly(ctx, proj, X, Y, getCss("--accent-hi"), 2.4, [7, 5]);
+  // blue dashed projection: convergence → peak → bottom (traces the remaining dot-com
+  // shape). Suppressed when the metric does not conform to the analog.
+  if (ok) {
+    const proj = [[n.equiv.progress, n.intensityNow]]; for (let i = 0; i < PROG_DOT.length; i++) if (PROG_DOT[i] > n.equiv.progress && n.intensityDot[i] != null) proj.push([PROG_DOT[i], n.intensityDot[i]]);
+    poly(ctx, proj, X, Y, getCss("--accent-hi"), 2.4, [7, 5]);
+  }
   // AI actual solid
   poly(ctx, aiP.map((p, i) => [p, n.intensityAi[i]]), X, Y, getCss("--accent-hi"), 2.9, []);
 
-  // marker vertical lines
+  // marker vertical lines (peak/bottom only when a projection exists)
   const MK = [{ id: "begin", p: 0, col: "var(--then)", dash: [], a: .55 },
     { id: "today", p: n.equiv.progress, col: "var(--text)", dash: [3, 4], a: .9 },
     { id: "peak", p: 100, col: "var(--peak)", dash: [3, 3], a: .9 },
     { id: "bottom", p: BOTTOM_PROG, col: "var(--bottom)", dash: [3, 3], a: .9 }];
-  MK.forEach(m => { const x = X(m.p); ctx.globalAlpha = m.a; ctx.strokeStyle = getCss(m.col.slice(4, -1)); ctx.lineWidth = m.id === "today" ? 1.6 : 1.4; ctx.setLineDash(m.dash);
+  MK.filter(m => ok || m.id === "begin" || m.id === "today").forEach(m => { const x = X(m.p); ctx.globalAlpha = m.a; ctx.strokeStyle = getCss(m.col.slice(4, -1)); ctx.lineWidth = m.id === "today" ? 1.6 : 1.4; ctx.setLineDash(m.dash);
     ctx.beginPath(); ctx.moveTo(x, PAD.t); ctx.lineTo(x, yb); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1; });
   // dots: convergence (grey+blue), peak (red), bottom (green)
   ctx.fillStyle = getCss("--then"); ctx.beginPath(); ctx.arc(eqx, eqy, 6, 0, 6.2832); ctx.fill();
   ctx.fillStyle = getCss("--accent-hi"); ctx.beginPath(); ctx.arc(eqx, eqy, 3.8, 0, 6.2832); ctx.fill(); ctx.strokeStyle = getCss("--bg"); ctx.lineWidth = 1.5; ctx.stroke();
-  const dot = (p, c) => { ctx.fillStyle = getCss(c); ctx.beginPath(); ctx.arc(X(p), Y(interp(PROG_DOT, n.intensityDot, p)), 5, 0, 6.2832); ctx.fill(); ctx.strokeStyle = getCss("--bg"); ctx.lineWidth = 1.5; ctx.stroke(); };
-  dot(100, "--peak"); dot(BOTTOM_PROG, "--bottom");
+  if (ok) {
+    const dot = (p, c) => { ctx.fillStyle = getCss(c); ctx.beginPath(); ctx.arc(X(p), Y(interp(PROG_DOT, n.intensityDot, p)), 5, 0, 6.2832); ctx.fill(); ctx.strokeStyle = getCss("--bg"); ctx.lineWidth = 1.5; ctx.stroke(); };
+    dot(100, "--peak"); dot(BOTTOM_PROG, "--bottom");
+  }
 
   placeMarkers(n, X, wrap);
 }
 // dual-timeline marker chips as HTML over the canvas (AI date over dot-com date)
 function placeMarkers(n, X, wrap) {
   const layer = el("mklayer"); layer.innerHTML = "";
-  const dcMonth = iso => fmtMY(iso);
+  const dcMonth = iso => fmtMY(iso), ok = n.valid !== false;
   const MK = [
     { p: 0, eb: "START", ebc: "var(--then)", col: "var(--then)", ai: fmtMY(DATA.aiStart) + " · " + DATA.aiStartEvent, dc: dcMonth(DATA.dotcomStart) + " · " + DATA.dotcomStartEvent, row: 0, align: "L" },
     { p: n.equiv.progress, eb: "TODAY", ebc: "var(--text)", col: "var(--text)", ai: fmtMY(DATA.asOf), dc: dcMonth(n.equivalentDotcomDate), row: 1, align: "C" },
     { p: 100, eb: "PROJECTED PEAK", ebc: "var(--peak)", col: "var(--peak)", ai: fmtMY(n.projectedPeakDate), dc: dcMonth(DATA.dotcomPeak), row: 0, align: "C" },
     { p: BOTTOM_PROG, eb: "PROJECTED BOTTOM", ebc: "var(--bottom)", col: "var(--bottom)", ai: fmtMY(bottomIso(n)), dc: dcMonth(DOT_END_ISO), row: 1, align: "R" }];
-  MK.forEach(m => { const c = document.createElement("div"); c.className = "mkchip"; c.style.left = X(m.p) + "px"; c.style.top = (m.row === 0 ? 4 : 40) + "px";
+  (ok ? MK : MK.slice(0, 2)).forEach(m => { const c = document.createElement("div"); c.className = "mkchip"; c.style.left = X(m.p) + "px"; c.style.top = (m.row === 0 ? 4 : 40) + "px";
     c.style.transform = m.align === "L" ? "translateX(-8px)" : m.align === "R" ? "translateX(calc(-100% + 8px))" : "translateX(-50%)";
     c.innerHTML = `<div class="eb" style="color:${m.ebc}">${m.eb}</div><div class="ai">${m.ai}</div><div class="dc">${m.dc}</div><div class="caret2" style="color:${m.col}">▼</div>`;
     layer.appendChild(c); });
@@ -670,7 +713,8 @@ function downloadCSV(node) {
   };
   for (let i = 0; i < DATA.dotMonths.length; i++) rd("dotcom", DATA.dotMonths[i], PROG_DOT[i], node.rawDot && node.rawDot[i], node.smoothedDot && node.smoothedDot[i], node.intensityDot[i], lv && lv.dotStart);
   for (let i = 0; i < DATA.aiMonths.length; i++) rd("ai", DATA.aiMonths[i], aiP[i], node.rawAi && node.rawAi[i], node.smoothedAi && node.smoothedAi[i], node.intensityAi[i], lv && lv.aiStart);
-  for (let i = 0; i < DATA.dotMonths.length; i++) { const p = PROG_DOT[i]; if (p <= node.equiv.progress) continue;
+  // Projected lifecycle rows only when the metric conforms (projection not suppressed).
+  if (node.valid !== false) for (let i = 0; i < DATA.dotMonths.length; i++) { const p = PROG_DOT[i]; if (p <= node.equiv.progress) continue;
     const day = isoFromOrd(aiOrdAt(node, p)), inten = node.intensityDot[i];
     if (!leaf) { lines.push(["ai_projected", day, round1(p), csvCell(inten)].join(",")); continue; }
     const val = lv.aiValAt(p);   // native units, continuous with the last real value

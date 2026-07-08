@@ -149,6 +149,12 @@ def _thennow_example(conn):
         # valuation roll-up
         "valIntensity": val.get("intensityNow"), "valEquiv": val.get("equivalentDotcomDate"),
         "valProj": val.get("projectedPeakDate"), "valPhase": val.get("phase"),
+        # validator verdicts + checks + cached observation, per metric
+        "priceValid": price.get("valid"), "capeValid": cape.get("valid"), "valValid": val.get("valid"),
+        "priceChecks": (price.get("validation") or {}).get("checks", []),
+        "capeChecks": (cape.get("validation") or {}).get("checks", []),
+        "priceObs": price.get("observations"), "capeObs": cape.get("observations"),
+        "valObs": val.get("observations"),
     }
 
 
