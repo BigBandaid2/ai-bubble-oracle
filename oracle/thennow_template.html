@@ -305,6 +305,9 @@ const RAMP = DATA.ramp, XMAX = 162, PEAK_IDX = DATA.peakIdx;
 // How today's level is matched on the non-monotone dot-com ramp. The server payload
 // is computed with "dominant"; the drawer toggle lets the reader switch to "first".
 let MATCH_MODE = "dominant";
+// Which materialized smoothing window the graphs read: "90" (3-month, default) or
+// "30" (1-month). The drawer toggle swaps it and every date recomputes.
+let SMOOTH = "90";
 const DOT_START = ord(DATA.dotcomStart), DOT_PEAK = ord(DATA.dotcomPeak);
 const AI_START = ord(DATA.aiStart), TODAY = ord(DATA.asOf);
 const PROG_DOT = DATA.progDot, PROG_AI = DATA.progAi;
@@ -363,6 +366,15 @@ function recompute(node) {
 }
 const PARENT = {}, NODES = {};
 (function link(n) { NODES[n.key] = n; (n.children || []).forEach(c => { PARENT[c.key] = n; link(c); }); })(DATA.tree);
+// Snapshot each leaf's two smoothing windows so the toggle can swap between them.
+// The top-level arrays are the 90-day default; alt30 is the 30-day alternative.
+Object.values(NODES).forEach(n => {
+  if (!n.leaf) return;
+  n.smooth = {
+    "90": { intensityDot: n.intensityDot, intensityAi: n.intensityAi, smoothedDot: n.smoothedDot, smoothedAi: n.smoothedAi, display: n.display },
+    "30": n.alt30 || null,
+  };
+});
 function recomputeUp(node) { let cur = PARENT[node.key]; while (cur) { recompute(cur); cur = PARENT[cur.key]; } }
 function tierOf(n) { return n.leaf ? ("leaf · " + (n.unitLabel || "index")) : PARENT[n.key] ? "roll-up" : "root · all metrics"; }
 function crumbOf(n) { const p = []; let c = n; while (c) { p.unshift(c); c = PARENT[c.key]; } return p; }
@@ -714,35 +726,44 @@ const DRAWER_ITEMS = [
   ["Cycle anchors", `The AI era starts ${fmtMY(DATA.aiStart)} (${DATA.aiStartEvent}); the dot-com era starts ${fmtMY(DATA.dotcomStart)} (${DATA.dotcomStartEvent}). Both are pinned to a single defining launch so the origins line up.`],
   ["Peak (100%)", `The month the smoothed Nasdaq tops out, ${fmtMY(DATA.dotcomPeak)} — a hair earlier than the intraday 2000-03-10 high because of smoothing.`],
   ["Bottom", `The dot-com low, ${fmtMY(DOT_END_ISO)}. On the AI clock each metric's projected bottom scales by its own measured pace.`],
-  ["Smoothing", `A centered 3-month average on each monthly series, so the matching point reads cleanly.`],
+  ["Smoothing", `Each series is a centered moving average on the daily grid, materialized at two windows. 3-month (90d) is the default and reads smoothest; 1-month (30d) tracks the leading edge more tightly, so the matching point and the projected date shift. Both are precomputed; the toggle swaps which one every graph reads.`],
   ["Matching point", `The dot-com climb is not monotone (the 1998 crisis pulled it back below levels it had already reached), so today's level can sit at more than one date. Dominant climb leg uses the last rise through it, the final approach to the peak; First crossing uses the earliest touch, even if a later correction undid it.`],
   ["Phase bands", `Editorial splits on the Netscape-to-peak clock (${BOUNDS.join("/")}%); they set the phase label, not the projected date.`],
   ["Projection", `Past today, AI is assumed to trace the remaining dot-com shape at the measured pace — a transparent method, not a forecast.`],
   ["Weighting", `Parents blend their children (equal weight by default). Change the weights in a parent's detail view and every date downstream moves.`]
 ];
 function renderDrawer() {
-  el("drawer-body").innerHTML = DRAWER_ITEMS.map(([t, d]) =>
-    `<div class="assump"><div class="at">${t}</div><div class="ad">${d}</div>${t === "Matching point" ? matchToggleHtml() : ""}</div>`).join("");
-  wireMatchToggle();
+  el("drawer-body").innerHTML = DRAWER_ITEMS.map(([t, d]) => {
+    const ctrl = t === "Matching point" ? matchToggleHtml() : t === "Smoothing" ? smoothToggleHtml() : "";
+    return `<div class="assump"><div class="at">${t}</div><div class="ad">${d}</div>${ctrl}</div>`;
+  }).join("");
+  wireMatchToggle(); wireSmoothToggle();
 }
 function matchToggleHtml() {
   return `<div class="seg2" id="match-toggle">` +
     `<button data-mode="dominant"${MATCH_MODE === "dominant" ? ' class="on"' : ""}>Dominant climb leg</button>` +
     `<button data-mode="first"${MATCH_MODE === "first" ? ' class="on"' : ""}>First crossing</button></div>`;
 }
-function wireMatchToggle() {
-  const box = el("match-toggle"); if (!box) return;
+function smoothToggleHtml() {
+  return `<div class="seg2" id="smooth-toggle">` +
+    `<button data-win="90"${SMOOTH === "90" ? ' class="on"' : ""}>3-month (90d)</button>` +
+    `<button data-win="30"${SMOOTH === "30" ? ' class="on"' : ""}>1-month (30d)</button></div>`;
+}
+function wireToggle(id, cur, apply) {
+  const box = el(id); if (!box) return;
   box.querySelectorAll("button").forEach(b => b.addEventListener("click", () => {
-    if (b.dataset.mode === MATCH_MODE) return;
-    applyMatchMode(b.dataset.mode);
-    box.querySelectorAll("button").forEach(x => x.classList.toggle("on", x.dataset.mode === MATCH_MODE));
+    const v = b.dataset.mode || b.dataset.win;
+    if (v === cur()) return;
+    apply(v);
+    box.querySelectorAll("button").forEach(x => x.classList.toggle("on", (x.dataset.mode || x.dataset.win) === cur()));
   }));
 }
-// Re-match every node against the ramp under the chosen mode (leaves re-evaluate,
-// parents re-blend then re-evaluate), then repaint. Same recompute path the weight
-// sliders use, so weights and match mode compose.
-function applyMatchMode(mode) {
-  MATCH_MODE = mode;
+function wireMatchToggle() { wireToggle("match-toggle", () => MATCH_MODE, applyMatchMode); }
+function wireSmoothToggle() { wireToggle("smooth-toggle", () => SMOOTH, applySmoothing); }
+// Re-derive every node's scalars after a global option changes (match mode, smoothing
+// window), then repaint. Same recompute path the weight sliders use, so all three
+// compose: leaves re-evaluate from their active arrays, parents re-blend then evaluate.
+function recomputeTree() {
   (function walk(n) {
     (n.children || []).forEach(walk);
     if (n.wip) return;
@@ -751,6 +772,20 @@ function applyMatchMode(mode) {
   })(DATA.tree);
   renderHero(); renderCards(); renderTree();
   if (CUR && !CUR.wip) refreshMetric(CUR);
+}
+function applyMatchMode(mode) { MATCH_MODE = mode; recomputeTree(); }
+// Swap every leaf's active arrays + display to the chosen smoothing window, then
+// re-derive the tree. The 30-day window tracks the leading edge more tightly, so
+// today's level, its matching point, and the projected date all shift.
+function applySmoothing(win) {
+  SMOOTH = win;
+  Object.values(NODES).forEach(n => {
+    const s = n.leaf && n.smooth && n.smooth[win];
+    if (!s) return;
+    n.intensityDot = s.intensityDot; n.intensityAi = s.intensityAi;
+    n.smoothedDot = s.smoothedDot; n.smoothedAi = s.smoothedAi; n.display = s.display;
+  });
+  recomputeTree();
 }
 function openDrawer() { el("drawer-scrim").classList.add("open"); el("drawer").classList.add("open"); }
 function closeDrawer() { el("drawer-scrim").classList.remove("open"); el("drawer").classList.remove("open"); }

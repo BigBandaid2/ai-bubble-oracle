@@ -34,7 +34,9 @@ CLOCK = {
 }
 PHASES = ["Early Ramp", "Acceleration", "Late Bubble", "Crash & Bottom", "Recovery"]
 PHASE_BOUNDS = [0, 35, 85, 100, 160]
-SMOOTH_DAYS = 90          # centered window, default "3-month" (Phase 4 adds 30-day)
+SMOOTH_WINDOWS = {"90": 90, "30": 30}   # centered-mean windows, materialized as permutations
+DEFAULT_SMOOTH = "90"                   # the "3-month" default; "30" is the "1-month" alternative
+SMOOTH_DAYS = SMOOTH_WINDOWS[DEFAULT_SMOOTH]
 
 
 def _d(s):
@@ -350,21 +352,9 @@ def _blend(arrays):
 
 
 # ------------------------------------------------------------------- build tree
-def _build_leaf(conn, node, dot_dates, ai_dates, today):
-    m = node["metric"]
-    pairs = _load_metric(conn, m)
-    if not pairs:
-        return None
-    raw_dot = _fill(pairs, dot_dates)
-    raw_ai = _fill(pairs, ai_dates)
-    if raw_dot[0] is None or raw_ai[0] is None:
-        return None                                   # no coverage (validator refines later)
-    sm_dot = _smooth_centered(raw_dot, SMOOTH_DAYS)
-    sm_ai = _smooth_centered(raw_ai, SMOOTH_DAYS)
-    int_dot, int_ai = _normalize(sm_dot, sm_ai, m["type"])
-    result = _evaluate(int_dot, int_ai, today)
-    validation = _validate(sm_dot, sm_ai, int_dot, int_ai, m["direction"])
-
+def _leaf_copy(m, node, sm_dot, sm_ai):
+    """The 'today' display and the 'vs dot-com' note for a leaf, from a given
+    smoothed series (so it can be recomputed per smoothing window)."""
     if m["type"] == "ratio_from_start":
         ai_mult = sm_ai[-1] / sm_ai[0]
         peak_mult = sm_dot[RAMP] / sm_dot[0]
@@ -377,12 +367,41 @@ def _build_leaf(conn, node, dot_dates, ai_dates, today):
         display = f"CAPE {sm_ai[-1]:.0f}"
         different = (f"CAPE is about {sm_ai[-1]:.0f} now against roughly {sm_dot[RAMP]:.0f} at "
                      "the 2000 peak, so on valuation multiple AI is already close to dot-com's top.")
+    return display, different
+
+
+def _build_leaf(conn, node, dot_dates, ai_dates, today):
+    m = node["metric"]
+    pairs = _load_metric(conn, m)
+    if not pairs:
+        return None
+    raw_dot = _fill(pairs, dot_dates)
+    raw_ai = _fill(pairs, ai_dates)
+    if raw_dot[0] is None or raw_ai[0] is None:
+        return None                                   # no coverage (validator refines later)
+
+    # Materialize BOTH smoothing windows (Phase 4): the 90-day "3-month" default and
+    # the 30-day "1-month" alternative. Each is its own dataset; the page's Options
+    # drawer toggles which one every graph reads, visibly moving the projected date.
+    perms = {}
+    for key, win in SMOOTH_WINDOWS.items():
+        sm_dot = _smooth_centered(raw_dot, win)
+        sm_ai = _smooth_centered(raw_ai, win)
+        int_dot, int_ai = _normalize(sm_dot, sm_ai, m["type"])
+        disp, _diff = _leaf_copy(m, node, sm_dot, sm_ai)
+        perms[key] = {"sm_dot": sm_dot, "sm_ai": sm_ai, "int_dot": int_dot,
+                      "int_ai": int_ai, "display": disp}
+
+    d = perms[DEFAULT_SMOOTH]      # scalars, validation, and prose come from the default window
+    result = _evaluate(d["int_dot"], d["int_ai"], today)
+    validation = _validate(d["sm_dot"], d["sm_ai"], d["int_dot"], d["int_ai"], m["direction"])
+    display, different = _leaf_copy(m, node, d["sm_dot"], d["sm_ai"])
 
     return {"key": node["key"], "label": node["label"], "leaf": m["kind"], "unit": m["unit"],
             "unitLabel": m["unitLabel"], "type": m["type"], "display": display, "different": different,
             "valid": validation["valid"], "validation": validation,
-            "_intDot": int_dot, "_intAi": int_ai, "_smDot": sm_dot, "_smAi": sm_ai,
-            "_rawDot": raw_dot, "_rawAi": raw_ai, **result}
+            "_intDot": d["int_dot"], "_intAi": d["int_ai"], "_smDot": d["sm_dot"], "_smAi": d["sm_ai"],
+            "_rawDot": raw_dot, "_rawAi": raw_ai, "_perms": perms, **result}
 
 
 def _build(conn, node, dot_dates, ai_dates, today):
@@ -439,6 +458,12 @@ def _emit(node, dw, aw):
         out["type"] = node["type"]; out["different"] = node["different"]
         out["smoothedDot"] = _pick(node["_smDot"], dw, 2); out["smoothedAi"] = _pick(node["_smAi"], aw, 2)
         out["rawDot"] = _pick(node["_rawDot"], dw, 2); out["rawAi"] = _pick(node["_rawAi"], aw, 2)
+        # the alternate smoothing window (30-day); the default (90) is the top-level set
+        alt = node.get("_perms", {}).get("30")
+        if alt:
+            out["alt30"] = {"intensityDot": _pick(alt["int_dot"], dw), "intensityAi": _pick(alt["int_ai"], aw),
+                            "smoothedDot": _pick(alt["sm_dot"], dw, 2), "smoothedAi": _pick(alt["sm_ai"], aw, 2),
+                            "display": alt["display"]}
     if "children" in node:
         out["children"] = [_emit(c, dw, aw) for c in node["children"]]
     return out
