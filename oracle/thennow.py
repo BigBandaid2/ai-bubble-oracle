@@ -181,20 +181,33 @@ def _phase_of(progress):
     return label
 
 
-def _match(target, int_dot):
-    """First upward crossing of `target` on the dot-com ramp (progress<=100),
-    returned as a progress %. Earliest crossing wins if the ramp is non-monotone."""
+def _match(target, int_dot, mode="dominant"):
+    """Where `target` sits on the dot-com ramp (progress<=100), as a progress %.
+
+    The ramp is not monotone (the 1998 crisis pulls it back below levels it had
+    already reached), so a level can be crossed more than once. Two readings:
+      - "dominant": the LAST upward crossing, i.e. the final time the dot-com rose
+        through this level on its sustained approach to the peak. This is the
+        dominant climb leg, and it is the default: an early touch that a later
+        correction undid does not represent how far along the cycle we are.
+      - "first": the EARLIEST crossing (the first date the level was reached)."""
     lim = min(len(int_dot) - 1, RAMP)
     if target <= (int_dot[0] or 0):
         return 0.0
+    crossings = []  # (progress, is_upward)
     for i in range(1, lim + 1):
         v0, v1 = int_dot[i - 1], int_dot[i]
         if v0 is None or v1 is None or v1 == v0:
             continue
         if (v0 - target) * (v1 - target) <= 0:
             f = (target - v0) / (v1 - v0)
-            return (i - 1 + f) / RAMP * 100.0
-    return lim / RAMP * 100.0
+            crossings.append(((i - 1 + f) / RAMP * 100.0, v1 > v0))
+    if not crossings:
+        return lim / RAMP * 100.0
+    if mode == "dominant":
+        ups = [p for p, up in crossings if up]
+        return ups[-1] if ups else crossings[-1][0]
+    return crossings[0][0]
 
 
 def _evaluate(int_dot, int_ai, today):

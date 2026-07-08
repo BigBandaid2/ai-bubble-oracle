@@ -211,6 +211,11 @@
   .assump { margin: 0 0 15px; padding-left: 12px; border-left: 2px solid var(--border2); }
   .assump .at { color: var(--text); font-weight: 600; font-size: 13px; }
   .assump .ad { color: var(--muted); font-size: 12.5px; line-height: 1.55; }
+  .seg2 { display: inline-flex; margin-top: 9px; border: 1px solid var(--border2); border-radius: 7px; overflow: hidden; }
+  .seg2 button { font-family: var(--font); font-size: 11.5px; padding: 5px 11px; background: transparent; color: var(--muted); border: none; border-right: 1px solid var(--border2); cursor: pointer; }
+  .seg2 button:last-child { border-right: none; }
+  .seg2 button.on { background: var(--accent); color: #fff; font-weight: 600; }
+  .seg2 button:not(.on):hover { background: var(--panel3); color: var(--text); }
 
   @media (max-width: 1000px) {
     #topbar .sub { display: none; } #topbar .wiptag { display: none; }
@@ -297,6 +302,9 @@ const DAYMS = 86400000;
 const ord = iso => Math.round(Date.parse(iso + "T00:00:00Z") / DAYMS);
 const isoFromOrd = n => new Date(n * DAYMS).toISOString().slice(0, 10);
 const RAMP = DATA.ramp, XMAX = 162, PEAK_IDX = DATA.peakIdx;
+// How today's level is matched on the non-monotone dot-com ramp. The server payload
+// is computed with "dominant"; the drawer toggle lets the reader switch to "first".
+let MATCH_MODE = "dominant";
 const DOT_START = ord(DATA.dotcomStart), DOT_PEAK = ord(DATA.dotcomPeak);
 const AI_START = ord(DATA.aiStart), TODAY = ord(DATA.asOf);
 const PROG_DOT = DATA.progDot, PROG_AI = DATA.progAi;
@@ -310,21 +318,28 @@ const fmtMYs = dt => MON[dt.getUTCMonth()] + " '" + String(dt.getUTCFullYear()).
 
 /* ---------- analog engine (mirrors oracle/thennow.py; needed for live weights) ---------- */
 function phaseOf(p) { let l = PHASES[0]; BOUNDS.forEach((e, i) => { if (p >= e) l = PHASES[i]; }); return l; }
-function match(target, prog, inten) {
-  const ramp = [];
-  for (let i = 0; i < prog.length; i++) if (inten[i] != null && prog[i] <= 100) ramp.push([prog[i], inten[i]]);
-  if (!ramp.length) return { progress: 0 };
-  const last = ramp[ramp.length - 1];
+// Where `target` sits on the (non-monotone) dot-com ramp, as a progress %.
+// mode "dominant" = the last upward crossing (the final approach to the peak, the
+// dominant climb leg); mode "first" = the earliest crossing. See oracle/thennow.py.
+function match(target, prog, inten, mode) {
+  const pts = [];
+  for (let i = 0; i < prog.length; i++) if (inten[i] != null && prog[i] <= 100) pts.push([prog[i], inten[i]]);
+  if (!pts.length) return { progress: 0 };
+  const last = pts[pts.length - 1];
   if (target >= last[1]) return { progress: last[0] };
-  if (target <= ramp[0][1]) return { progress: ramp[0][0] };
-  for (let i = 1; i < ramp.length; i++) { const [p0, v0] = ramp[i - 1], [p1, v1] = ramp[i];
+  if (target <= pts[0][1]) return { progress: pts[0][0] };
+  const cr = [];
+  for (let i = 1; i < pts.length; i++) { const [p0, v0] = pts[i - 1], [p1, v1] = pts[i];
     if (v1 === v0) continue;
-    if ((v0 - target) * (v1 - target) <= 0) { const f = (target - v0) / (v1 - v0); return { progress: p0 + f * (p1 - p0) }; } }
-  return { progress: last[0] };
+    if ((v0 - target) * (v1 - target) <= 0) { const f = (target - v0) / (v1 - v0); cr.push({ progress: p0 + f * (p1 - p0), up: v1 > v0 }); } }
+  if (!cr.length) return { progress: last[0] };
+  if (mode === "first") return { progress: cr[0].progress };
+  const ups = cr.filter(c => c.up);                       // dominant (default): last upward crossing
+  return { progress: (ups.length ? ups[ups.length - 1] : cr[cr.length - 1]).progress };
 }
 function evaluate(intDot, intAi) {
   let aiNow = 0; for (let i = intAi.length - 1; i >= 0; i--) if (intAi[i] != null) { aiNow = intAi[i]; break; }
-  const eq = match(aiNow, PROG_DOT, intDot).progress, equivOrd = DOT_START + Math.round(eq / 100 * RAMP);
+  const eq = match(aiNow, PROG_DOT, intDot, MATCH_MODE).progress, equivOrd = DOT_START + Math.round(eq / 100 * RAMP);
   const aiElapsed = TODAY - AI_START, dotDone = Math.max(eq, 0) / 100 * RAMP;
   const ratio = dotDone > 0 ? aiElapsed / dotDone : 1, dotLeft = Math.max(100 - eq, 0) / 100 * RAMP, projOrd = TODAY + Math.round(ratio * dotLeft);
   return { intensityNow: r3(aiNow), equivProg: eq, equivalentDotcomDate: isoFromOrd(equivOrd), daysFromPeak: equivOrd - DOT_PEAK,
@@ -700,12 +715,43 @@ const DRAWER_ITEMS = [
   ["Peak (100%)", `The month the smoothed Nasdaq tops out, ${fmtMY(DATA.dotcomPeak)} — a hair earlier than the intraday 2000-03-10 high because of smoothing.`],
   ["Bottom", `The dot-com low, ${fmtMY(DOT_END_ISO)}. On the AI clock each metric's projected bottom scales by its own measured pace.`],
   ["Smoothing", `A centered 3-month average on each monthly series, so the matching point reads cleanly.`],
-  ["Matching point", `Today's level maps to the first date the dot-com path reached it on the way up; if it crosses that level twice, the earliest wins.`],
+  ["Matching point", `The dot-com climb is not monotone (the 1998 crisis pulled it back below levels it had already reached), so today's level can sit at more than one date. Dominant climb leg uses the last rise through it, the final approach to the peak; First crossing uses the earliest touch, even if a later correction undid it.`],
   ["Phase bands", `Editorial splits on the Netscape-to-peak clock (${BOUNDS.join("/")}%); they set the phase label, not the projected date.`],
   ["Projection", `Past today, AI is assumed to trace the remaining dot-com shape at the measured pace — a transparent method, not a forecast.`],
   ["Weighting", `Parents blend their children (equal weight by default). Change the weights in a parent's detail view and every date downstream moves.`]
 ];
-function renderDrawer() { el("drawer-body").innerHTML = DRAWER_ITEMS.map(([t, d]) => `<div class="assump"><div class="at">${t}</div><div class="ad">${d}</div></div>`).join(""); }
+function renderDrawer() {
+  el("drawer-body").innerHTML = DRAWER_ITEMS.map(([t, d]) =>
+    `<div class="assump"><div class="at">${t}</div><div class="ad">${d}</div>${t === "Matching point" ? matchToggleHtml() : ""}</div>`).join("");
+  wireMatchToggle();
+}
+function matchToggleHtml() {
+  return `<div class="seg2" id="match-toggle">` +
+    `<button data-mode="dominant"${MATCH_MODE === "dominant" ? ' class="on"' : ""}>Dominant climb leg</button>` +
+    `<button data-mode="first"${MATCH_MODE === "first" ? ' class="on"' : ""}>First crossing</button></div>`;
+}
+function wireMatchToggle() {
+  const box = el("match-toggle"); if (!box) return;
+  box.querySelectorAll("button").forEach(b => b.addEventListener("click", () => {
+    if (b.dataset.mode === MATCH_MODE) return;
+    applyMatchMode(b.dataset.mode);
+    box.querySelectorAll("button").forEach(x => x.classList.toggle("on", x.dataset.mode === MATCH_MODE));
+  }));
+}
+// Re-match every node against the ramp under the chosen mode (leaves re-evaluate,
+// parents re-blend then re-evaluate), then repaint. Same recompute path the weight
+// sliders use, so weights and match mode compose.
+function applyMatchMode(mode) {
+  MATCH_MODE = mode;
+  (function walk(n) {
+    (n.children || []).forEach(walk);
+    if (n.wip) return;
+    if (n.leaf) Object.assign(n, evaluate(n.intensityDot, n.intensityAi));
+    else recompute(n);
+  })(DATA.tree);
+  renderHero(); renderCards(); renderTree();
+  if (CUR && !CUR.wip) refreshMetric(CUR);
+}
 function openDrawer() { el("drawer-scrim").classList.add("open"); el("drawer").classList.add("open"); }
 function closeDrawer() { el("drawer-scrim").classList.remove("open"); el("drawer").classList.remove("open"); }
 
