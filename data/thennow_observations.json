@@ -1,1 +1,26 @@
-{}
+{
+  "ai_peak": {
+    "hash": "526c984331e0",
+    "text": "This metric suggests AI enthusiasm is climbing steeply, matching dot-com's acceleration phase. If the pattern holds, peak exuberance could arrive around mid-2027. Caveat: only one input feeds this analog, so it captures a narrow slice of market dynamics."
+  },
+  "nasdaq": {
+    "hash": "1a682d9f2472",
+    "text": "The Nasdaq has risen 2.4x since ChatGPT, matching dot-com's acceleration phase about 10 months before the 2000 peak. If the timeline compresses similarly, the analog suggests a top around mid-2027. Caveat: index composition differs vastly, and today's mega-cap tech firms have real earnings, unlike many dot-com companies."
+  },
+  "price_appreciation": {
+    "hash": "c046c92f71fc",
+    "text": "AI valuations are accelerating at a pace similar to late 1998, suggesting the boom phase still has runway. Caveat: compressed timelines may reflect faster information spread rather than fundamentally different bubble dynamics."
+  },
+  "sp500": {
+    "hash": "eb3f904521cb",
+    "text": "The S&P 500 has risen sharply since ChatGPT's launch, tracking a similar acceleration phase to the dot-com bubble's 1998 advance. If the current compression holds, the broad market could peak around early 2028. Caveat: stock indexes reflect many sectors beyond AI, so this analog conflates bubble dynamics in one industry with economy-wide valuation."
+  },
+  "valuation": {
+    "hash": "526c984331e0",
+    "text": "AI valuations are climbing at a pace matching the dot-com acceleration phase, about 14 months before that bubble peaked. Caveat: this assumes compression ratios stay constant, but market dynamics often shift unpredictably."
+  },
+  "valuation_multiple": {
+    "hash": "6a8fd531f129",
+    "text": "Valuation multiples have climbed to levels comparable to late 1999, suggesting AI euphoria has reached a similar intensity to the dot-com peak. If this metric's historical analog holds, markets face potential pressure around late 2026. Caveat: valuation alone cannot predict crashes, which often require a triggering catalyst that may never materialize."
+  }
+}
