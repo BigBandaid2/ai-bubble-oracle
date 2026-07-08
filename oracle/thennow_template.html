@@ -115,6 +115,35 @@
     aside { width: auto; height: auto; overflow: visible; border-left: none; border-top: 1px solid var(--border); }
     .cbody { grid-template-columns: 1fr; }
   }
+
+  /* ---- click-to-expand modal ---- */
+  .ncw { cursor: zoom-in; }
+  .ncw::after { content: "\2922"; position: absolute; top: 6px; right: 8px; font-size: 13px;
+    color: var(--muted2); opacity: .65; pointer-events: none; }
+  #modal-scrim { position: fixed; inset: 0; background: rgba(0,0,0,.62); opacity: 0; pointer-events: none;
+    transition: opacity .18s; z-index: 40; }
+  #modal-scrim.open { opacity: 1; pointer-events: auto; }
+  #modal { position: fixed; inset: 3vh 3vw; background: var(--panel); border: 1px solid var(--border);
+    border-radius: 14px; z-index: 41; display: flex; flex-direction: column; padding: 18px 22px 20px;
+    opacity: 0; transform: scale(.985); pointer-events: none; transition: opacity .18s, transform .18s; }
+  #modal.open { opacity: 1; transform: none; pointer-events: auto; }
+  .modal-head { display: flex; align-items: center; gap: 12px; }
+  .modal-title { font-size: 18px; font-weight: 600; display: flex; align-items: center; gap: 9px; }
+  .modal-actions { margin-left: auto; display: flex; gap: 8px; }
+  .mbtn { background: var(--panel2); border: 1px solid var(--border); color: var(--text); font: inherit;
+    font-size: 13px; padding: 7px 13px; border-radius: 8px; cursor: pointer; }
+  .mbtn:hover { border-color: var(--accent); color: var(--accent); }
+  .mbtn.close { font-size: 18px; line-height: 1; padding: 4px 11px; }
+  .modal-chart { flex: 1; position: relative; margin: 14px 0; min-height: 0; }
+  .modal-chart canvas { width: 100%; height: 100%; display: block; }
+  .modal-deriv { font-size: 12.5px; color: var(--muted); line-height: 1.6; max-height: 32vh; overflow-y: auto;
+    border-top: 1px solid var(--border); padding-top: 12px; }
+  .modal-deriv h4 { font-size: 11px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted2);
+    margin: 0 0 6px; font-weight: 600; }
+  .modal-deriv ol { margin: 0 0 0 18px; }
+  .modal-deriv li { margin: 4px 0; }
+  .modal-deriv b { color: var(--text); font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  .modal-deriv .dl-note { margin-top: 8px; color: var(--muted2); }
 </style>
 </head>
 <body>
@@ -150,6 +179,20 @@
     </div>
   </aside>
 </div>
+
+<div id="modal-scrim"></div>
+<div id="modal" role="dialog" aria-modal="true" aria-label="Graph detail">
+  <div class="modal-head">
+    <div class="modal-title" id="modal-title"></div>
+    <div class="modal-actions">
+      <button id="modal-dl" class="mbtn" title="Download the month-by-month series behind this graph">&#10515; Download data (CSV)</button>
+      <button id="modal-close" class="mbtn close" aria-label="Close">&times;</button>
+    </div>
+  </div>
+  <div class="modal-chart"><canvas id="modal-canvas"></canvas></div>
+  <div class="modal-deriv" id="modal-deriv"></div>
+</div>
+
 <script>
 const DATA = __DATA__;
 const $ = (s, el) => (el || document).querySelector(s);
@@ -332,6 +375,8 @@ function nodeCard(node) {
   body.className = "cbody";
   const left = document.createElement("div");
   const cw = document.createElement("div"); cw.className = "ncw";
+  cw.title = "Click to expand";
+  cw.addEventListener("click", () => openModal(node));
   const canvas = document.createElement("canvas"); cw.appendChild(canvas);
   const leg = document.createElement("div"); leg.className = "legend";
   leg.innerHTML = `<span><i style="background:var(--ath)"></i>Dot-com path</span>` +
@@ -504,6 +549,71 @@ function drawNode(canvas, node) {
     pt(ctx, x2px(node.aiNow.progress), y2px(node.aiNow.intensity), css.getPropertyValue("--accent"));
   }
 }
+
+/* ---------- click-to-expand modal + data download ---------- */
+let modalNode = null;
+function openModal(node) {
+  if (!node || node.wip) return;
+  modalNode = node;
+  $("#modal-title").innerHTML = `${node.label} <span class="tier">${tierOf(node)}</span>`;
+  $("#modal-deriv").innerHTML = derivHtml(node);
+  $("#modal-scrim").classList.add("open");
+  $("#modal").classList.add("open");
+  requestAnimationFrame(() => drawNode($("#modal-canvas"), node));
+}
+function closeModal() {
+  $("#modal-scrim").classList.remove("open");
+  $("#modal").classList.remove("open");
+  modalNode = null;
+}
+function derivHtml(node) {
+  const eq = node.equiv.progress;
+  const aiElapsed = TODAY - AI_START;
+  const dotDone = Math.round(Math.max(eq, 0) / 100 * RAMP);
+  const dotLeft = Math.round(Math.max(100 - eq, 0) / 100 * RAMP);
+  const scaled = Math.round(node.compression * dotLeft);
+  const pctv = v => (v * 100).toFixed(0) + "%";
+  const rows = [];
+  if (node.leaf) {
+    rows.push(`Today the AI reading sits at <b>${pctv(node.intensityNow)}</b> of the way from the dot-com starting level to its 2000 peak (${node.display}).`);
+  } else {
+    const kids = liveKids(node), w = node._weights || kids.map(() => 1), tot = w.reduce((a, b) => a + b, 0) || 1;
+    rows.push(`Blend of ${kids.map((c, i) => `${c.label} <b>${Math.round(w[i] / tot * 100)}%</b>`).join(", ")} gives intensity <b>${pctv(node.intensityNow)}</b>.`);
+  }
+  rows.push(`That matches the dot-com path at <b>${eq.toFixed(1)}%</b> of its timeline: <b>${node.equivalentDotcomDate}</b> (${node.phase}), <b>${Math.abs(node.daysFromPeak)}</b> days ${node.daysFromPeak < 0 ? "before" : "after"} the 2000-03 peak.`);
+  rows.push(`AI reached this in <b>${aiElapsed}</b> days; the dot-com path took <b>${dotDone}</b> days to cover the same ground, so AI's pace is <b>${node.compression}&times;</b> (${node.compression < 1 ? "faster" : "slower"}).`);
+  rows.push(`Dot-com then took <b>${dotLeft}</b> more days to peak. Scaled by pace: ${node.compression} &times; ${dotLeft} &asymp; <b>${scaled}</b> days from ${DATA.asOf}, so the projected top is <b>${node.projectedPeakDate}</b>.`);
+  const note = node.leaf
+    ? `The CSV has every month for both eras: raw ${node.unit || "value"}, the 3-month smoothed value, and the 0-1 intensity behind this curve.`
+    : `The CSV has the blended intensity per month for both eras.`;
+  return `<h4>How this date is derived</h4><ol>${rows.map(r => `<li>${r}</li>`).join("")}</ol><div class="dl-note">${note}</div>`;
+}
+function csvCell(v) { return v == null ? "" : v; }
+function downloadCSV(node) {
+  const leaf = !!node.leaf;
+  const lines = [leaf ? `era,month,progress_pct,${node.unit || "raw"},smoothed,intensity`
+                      : `era,month,progress_pct,intensity`];
+  const push = (era, months, prog, raw, sm, inten) => {
+    for (let i = 0; i < months.length; i++) {
+      lines.push(leaf
+        ? [era, months[i], prog[i], csvCell(raw[i]), csvCell(sm[i]), csvCell(inten[i])].join(",")
+        : [era, months[i], prog[i], csvCell(inten[i])].join(","));
+    }
+  };
+  push("dotcom", DATA.dotMonths, PROG_DOT, node.rawDot, node.smoothedDot, node.intensityDot);
+  push("ai", DATA.aiMonths, PROG_AI, node.rawAi, node.smoothedAi, node.intensityAi);
+  const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `thennow_${node.key}.csv`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 0);
+}
+$("#modal-scrim").addEventListener("click", closeModal);
+$("#modal-close").addEventListener("click", closeModal);
+$("#modal-dl").addEventListener("click", () => downloadCSV(modalNode));
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeModal(); });
+window.addEventListener("resize", () => { if (modalNode) requestAnimationFrame(() => drawNode($("#modal-canvas"), modalNode)); });
 
 /* ---------- boot ---------- */
 document.getElementById("hideall").addEventListener("click", () => {

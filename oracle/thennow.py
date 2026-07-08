@@ -172,29 +172,39 @@ def _axes(today):
 
 # ------------------------------------------------------------------ leaf curves
 def _leaf_raw(conn, kind, ax):
-    """Return (dot_vals, ai_vals) smoothed and aligned to the canonical months."""
+    """Return raw (monthly) and smoothed value series for both eras, aligned to
+    the canonical months. `unit` names what the raw number is."""
     if kind == "price":
         rows = db.load_prices(conn, NASDAQ)
         pairs = sorted((r["date"], r["close"]) for r in rows if r["close"] is not None)
+        unit = "nasdaq_close"
     elif kind == "cape":
         rows = db.load_cape(conn)
         pairs = sorted((r["date"], r["cape"]) for r in rows)
+        unit = "shiller_cape"
     else:
-        return None, None
+        return None
     if not pairs:
-        return None, None
-    dot = _smooth(_on_months(pairs, ax["dotMonths"]), SMOOTH_MONTHS)
-    ai = _smooth(_on_months(pairs, ax["aiMonths"]), SMOOTH_MONTHS)
-    return dot, ai
+        return None
+    raw_dot = _on_months(pairs, ax["dotMonths"])
+    raw_ai = _on_months(pairs, ax["aiMonths"])
+    return {"unit": unit, "rawDot": raw_dot, "smoothedDot": _smooth(raw_dot, SMOOTH_MONTHS),
+            "rawAi": raw_ai, "smoothedAi": _smooth(raw_ai, SMOOTH_MONTHS)}
+
+
+def _r2(seq):
+    return [round(v, 2) if v is not None else None for v in seq]
 
 
 def _leaf_curves(conn, node, ax):
-    """Compute a leaf's 0..1 intensity curves plus a human display of 'now'."""
+    """Compute a leaf's 0..1 intensity curves, the raw/smoothed series behind
+    them (for inspection/download), and a human display of 'now'."""
     kind = node["leaf"]
     mode = "relative" if kind == "price" else "absolute"
-    dot, ai = _leaf_raw(conn, kind, ax)
-    if not dot or not ai or dot[0] is None or ai[0] is None:
+    lr = _leaf_raw(conn, kind, ax)
+    if not lr or lr["smoothedDot"][0] is None or lr["smoothedAi"][0] is None:
         return None
+    dot, ai = lr["smoothedDot"], lr["smoothedAi"]
     dot_start, dot_peak = dot[0], dot[ax["peakIdx"]]
     span = dot_peak - dot_start or 1.0
     dot_int = [round((v - dot_start) / span, 4) if v is not None else None for v in dot]
@@ -216,6 +226,9 @@ def _leaf_curves(conn, node, ax):
         different = (f"CAPE is about {ai[-1]:.0f} now against roughly {dot_peak:.0f} at the "
                      "2000 peak, so on valuation multiple AI is already close to dot-com's top.")
     return {"intensityDot": dot_int, "intensityAi": ai_int,
+            "unit": lr["unit"],
+            "rawDot": _r2(lr["rawDot"]), "smoothedDot": _r2(dot),
+            "rawAi": _r2(lr["rawAi"]), "smoothedAi": _r2(ai),
             "display": display, "similar": similar, "different": different}
 
 
@@ -297,9 +310,7 @@ def _build(conn, node, ax, today):
             return None
         result = _evaluate(curves["intensityDot"], curves["intensityAi"], ax, today)
         return {"key": node["key"], "label": node["label"], "leaf": node["leaf"],
-                "intensityDot": curves["intensityDot"], "intensityAi": curves["intensityAi"],
-                "display": curves["display"], "similar": curves["similar"],
-                "different": curves["different"], **result}
+                **curves, **result}
 
     kids = [_build(conn, c, ax, today) for c in node["children"]]
     live = [k for k in kids if k and not k.get("wip")]
@@ -342,6 +353,7 @@ def compute_thennow(conn):
         "aiStart": AI["start"], "ramp": ax["ramp"], "asOf": today.isoformat(),
         "phases": PHASES, "phaseBounds": PHASE_BOUNDS,
         "progDot": ax["progDot"], "progAi": ax["progAi"], "peakIdx": ax["peakIdx"],
+        "dotMonths": ax["dotMonths"], "aiMonths": ax["aiMonths"],
         "tree": root,
         "assumptions": [
             "The dot-com bubble is a fair analog: an infrastructure-led tech cycle, "
