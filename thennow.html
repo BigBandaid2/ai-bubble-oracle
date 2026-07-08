@@ -507,13 +507,25 @@ function openNode(key) {
 }
 function closeModal() { el("scrim").classList.remove("open"); el("modal").classList.remove("open"); CUR = null; el("hoverchip").style.display = "none"; }
 function tilesHtml(n) {
-  const before = n.daysFromPeak < 0, t = [
+  const before = n.daysFromPeak < 0, ok = n.valid !== false;
+  const dfp = n.daysFromPeak === 0 ? "at the peak"
+    : `${Math.abs(n.daysFromPeak)}d ${before ? "before" : "after"} peak`;
+  const toAi = ok ? Math.max(0, Math.round(ord(n.projectedPeakDate) - TODAY)) : null;
+  const t = [
     ["intensity now", `${(n.intensityNow * 100).toFixed(0)}%`, "accent", "of the run to the peak"],
     ["today", n.display || "blended", "", n.leaf ? n.unitLabel : "weighted mean"],
-    ["matches dot-com", n.equivalentDotcomDate, "", n.phase],
-    ["from 2000 peak", `${Math.abs(n.daysFromPeak)}d`, "", n.daysFromPeak === 0 ? "at the peak" : before ? "before the peak" : "after the peak"],
-    ["pace vs dot-com", `${n.compression}×`, "", n.compression < 1 ? "faster" : "slower"]];
+    ["at 2000 peak", peakDisplay(n) || "—", "", n.leaf ? n.unitLabel : "leaf metric only"],
+    ["matches dot-com", n.equivalentDotcomDate, "", `${n.phase} · ${dfp}`],
+    ["until AI peak", ok ? `${toAi.toLocaleString()}d` : "—", "accent",
+      ok ? `${n.compression}× dot-com pace, ${n.compression < 1 ? "faster" : "slower"}` : "projection suppressed"]];
   return t.map(([k, v, cls, s]) => `<div class="tile"><span class="k">${k}</span><span class="v ${cls}">${v}</span><span class="sub">${s}</span></div>`).join("");
+}
+// The metric's value AT the declared dot-com peak, in the same native terms as the
+// "today" tile, so today's AI reading and the 2000-peak reading sit side by side.
+function peakDisplay(n) {
+  if (!n.leaf) return null;
+  const lv = leafVals(n);
+  return lv.ratio ? `up ${lv.peakMult.toFixed(1)}x` : `${n.unitLabel} ${Math.round(n.smoothedDot[PEAK_IDX])}`;
 }
 function derivHtml(n) {
   const bd = bottomIso(n);
