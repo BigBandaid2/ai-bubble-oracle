@@ -119,20 +119,34 @@ def _thennow_example(conn):
                 return hit
         return {}
 
-    root = t["tree"]
+    root, pk = t["tree"], t["peakIdx"]
     price, cape, val = (find(root, "price_appreciation"),
                         find(root, "valuation_multiple"),
                         find(root, "valuation"))
+
+    def last(a):
+        return a[-1] if a else None
+
+    def at(a, i):
+        return a[i] if a and 0 <= i < len(a) else None
+
     return {
         "headlineDate": t["headlineDate"], "bandLow": t["bandLow"],
         "bandHigh": t["bandHigh"], "asOf": t["asOf"],
-        "dotMonths": len(t["progDot"]), "aiMonths": len(t["progAi"]),
+        "dotWk": len(t["progDot"]), "aiWk": len(t["progAi"]),
+        # price leaf: native look-through (Nasdaq) at each step + scalars
+        "priceRawNow": last(price.get("rawAi")), "priceSmNow": last(price.get("smoothedAi")),
+        "pricePeak": at(price.get("smoothedDot"), pk), "priceStart": at(price.get("smoothedAi"), 0),
         "priceIntensity": price.get("intensityNow"), "priceEquiv": price.get("equivalentDotcomDate"),
         "priceProj": price.get("projectedPeakDate"), "priceDisplay": price.get("display"),
         "priceDaysFromPeak": price.get("daysFromPeak"), "priceCompression": price.get("compression"),
+        # cape leaf
+        "capeRawNow": last(cape.get("rawAi")), "capeSmNow": last(cape.get("smoothedAi")),
+        "capePeak": at(cape.get("smoothedDot"), pk),
         "capeIntensity": cape.get("intensityNow"), "capeEquiv": cape.get("equivalentDotcomDate"),
         "capeProj": cape.get("projectedPeakDate"), "capeDisplay": cape.get("display"),
         "capeDaysFromPeak": cape.get("daysFromPeak"), "capeCompression": cape.get("compression"),
+        # valuation roll-up
         "valIntensity": val.get("intensityNow"), "valEquiv": val.get("equivalentDotcomDate"),
         "valProj": val.get("projectedPeakDate"), "valPhase": val.get("phase"),
     }
