@@ -240,7 +240,7 @@ def _build_leaf(conn, node, dot_dates, ai_dates, today):
                      "the 2000 peak, so on valuation multiple AI is already close to dot-com's top.")
 
     return {"key": node["key"], "label": node["label"], "leaf": m["kind"], "unit": m["unit"],
-            "display": display, "different": different,
+            "type": m["type"], "display": display, "different": different,
             "_intDot": int_dot, "_intAi": int_ai, "_smDot": sm_dot, "_smAi": sm_ai,
             "_rawDot": raw_dot, "_rawAi": raw_ai, **result}
 
@@ -284,7 +284,7 @@ def _emit(node, dw, aw):
               "compression", "projectedPeakDate", "phase", "beyondDotcomPeak"):
         out[k] = node[k]
     if "leaf" in node:
-        out["leaf"] = node["leaf"]; out["unit"] = node["unit"]; out["different"] = node["different"]
+        out["leaf"] = node["leaf"]; out["unit"] = node["unit"]; out["type"] = node["type"]; out["different"] = node["different"]
         out["smoothedDot"] = _pick(node["_smDot"], dw, 2); out["smoothedAi"] = _pick(node["_smAi"], aw, 2)
         out["rawDot"] = _pick(node["_rawDot"], dw, 2); out["rawAi"] = _pick(node["_rawAi"], aw, 2)
     if "children" in node:

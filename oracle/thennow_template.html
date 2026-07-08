@@ -363,9 +363,16 @@ function bottomIso(n) { return isoFromOrd(aiOrdAt(n, BOTTOM_PROG)); }
 function leafVals(n) {
   if (!n.leaf) return null;
   const dotStart = n.smoothedDot[0], aiStart = n.smoothedAi[0], peakMult = n.smoothedDot[PEAK_IDX] / dotStart;
-  return { dotStart, aiStart, peakMult,
+  const ratio = n.type === "ratio_from_start";
+  return { dotStart, aiStart, peakMult, ratio,
     dotValAt: p => interp(PROG_DOT, n.smoothedDot, p),
-    aiValAt: p => p <= n.equiv.progress ? interp(aiPlot(n), n.smoothedAi, p) : aiStart * (1 + interp(PROG_DOT, n.intensityDot, p) * (peakMult - 1)) };
+    // Past today, AI is assumed to trace the dot-com shape. For a ratio metric
+    // that means AI keeps its own start and follows the appreciation curve; for
+    // an absolute-level metric (CAPE) it simply follows the dot-com level itself,
+    // so the native value stays continuous at the convergence point.
+    aiValAt: p => p <= n.equiv.progress ? interp(aiPlot(n), n.smoothedAi, p)
+      : (ratio ? aiStart * (1 + interp(PROG_DOT, n.intensityDot, p) * (peakMult - 1))
+               : interp(PROG_DOT, n.smoothedDot, p)) };
 }
 
 /* ---------- HERO ---------- */
@@ -650,19 +657,26 @@ function closeDrawer() { el("drawer-scrim").classList.remove("open"); el("drawer
 const csvCell = v => v == null ? "" : v, round1 = x => Math.round(x * 10) / 10;
 function downloadCSV(node) {
   if (!node) return; const leaf = !!node.leaf, lv = leafVals(node), aiP = aiPlot(node);
-  const lines = [leaf ? `era,month,progress_pct,${node.unit},smoothed,multiple_x,intensity` : `era,month,progress_pct,intensity`];
-  const rd = (era, month, prog, raw, sm, inten, base) => {
-    if (!leaf) { lines.push([era, month, round1(prog), csvCell(inten)].join(",")); return; }
-    const mult = sm != null && base ? sm / base : null;
-    lines.push([era, month, round1(prog), csvCell(raw), csvCell(sm), mult != null ? mult.toFixed(3) : "", csvCell(inten)].join(","));
+  const mult = leaf && lv.ratio;   // only a ratio metric has an appreciation multiple
+  const head = !leaf ? `era,date,progress_pct,intensity`
+    : mult ? `era,date,progress_pct,${node.unit},smoothed,multiple_x,intensity`
+           : `era,date,progress_pct,${node.unit},smoothed,intensity`;
+  const lines = [head];
+  const rd = (era, day, prog, raw, sm, inten, base) => {
+    if (!leaf) { lines.push([era, day, round1(prog), csvCell(inten)].join(",")); return; }
+    const cells = [era, day, round1(prog), csvCell(raw), csvCell(sm)];
+    if (mult) cells.push(sm != null && base ? (sm / base).toFixed(3) : "");
+    cells.push(csvCell(inten)); lines.push(cells.join(","));
   };
   for (let i = 0; i < DATA.dotMonths.length; i++) rd("dotcom", DATA.dotMonths[i], PROG_DOT[i], node.rawDot && node.rawDot[i], node.smoothedDot && node.smoothedDot[i], node.intensityDot[i], lv && lv.dotStart);
   for (let i = 0; i < DATA.aiMonths.length; i++) rd("ai", DATA.aiMonths[i], aiP[i], node.rawAi && node.rawAi[i], node.smoothedAi && node.smoothedAi[i], node.intensityAi[i], lv && lv.aiStart);
   for (let i = 0; i < DATA.dotMonths.length; i++) { const p = PROG_DOT[i]; if (p <= node.equiv.progress) continue;
-    const month = isoFromOrd(aiOrdAt(node, p)), inten = node.intensityDot[i];
-    if (!leaf) { lines.push(["ai_projected", month, round1(p), csvCell(inten)].join(",")); continue; }
-    const val = lv.aiValAt(p), mult = val != null && lv.aiStart ? val / lv.aiStart : null;
-    lines.push(["ai_projected", month, round1(p), "", val != null ? Math.round(val * 100) / 100 : "", mult != null ? mult.toFixed(3) : "", csvCell(inten)].join(",")); }
+    const day = isoFromOrd(aiOrdAt(node, p)), inten = node.intensityDot[i];
+    if (!leaf) { lines.push(["ai_projected", day, round1(p), csvCell(inten)].join(",")); continue; }
+    const val = lv.aiValAt(p);   // native units, continuous with the last real value
+    const cells = ["ai_projected", day, round1(p), "", val != null ? Math.round(val * 100) / 100 : ""];
+    if (mult) cells.push(val != null && lv.aiStart ? (val / lv.aiStart).toFixed(3) : "");
+    cells.push(csvCell(inten)); lines.push(cells.join(",")); }
   const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
   const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `thennow_${node.key}.csv`;
   document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 0);
