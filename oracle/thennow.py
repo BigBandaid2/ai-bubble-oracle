@@ -35,10 +35,20 @@ from datetime import date, datetime, timezone
 
 from . import db
 
-DOTCOM = {"start": "1995-01-01", "peak": "2000-03-01", "end": "2002-10-01"}
-AI = {"start": "2022-11-01"}   # ChatGPT month (the series is monthly)
+# Both eras are anchored on a single defining launch event, so the origins are
+# comparable: Netscape's IPO (1995-08-09) opened the dot-com boom the way
+# ChatGPT (2022-11-30) opened the AI boom. The peak is not hard-coded; it is
+# read from the data (the month the smoothed Nasdaq tops out), see _peak_month.
+DOTCOM = {"start": "1995-08-01", "peak": "2000-03-01", "end": "2002-10-01",
+          "startEvent": "Netscape IPO"}
+AI = {"start": "2022-11-01", "startEvent": "ChatGPT launch"}
 PHASES = ["Early Ramp", "Acceleration", "Late Bubble", "Crash & Bottom", "Recovery"]
-PHASE_BOUNDS = [0, 40, 85, 100, 135]
+# Progress-% band edges, calibrated to the dot-com narrative on the Netscape->peak
+# clock: Early Ramp through ~1997 (0-35), Acceleration 1998-99 (35-85), the
+# blow-off Late Bubble into the 2000 peak (85-100), Crash & Bottom to the 2002
+# low (100-160), Recovery to new highs beyond the window (>=160). Editorial and
+# tunable; they set phase labels, not the projected date.
+PHASE_BOUNDS = [0, 35, 85, 100, 160]
 SMOOTH_MONTHS = 3
 NASDAQ = "^IXIC"
 
@@ -156,18 +166,30 @@ def _phase_of(progress):
 
 
 # ---------------------------------------------------------------- axes (shared)
-def _axes(today):
+def _peak_month(conn):
+    """The cycle peak = the month the smoothed Nasdaq tops out. Reading it from
+    the data (not hard-coding 2000-03) means the grey line's high sits exactly
+    at progress 100, where the peak marker is drawn."""
+    rows = db.load_prices(conn, NASDAQ)
+    pairs = sorted((r["date"], r["close"]) for r in rows if r["close"] is not None)
+    months = _month_starts(DOTCOM["start"], DOTCOM["end"])
+    vals = _smooth(_on_months(pairs, months), SMOOTH_MONTHS)
+    best = max(range(len(vals)), key=lambda i: (vals[i] if vals[i] is not None else float("-inf")))
+    return months[best]
+
+
+def _axes(today, peak):
     """Shared canonical month lists + progress arrays for both eras. Every leaf
-    and every combined node lives on these, so weighting is a pointwise average."""
-    ramp = _days(DOTCOM["start"], DOTCOM["peak"])
+    and every combined node lives on these, so weighting is a pointwise average.
+    progress = days since the era start / days(start -> peak) * 100."""
+    ramp = _days(DOTCOM["start"], peak)
     dot_months = _month_starts(DOTCOM["start"], DOTCOM["end"])
     ai_months = _month_starts(AI["start"], today.isoformat())
     prog_dot = [round(_days(DOTCOM["start"], m) / ramp * 100.0, 2) for m in dot_months]
     prog_ai = [round(_days(AI["start"], m) / ramp * 100.0, 2) for m in ai_months]
-    peak_idx = min(range(len(dot_months)),
-                   key=lambda i: abs(_days(DOTCOM["peak"], dot_months[i])))
-    return {"dotMonths": dot_months, "aiMonths": ai_months,
-            "progDot": prog_dot, "progAi": prog_ai, "peakIdx": peak_idx, "ramp": ramp}
+    return {"dotMonths": dot_months, "aiMonths": ai_months, "peakDate": peak,
+            "progDot": prog_dot, "progAi": prog_ai,
+            "peakIdx": dot_months.index(peak), "ramp": ramp}
 
 
 # ------------------------------------------------------------------ leaf curves
@@ -259,7 +281,7 @@ def _evaluate(intensity_dot, intensity_ai, ax, today):
     equiv_prog = m["progress"]
     ramp = ax["ramp"]
     equiv_date = date.fromordinal(_add_days(DOTCOM["start"], round(equiv_prog / 100.0 * ramp)))
-    days_from_peak = (equiv_date - _d(DOTCOM["peak"])).days
+    days_from_peak = (equiv_date - _d(ax["peakDate"])).days
     # rate-scale the remaining distance to the peak
     ai_elapsed = _days(AI["start"], today.isoformat())
     dot_days_done = max(equiv_prog, 0.0) / 100.0 * ramp
@@ -338,7 +360,7 @@ def _leaf_dates(node, acc):
 # --------------------------------------------------------------------- assemble
 def compute_thennow(conn):
     today = _today()
-    ax = _axes(today)
+    ax = _axes(today, _peak_month(conn))
     root = _build(conn, THENNOW_TREE, ax, today)
     if not root:
         return None
@@ -349,8 +371,9 @@ def compute_thennow(conn):
     return {
         "headlineDate": root["projectedPeakDate"],
         "bandLow": band_low, "bandHigh": band_high,
-        "dotcomStart": DOTCOM["start"], "dotcomPeak": DOTCOM["peak"],
-        "aiStart": AI["start"], "ramp": ax["ramp"], "asOf": today.isoformat(),
+        "dotcomStart": DOTCOM["start"], "dotcomStartEvent": DOTCOM["startEvent"],
+        "dotcomPeak": ax["peakDate"], "aiStart": AI["start"],
+        "aiStartEvent": AI["startEvent"], "ramp": ax["ramp"], "asOf": today.isoformat(),
         "phases": PHASES, "phaseBounds": PHASE_BOUNDS,
         "progDot": ax["progDot"], "progAi": ax["progAi"], "peakIdx": ax["peakIdx"],
         "dotMonths": ax["dotMonths"], "aiMonths": ax["aiMonths"],

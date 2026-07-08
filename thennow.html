@@ -134,16 +134,25 @@
     font-size: 13px; padding: 7px 13px; border-radius: 8px; cursor: pointer; }
   .mbtn:hover { border-color: var(--accent); color: var(--accent); }
   .mbtn.close { font-size: 18px; line-height: 1; padding: 4px 11px; }
-  .modal-chart { flex: 1; position: relative; margin: 14px 0; min-height: 0; }
-  .modal-chart canvas { width: 100%; height: 100%; display: block; }
-  .modal-deriv { font-size: 12.5px; color: var(--muted); line-height: 1.6; max-height: 32vh; overflow-y: auto;
-    border-top: 1px solid var(--border); padding-top: 12px; }
-  .modal-deriv h4 { font-size: 11px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted2);
+  .modal-body { flex: 1; display: flex; gap: 18px; min-height: 0; margin-top: 12px; }
+  .modal-chart { flex: 1; position: relative; min-height: 0; }
+  .modal-chart canvas { width: 100%; height: 100%; display: block; cursor: crosshair; }
+  .modal-side { width: 344px; flex-shrink: 0; overflow-y: auto; border-left: 1px solid var(--border);
+    padding-left: 16px; font-size: 12.5px; color: var(--muted); line-height: 1.6; }
+  .modal-side h4 { font-size: 11px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted2);
     margin: 0 0 6px; font-weight: 600; }
-  .modal-deriv ol { margin: 0 0 0 18px; }
-  .modal-deriv li { margin: 4px 0; }
-  .modal-deriv b { color: var(--text); font-family: var(--mono); font-variant-numeric: tabular-nums; }
-  .modal-deriv .dl-note { margin-top: 8px; color: var(--muted2); }
+  .modal-side h4.mt { margin-top: 16px; border-top: 1px solid var(--border); padding-top: 14px; }
+  .modal-side ol { margin: 0 0 0 18px; padding: 0; }
+  .modal-side li { margin: 4px 0; }
+  .modal-side b { color: var(--text); font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  .modal-side .dl-note { margin-top: 8px; color: var(--muted2); }
+  .assump { margin: 0 0 9px; padding-left: 11px; border-left: 2px solid var(--border); }
+  .assump .at { color: var(--text); font-weight: 600; font-size: 12px; }
+  .assump .ad { color: var(--muted); font-size: 11.5px; }
+  @media (max-width: 900px) {
+    .modal-body { flex-direction: column; }
+    .modal-side { width: auto; border-left: none; border-top: 1px solid var(--border); padding-left: 0; padding-top: 12px; }
+  }
 </style>
 </head>
 <body>
@@ -189,12 +198,17 @@
       <button id="modal-close" class="mbtn close" aria-label="Close">&times;</button>
     </div>
   </div>
-  <div class="modal-chart"><canvas id="modal-canvas"></canvas></div>
-  <div class="modal-deriv" id="modal-deriv"></div>
+  <div class="modal-body">
+    <div class="modal-chart"><canvas id="modal-canvas"></canvas></div>
+    <div class="modal-side">
+      <div id="modal-deriv"></div>
+      <div id="modal-opts"></div>
+    </div>
+  </div>
 </div>
 
 <script>
-const DATA = {"headlineDate":"2027-09-06","bandLow":"2027-05-29","bandHigh":"2028-08-13","dotcomStart":"1995-01-01","dotcomPeak":"2000-03-01","aiStart":"2022-11-01","ramp":1886,"asOf":"2026-07-08","phases":["Early Ramp","Acceleration","Late Bubble","Crash & Bottom","Recovery"],"phaseBounds":[0,40,85,100,135],"progDot":[0.0,1.64,3.13,4.77,6.36,8.01,9.6,11.24,12.88,14.48,16.12,17.71,19.35,21.0,22.53,24.18,25.77,27.41,29.0,30.65,32.29,33.88,35.52,37.12,38.76,40.4,41.89,43.53,45.12,46.77,48.36,50.0,51.64,53.23,54.88,56.47,58.11,59.76,61.24,62.88,64.48,66.12,67.71,69.35,71.0,72.59,74.23,75.82,77.47,79.11,80.59,82.24,83.83,85.47,87.06,88.71,90.35,91.94,93.58,95.17,96.82,98.46,100.0,101.64,103.23,104.88,106.47,108.11,109.76,111.35,112.99,114.58,116.22,117.87,119.35,121.0,122.59,124.23,125.82,127.47,129.11,130.7,132.34,133.93,135.58,137.22,138.71,140.35,141.94,143.58,145.17,146.82,148.46,150.05],"progAi":[0.0,1.59,3.23,4.88,6.36,8.01,9.6,11.24,12.83,14.48,16.12,17.71,19.35,20.94,22.59,24.23,25.77,27.41,29.0,30.65,32.24,33.88,35.52,37.12,38.76,40.35,41.99,43.64,45.12,46.77,48.36,50.0,51.59,53.23,54.88,56.47,58.11,59.7,61.35,62.99,64.48,66.12,67.71,69.35,70.94],"peakIdx":62,"dotMonths":["1995-01-01","1995-02-01","1995-03-01","1995-04-01","1995-05-01","1995-06-01","1995-07-01","1995-08-01","1995-09-01","1995-10-01","1995-11-01","1995-12-01","1996-01-01","1996-02-01","1996-03-01","1996-04-01","1996-05-01","1996-06-01","1996-07-01","1996-08-01","1996-09-01","1996-10-01","1996-11-01","1996-12-01","1997-01-01","1997-02-01","1997-03-01","1997-04-01","1997-05-01","1997-06-01","1997-07-01","1997-08-01","1997-09-01","1997-10-01","1997-11-01","1997-12-01","1998-01-01","1998-02-01","1998-03-01","1998-04-01","1998-05-01","1998-06-01","1998-07-01","1998-08-01","1998-09-01","1998-10-01","1998-11-01","1998-12-01","1999-01-01","1999-02-01","1999-03-01","1999-04-01","1999-05-01","1999-06-01","1999-07-01","1999-08-01","1999-09-01","1999-10-01","1999-11-01","1999-12-01","2000-01-01","2000-02-01","2000-03-01","2000-04-01","2000-05-01","2000-06-01","2000-07-01","2000-08-01","2000-09-01","2000-10-01","2000-11-01","2000-12-01","2001-01-01","2001-02-01","2001-03-01","2001-04-01","2001-05-01","2001-06-01","2001-07-01","2001-08-01","2001-09-01","2001-10-01","2001-11-01","2001-12-01","2002-01-01","2002-02-01","2002-03-01","2002-04-01","2002-05-01","2002-06-01","2002-07-01","2002-08-01","2002-09-01","2002-10-01"],"aiMonths":["2022-11-01","2022-12-01","2023-01-01","2023-02-01","2023-03-01","2023-04-01","2023-05-01","2023-06-01","2023-07-01","2023-08-01","2023-09-01","2023-10-01","2023-11-01","2023-12-01","2024-01-01","2024-02-01","2024-03-01","2024-04-01","2024-05-01","2024-06-01","2024-07-01","2024-08-01","2024-09-01","2024-10-01","2024-11-01","2024-12-01","2025-01-01","2025-02-01","2025-03-01","2025-04-01","2025-05-01","2025-06-01","2025-07-01","2025-08-01","2025-09-01","2025-10-01","2025-11-01","2025-12-01","2026-01-01","2026-02-01","2026-03-01","2026-04-01","2026-05-01","2026-06-01","2026-07-01"],"tree":{"key":"ai_peak","label":"AI bubble bursts","intensityDot":[0.0,0.0067,0.0214,0.035,0.052,0.0721,0.0873,0.1015,0.1072,0.117,0.1255,0.1327,0.1467,0.1534,0.1643,0.1698,0.1761,0.1668,0.1592,0.159,0.1776,0.2007,0.2188,0.2399,0.253,0.2579,0.2468,0.256,0.2843,0.3382,0.3665,0.3882,0.3892,0.3881,0.3855,0.3863,0.4118,0.4483,0.4926,0.5095,0.5161,0.5236,0.4993,0.4657,0.4277,0.4631,0.5253,0.6098,0.648,0.6792,0.6966,0.721,0.7376,0.7504,0.7582,0.7547,0.7455,0.7826,0.8652,0.934,0.9894,1.0055,1.0,0.9384,0.9071,0.897,0.9409,0.9208,0.8773,0.7726,0.6827,0.6374,0.5948,0.529,0.4628,0.4479,0.4682,0.4641,0.4302,0.3595,0.3174,0.3128,0.3547,0.3786,0.3626,0.3562,0.3354,0.3229,0.2762,0.2185,0.1709,0.1275,0.1164,0.1028],"intensityAi":[0.1745,0.1764,0.1804,0.1833,0.1886,0.1923,0.2122,0.2349,0.2483,0.2454,0.2243,0.2243,0.2424,0.2742,0.3028,0.3244,0.3339,0.3415,0.3537,0.3782,0.391,0.3991,0.409,0.4308,0.4495,0.4586,0.4561,0.4278,0.3872,0.3724,0.3923,0.4403,0.4685,0.4943,0.5164,0.5333,0.5444,0.5489,0.5484,0.5269,0.5234,0.5491,0.5914,0.6143,0.6138],"weights":[1.0],"display":"blended","children":[{"key":"valuation","label":"Valuation","intensityDot":[0.0,0.0067,0.0214,0.035,0.052,0.0721,0.0873,0.1015,0.1072,0.117,0.1255,0.1327,0.1467,0.1534,0.1643,0.1698,0.1761,0.1668,0.1592,0.159,0.1776,0.2007,0.2188,0.2399,0.253,0.2579,0.2468,0.256,0.2843,0.3382,0.3665,0.3882,0.3892,0.3881,0.3855,0.3863,0.4118,0.4483,0.4926,0.5095,0.5161,0.5236,0.4993,0.4657,0.4277,0.4631,0.5253,0.6098,0.648,0.6792,0.6966,0.721,0.7376,0.7504,0.7582,0.7547,0.7455,0.7826,0.8652,0.934,0.9894,1.0055,1.0,0.9384,0.9071,0.897,0.9409,0.9208,0.8773,0.7726,0.6827,0.6374,0.5948,0.529,0.4628,0.4479,0.4682,0.4641,0.4302,0.3595,0.3174,0.3128,0.3547,0.3786,0.3626,0.3562,0.3354,0.3229,0.2762,0.2185,0.1709,0.1275,0.1164,0.1028],"intensityAi":[0.1745,0.1764,0.1804,0.1833,0.1886,0.1923,0.2122,0.2349,0.2483,0.2454,0.2243,0.2243,0.2424,0.2742,0.3028,0.3244,0.3339,0.3415,0.3537,0.3782,0.391,0.3991,0.409,0.4308,0.4495,0.4586,0.4561,0.4278,0.3872,0.3724,0.3923,0.4403,0.4685,0.4943,0.5164,0.5333,0.5444,0.5489,0.5484,0.5269,0.5234,0.5491,0.5914,0.6143,0.6138],"weights":[1.0,1.0],"display":"blended","children":[{"key":"price_appreciation","label":"Price appreciation","leaf":"price","intensityDot":[0.0,0.004,0.0122,0.0187,0.0295,0.044,0.0584,0.0686,0.0718,0.0755,0.0762,0.0784,0.0822,0.0868,0.0989,0.1121,0.1199,0.1097,0.1003,0.1042,0.1172,0.1312,0.1371,0.1518,0.1533,0.1469,0.1358,0.1443,0.1647,0.1955,0.2128,0.2354,0.2353,0.2366,0.2259,0.2283,0.244,0.2685,0.2916,0.2924,0.2978,0.2982,0.2723,0.2537,0.2444,0.2861,0.3322,0.4002,0.4315,0.4564,0.4598,0.4767,0.4975,0.5063,0.5312,0.5368,0.5671,0.6223,0.7448,0.8349,0.9608,1.0074,1.0,0.8801,0.824,0.8153,0.8898,0.8627,0.8259,0.6771,0.5658,0.5106,0.4693,0.411,0.3502,0.3464,0.376,0.3678,0.3396,0.2783,0.2472,0.2587,0.3005,0.3231,0.3047,0.295,0.2722,0.2615,0.2261,0.1928,0.165,0.138,0.1382,0.1323],"intensityAi":[0.0,0.004,0.004,0.0154,0.0196,0.0293,0.0395,0.0534,0.0606,0.0568,0.0471,0.0483,0.06,0.0751,0.0873,0.0963,0.0995,0.1037,0.1125,0.1252,0.1316,0.1346,0.1379,0.1477,0.155,0.165,0.1626,0.1495,0.1352,0.1369,0.157,0.181,0.1963,0.2113,0.2283,0.2408,0.2446,0.2429,0.2383,0.2275,0.2369,0.265,0.2952,0.3014,0.2951],"unit":"nasdaq_close","rawDot":[755.2,793.73,817.21,843.98,864.58,933.45,1001.21,1020.11,1043.54,1036.06,1059.2,1052.13,1059.79,1100.05,1101.4,1190.52,1243.43,1185.02,1080.59,1141.5,1226.92,1221.51,1292.61,1291.03,1379.85,1309.0,1221.7,1260.76,1400.32,1442.07,1593.81,1587.32,1685.69,1593.61,1600.55,1570.35,1619.36,1770.51,1835.68,1868.41,1778.87,1894.74,1872.39,1499.25,1693.84,1771.39,1949.54,2192.69,2505.89,2288.03,2461.4,2542.86,2470.52,2686.12,2638.49,2739.35,2746.16,2966.43,3336.16,4069.31,3940.35,4696.69,4572.83,3860.66,3400.91,3966.11,3766.99,4206.35,3672.82,3369.63,2597.93,2470.52,2772.73,2151.83,1840.26,2116.24,2110.49,2160.54,2027.13,1805.43,1498.8,1690.2,1930.58,1950.4,1934.03,1731.49,1845.35,1688.23,1615.73,1463.21,1328.26,1314.85,1172.06,1329.75],"smoothedDot":[774.46,788.71,818.31,841.92,880.67,933.08,984.92,1021.62,1033.24,1046.27,1049.13,1057.04,1070.66,1087.08,1130.66,1178.45,1206.32,1169.68,1135.7,1149.67,1196.64,1247.01,1268.38,1321.16,1326.63,1303.52,1263.82,1294.26,1367.72,1478.73,1541.07,1622.27,1622.21,1626.62,1588.17,1596.75,1653.41,1741.85,1824.87,1827.65,1847.34,1848.67,1755.46,1688.49,1654.83,1804.92,1971.21,2216.04,2328.87,2418.44,2430.76,2491.59,2566.5,2598.38,2687.99,2708.0,2817.31,3016.25,3457.3,3781.94,4235.45,4403.29,4376.73,3944.8,3742.56,3711.34,3979.82,3882.05,3749.6,3213.46,2812.69,2613.73,2465.03,2254.94,2036.11,2022.33,2129.09,2099.39,1997.7,1777.12,1664.81,1706.53,1857.06,1938.34,1871.97,1836.96,1755.02,1716.44,1589.06,1469.07,1368.77,1271.72,1272.22,1250.91],"rawAi":[11468.0,10466.48,11584.55,11455.54,12221.91,12226.58,12935.29,13787.92,14346.02,14034.97,13219.32,12851.24,14226.22,15011.35,15164.01,16091.92,16379.46,15657.82,16735.02,17732.6,17599.4,17713.62,18189.17,18095.15,19218.17,19310.79,19627.44,18847.28,17299.29,17446.34,19113.77,20369.73,21122.45,21455.55,22660.01,23724.96,23365.69,23241.99,23461.82,22668.21,21590.63,24892.31,26972.62,26213.72,25832.67],"smoothedAi":[10967.24,11173.01,11168.86,11754.0,11968.01,12461.26,12983.26,13689.74,14056.3,13866.77,13368.51,13432.26,14029.6,14800.53,15422.43,15878.46,16043.07,16257.43,16708.48,17355.67,17681.87,17834.06,17999.31,18500.83,18874.7,19385.47,19261.84,18591.34,17864.3,17953.13,18976.61,20201.98,20982.58,21746.0,22613.51,23250.22,23444.21,23356.5,23124.01,22573.55,23050.38,24485.19,26026.22,26339.67,26023.2],"display":"up 2.4x since ChatGPT","similar":"Both cycles are led by a single tech-heavy index climbing above trend.","different":"Up about 2.4x since ChatGPT vs roughly 5.7x for the dot-com Nasdaq into 2000, so on price alone AI reads earlier and less stretched.","intensityNow":0.295,"equivalentDotcomDate":"1998-04-16","phase":"Acceleration","daysFromPeak":-685,"compression":1.12,"projectedPeakDate":"2028-08-13","beyondDotcomPeak":false,"equiv":{"progress":63.7,"intensity":0.295,"date":"1998-04-16"},"aiNow":{"progress":70.9,"intensity":0.295}},{"key":"valuation_multiple","label":"Valuation multiple","leaf":"cape","intensityDot":[0.0,0.0095,0.0306,0.0512,0.0745,0.1001,0.1163,0.1344,0.1427,0.1586,0.1748,0.1871,0.2111,0.22,0.2298,0.2274,0.2323,0.224,0.2181,0.2139,0.238,0.2702,0.3004,0.3279,0.3528,0.3688,0.3577,0.3677,0.404,0.4809,0.5202,0.5411,0.5432,0.5395,0.545,0.5444,0.5797,0.628,0.6935,0.7267,0.7343,0.749,0.7263,0.6777,0.6111,0.6401,0.7185,0.8194,0.8644,0.9019,0.9335,0.9654,0.9777,0.9945,0.9853,0.9726,0.9239,0.9429,0.9855,1.0332,1.018,1.0036,1.0,0.9967,0.9902,0.9786,0.9921,0.9789,0.9288,0.8681,0.7996,0.7641,0.7203,0.6469,0.5755,0.5494,0.5605,0.5604,0.5208,0.4407,0.3875,0.3669,0.4089,0.4341,0.4205,0.4174,0.3985,0.3843,0.3264,0.2441,0.1767,0.1169,0.0947,0.0734],"intensityAi":[0.349,0.3488,0.3568,0.3512,0.3576,0.3552,0.3849,0.4163,0.4361,0.434,0.4015,0.4003,0.4248,0.4733,0.5182,0.5525,0.5682,0.5792,0.5948,0.6312,0.6504,0.6636,0.6801,0.7139,0.7439,0.7521,0.7496,0.7061,0.6392,0.6079,0.6276,0.6996,0.7407,0.7773,0.8045,0.8257,0.8442,0.8549,0.8586,0.8263,0.8099,0.8332,0.8875,0.9272,0.9325],"unit":"shiller_cape","rawDot":[20.22,20.8,21.15,21.64,22.19,22.72,23.37,23.28,23.94,23.93,24.35,25.03,24.76,25.97,25.63,25.42,25.81,25.96,24.86,25.41,25.68,26.48,27.58,27.72,28.33,29.26,28.8,27.58,29.93,31.25,32.76,32.58,32.66,32.9,32.33,33.03,32.86,34.71,36.29,37.27,36.95,36.8,38.26,35.42,33.53,33.77,37.37,38.82,40.57,40.4,41.35,42.7,42.55,42.18,43.83,41.93,41.32,40.55,43.21,44.19,43.77,42.18,43.22,43.53,41.96,42.78,42.75,42.87,41.89,39.37,38.78,37.27,36.98,35.83,32.32,32.17,34.07,33.07,32.16,31.4,27.67,28.58,30.01,30.5,30.28,29.09,30.29,29.01,28.13,26.39,23.46,23.59,22.36,21.96],"smoothedDot":[20.51,20.72,21.2,21.66,22.18,22.76,23.12,23.53,23.72,24.07,24.44,24.71,25.25,25.45,25.67,25.62,25.73,25.54,25.41,25.32,25.86,26.58,27.26,27.88,28.44,28.8,28.55,28.77,29.59,31.31,32.2,32.67,32.71,32.63,32.75,32.74,33.53,34.62,36.09,36.84,37.01,37.34,36.83,35.74,34.24,34.89,36.65,38.92,39.93,40.77,41.48,42.2,42.48,42.85,42.65,42.36,41.27,41.69,42.65,43.72,43.38,43.06,42.98,42.9,42.76,42.5,42.8,42.5,41.38,40.01,38.47,37.68,36.69,35.04,33.44,32.85,33.1,33.1,32.21,30.41,29.22,28.75,29.7,30.26,29.96,29.89,29.46,29.14,27.84,25.99,24.48,23.14,22.64,22.16],"rawAi":[28.38,28.32,28.34,28.92,27.94,28.77,28.76,29.94,30.89,30.09,29.8,28.7,30.01,31.45,31.97,33.04,33.76,33.03,33.78,34.81,35.48,35.08,35.7,36.59,37.36,37.72,37.14,37.19,34.79,32.63,35.08,36.12,37.48,37.85,38.59,39.31,39.28,39.84,40.03,39.53,37.66,38.93,41.1,41.32,41.6],"smoothedAi":[28.35,28.35,28.53,28.4,28.54,28.49,29.16,29.86,30.31,30.26,29.53,29.5,30.05,31.14,32.15,32.92,33.28,33.52,33.87,34.69,35.12,35.42,35.79,36.55,37.22,37.41,37.35,36.37,34.87,34.17,34.61,36.23,37.15,37.97,38.58,39.06,39.48,39.72,39.8,39.07,38.71,39.23,40.45,41.34,41.46],"display":"CAPE 41","similar":"Rich broad-market valuations in both booms, driven by the tech leaders.","different":"CAPE is about 41 now against roughly 43 at the 2000 peak, so on valuation multiple AI is already close to dot-com's top.","intensityNow":0.932,"equivalentDotcomDate":"1999-02-28","phase":"Acceleration","daysFromPeak":-367,"compression":0.89,"projectedPeakDate":"2027-05-29","beyondDotcomPeak":false,"equiv":{"progress":80.5,"intensity":0.932,"date":"1999-02-28"},"aiNow":{"progress":70.9,"intensity":0.932}}],"intensityNow":0.614,"equivalentDotcomDate":"1998-12-04","phase":"Acceleration","daysFromPeak":-453,"compression":0.94,"projectedPeakDate":"2027-09-06","beyondDotcomPeak":false,"equiv":{"progress":76.0,"intensity":0.614,"date":"1998-12-04"},"aiNow":{"progress":70.9,"intensity":0.614}},{"key":"market_concentration","label":"Market concentration","wip":true},{"key":"capex","label":"Infrastructure / capex","wip":true},{"key":"speculation","label":"Speculative activity","wip":true}],"intensityNow":0.614,"equivalentDotcomDate":"1998-12-04","phase":"Acceleration","daysFromPeak":-453,"compression":0.94,"projectedPeakDate":"2027-09-06","beyondDotcomPeak":false,"equiv":{"progress":76.0,"intensity":0.614,"date":"1998-12-04"},"aiNow":{"progress":70.9,"intensity":0.614}},"assumptions":["The dot-com bubble is a fair analog: an infrastructure-led tech cycle, narrow leadership, heavy retail speculation, one defining index.","Cycle anchors are chosen: dot-com runs 1995 to its 2000-03 peak to the 2002-10 bottom; the AI cycle starts at the 2022-11 ChatGPT release.","Each metric becomes a 0-1 intensity: 0 at the dot-com starting level, 1 at the 2000 peak. Parents weight-average their children (equal by default, adjustable)."],"limitations":["The date is a bold hook over a transparent method, not a forecast. Change the weights or anchors and it moves.","Price appreciation and valuation multiple tell different stories on purpose: price reads early, CAPE reads late. The parent is where they reconcile.","Small sample: one prior cycle. The band is the spread of the leaf dates, the honest uncertainty.","Concentration, capex and speculation are not wired yet, so today the headline reflects Valuation only."]};
+const DATA = {"headlineDate":"2027-06-17","bandLow":"2027-06-08","bandHigh":"2027-06-21","dotcomStart":"1995-08-01","dotcomStartEvent":"Netscape IPO","dotcomPeak":"2000-02-01","aiStart":"2022-11-01","aiStartEvent":"ChatGPT launch","ramp":1645,"asOf":"2026-07-08","phases":["Early Ramp","Acceleration","Late Bubble","Crash & Bottom","Recovery"],"phaseBounds":[0,35,85,100,160],"progDot":[0.0,1.88,3.71,5.59,7.42,9.3,11.19,12.95,14.83,16.66,18.54,20.36,22.25,24.13,25.96,27.84,29.67,31.55,33.43,35.14,37.02,38.84,40.73,42.55,44.44,46.32,48.15,50.03,51.85,53.74,55.62,57.33,59.21,61.03,62.92,64.74,66.63,68.51,70.33,72.22,74.04,75.93,77.81,79.51,81.4,83.22,85.11,86.93,88.81,90.7,92.52,94.41,96.23,98.12,100.0,101.76,103.65,105.47,107.36,109.18,111.06,112.95,114.77,116.66,118.48,120.36,122.25,123.95,125.84,127.66,129.54,131.37,133.25,135.14,136.96,138.84,140.67,142.55,144.44,146.14,148.02,149.85,151.73,153.56,155.44,157.33,159.15],"progAi":[0.0,1.82,3.71,5.59,7.29,9.18,11.0,12.89,14.71,16.6,18.48,20.3,22.19,24.01,25.9,27.78,29.54,31.43,33.25,35.14,36.96,38.84,40.73,42.55,44.44,46.26,48.15,50.03,51.73,53.62,55.44,57.33,59.15,61.03,62.92,64.74,66.63,68.45,70.33,72.22,73.92,75.81,77.63,79.51,81.34],"peakIdx":54,"dotMonths":["1995-08-01","1995-09-01","1995-10-01","1995-11-01","1995-12-01","1996-01-01","1996-02-01","1996-03-01","1996-04-01","1996-05-01","1996-06-01","1996-07-01","1996-08-01","1996-09-01","1996-10-01","1996-11-01","1996-12-01","1997-01-01","1997-02-01","1997-03-01","1997-04-01","1997-05-01","1997-06-01","1997-07-01","1997-08-01","1997-09-01","1997-10-01","1997-11-01","1997-12-01","1998-01-01","1998-02-01","1998-03-01","1998-04-01","1998-05-01","1998-06-01","1998-07-01","1998-08-01","1998-09-01","1998-10-01","1998-11-01","1998-12-01","1999-01-01","1999-02-01","1999-03-01","1999-04-01","1999-05-01","1999-06-01","1999-07-01","1999-08-01","1999-09-01","1999-10-01","1999-11-01","1999-12-01","2000-01-01","2000-02-01","2000-03-01","2000-04-01","2000-05-01","2000-06-01","2000-07-01","2000-08-01","2000-09-01","2000-10-01","2000-11-01","2000-12-01","2001-01-01","2001-02-01","2001-03-01","2001-04-01","2001-05-01","2001-06-01","2001-07-01","2001-08-01","2001-09-01","2001-10-01","2001-11-01","2001-12-01","2002-01-01","2002-02-01","2002-03-01","2002-04-01","2002-05-01","2002-06-01","2002-07-01","2002-08-01","2002-09-01","2002-10-01"],"aiMonths":["2022-11-01","2022-12-01","2023-01-01","2023-02-01","2023-03-01","2023-04-01","2023-05-01","2023-06-01","2023-07-01","2023-08-01","2023-09-01","2023-10-01","2023-11-01","2023-12-01","2024-01-01","2024-02-01","2024-03-01","2024-04-01","2024-05-01","2024-06-01","2024-07-01","2024-08-01","2024-09-01","2024-10-01","2024-11-01","2024-12-01","2025-01-01","2025-02-01","2025-03-01","2025-04-01","2025-05-01","2025-06-01","2025-07-01","2025-08-01","2025-09-01","2025-10-01","2025-11-01","2025-12-01","2026-01-01","2026-02-01","2026-03-01","2026-04-01","2026-05-01","2026-06-01","2026-07-01"],"tree":{"key":"ai_peak","label":"AI bubble bursts","intensityDot":[0.0,0.0029,0.014,0.0238,0.0321,0.048,0.0556,0.0677,0.0735,0.0804,0.0702,0.0617,0.0614,0.0822,0.1082,0.129,0.1526,0.1678,0.1736,0.1613,0.1715,0.2035,0.2643,0.2963,0.3204,0.3216,0.3201,0.3176,0.3185,0.3473,0.3884,0.4385,0.4581,0.4654,0.4741,0.4471,0.4092,0.3657,0.4046,0.4747,0.5693,0.6119,0.647,0.667,0.6945,0.7127,0.7271,0.735,0.7307,0.7188,0.7592,0.8493,0.925,0.9834,1.0,0.994,0.9281,0.8943,0.883,0.9306,0.9084,0.8599,0.7453,0.6462,0.5963,0.5489,0.4753,0.4017,0.3846,0.4069,0.4023,0.3643,0.2854,0.238,0.2323,0.2789,0.3055,0.2878,0.2808,0.2577,0.2438,0.1915,0.1262,0.0723,0.0234,0.0106,-0.0048],"intensityAi":[0.1218,0.1247,0.1292,0.1341,0.1408,0.1463,0.1708,0.1988,0.2153,0.2115,0.1857,0.186,0.2084,0.2472,0.2818,0.308,0.3194,0.3287,0.344,0.374,0.3897,0.3994,0.4113,0.4378,0.4603,0.4722,0.469,0.4345,0.3857,0.3689,0.3946,0.4533,0.4879,0.5197,0.5475,0.5686,0.582,0.587,0.5858,0.5595,0.5567,0.5902,0.6431,0.6704,0.669],"weights":[1.0],"display":"blended","children":[{"key":"valuation","label":"Valuation","intensityDot":[0.0,0.0029,0.014,0.0238,0.0321,0.048,0.0556,0.0677,0.0735,0.0804,0.0702,0.0617,0.0614,0.0822,0.1082,0.129,0.1526,0.1678,0.1736,0.1613,0.1715,0.2035,0.2643,0.2963,0.3204,0.3216,0.3201,0.3176,0.3185,0.3473,0.3884,0.4385,0.4581,0.4654,0.4741,0.4471,0.4092,0.3657,0.4046,0.4747,0.5693,0.6119,0.647,0.667,0.6945,0.7127,0.7271,0.735,0.7307,0.7188,0.7592,0.8493,0.925,0.9834,1.0,0.994,0.9281,0.8943,0.883,0.9306,0.9084,0.8599,0.7453,0.6462,0.5963,0.5489,0.4753,0.4017,0.3846,0.4069,0.4023,0.3643,0.2854,0.238,0.2323,0.2789,0.3055,0.2878,0.2808,0.2577,0.2438,0.1915,0.1262,0.0723,0.0234,0.0106,-0.0048],"intensityAi":[0.1218,0.1247,0.1292,0.1341,0.1408,0.1463,0.1708,0.1988,0.2153,0.2115,0.1857,0.186,0.2084,0.2472,0.2818,0.308,0.3194,0.3287,0.344,0.374,0.3897,0.3994,0.4113,0.4378,0.4603,0.4722,0.469,0.4345,0.3857,0.3689,0.3946,0.4533,0.4879,0.5197,0.5475,0.5686,0.582,0.587,0.5858,0.5595,0.5567,0.5902,0.6431,0.6704,0.669],"weights":[1.0,1.0],"display":"blended","children":[{"key":"price_appreciation","label":"Price appreciation","leaf":"price","intensityDot":[0.0,0.0004,0.0043,0.0051,0.0075,0.0115,0.0164,0.0293,0.0435,0.0518,0.0409,0.0308,0.035,0.0489,0.0638,0.0702,0.0858,0.0874,0.0806,0.0688,0.0778,0.0996,0.1326,0.151,0.1751,0.1751,0.1764,0.165,0.1676,0.1844,0.2106,0.2352,0.236,0.2419,0.2423,0.2146,0.1948,0.1848,0.2293,0.2786,0.3512,0.3847,0.4113,0.4149,0.433,0.4552,0.4647,0.4912,0.4972,0.5296,0.5886,0.7194,0.8157,0.9502,1.0,0.9921,0.864,0.804,0.7948,0.8744,0.8454,0.8061,0.6471,0.5282,0.4692,0.4251,0.3628,0.2979,0.2938,0.3255,0.3166,0.2865,0.2211,0.1877,0.2001,0.2448,0.2689,0.2492,0.2388,0.2145,0.2031,0.1653,0.1297,0.0999,0.0712,0.0713,0.065],"intensityAi":[0.0,0.0057,0.0056,0.022,0.0279,0.0417,0.0563,0.076,0.0862,0.0809,0.067,0.0688,0.0855,0.107,0.1243,0.1371,0.1416,0.1476,0.1602,0.1783,0.1874,0.1916,0.1962,0.2102,0.2207,0.2349,0.2315,0.2128,0.1925,0.1949,0.2235,0.2577,0.2795,0.3008,0.325,0.3428,0.3482,0.3457,0.3392,0.3239,0.3372,0.3772,0.4202,0.429,0.4201],"unit":"nasdaq_close","rawDot":[1020.11,1043.54,1036.06,1059.2,1052.13,1059.79,1100.05,1101.4,1190.52,1243.43,1185.02,1080.59,1141.5,1226.92,1221.51,1292.61,1291.03,1379.85,1309.0,1221.7,1260.76,1400.32,1442.07,1593.81,1587.32,1685.69,1593.61,1600.55,1570.35,1619.36,1770.51,1835.68,1868.41,1778.87,1894.74,1872.39,1499.25,1693.84,1771.39,1949.54,2192.69,2505.89,2288.03,2461.4,2542.86,2470.52,2686.12,2638.49,2739.35,2746.16,2966.43,3336.16,4069.31,3940.35,4696.69,4572.83,3860.66,3400.91,3966.11,3766.99,4206.35,3672.82,3369.63,2597.93,2470.52,2772.73,2151.83,1840.26,2116.24,2110.49,2160.54,2027.13,1805.43,1498.8,1690.2,1930.58,1950.4,1934.03,1731.49,1845.35,1688.23,1615.73,1463.21,1328.26,1314.85,1172.06,1329.75],"smoothedDot":[1031.83,1033.24,1046.27,1049.13,1057.04,1070.66,1087.08,1130.66,1178.45,1206.32,1169.68,1135.7,1149.67,1196.64,1247.01,1268.38,1321.16,1326.63,1303.52,1263.82,1294.26,1367.72,1478.73,1541.07,1622.27,1622.21,1626.62,1588.17,1596.75,1653.41,1741.85,1824.87,1827.65,1847.34,1848.67,1755.46,1688.49,1654.83,1804.92,1971.21,2216.04,2328.87,2418.44,2430.76,2491.59,2566.5,2598.38,2687.99,2708.0,2817.31,3016.25,3457.3,3781.94,4235.45,4403.29,4376.73,3944.8,3742.56,3711.34,3979.82,3882.05,3749.6,3213.46,2812.69,2613.73,2465.03,2254.94,2036.11,2022.33,2129.09,2099.39,1997.7,1777.12,1664.81,1706.53,1857.06,1938.34,1871.97,1836.96,1755.02,1716.44,1589.06,1469.07,1368.77,1271.72,1272.22,1250.91],"rawAi":[11468.0,10466.48,11584.55,11455.54,12221.91,12226.58,12935.29,13787.92,14346.02,14034.97,13219.32,12851.24,14226.22,15011.35,15164.01,16091.92,16379.46,15657.82,16735.02,17732.6,17599.4,17713.62,18189.17,18095.15,19218.17,19310.79,19627.44,18847.28,17299.29,17446.34,19113.77,20369.73,21122.45,21455.55,22660.01,23724.96,23365.69,23241.99,23461.82,22668.21,21590.63,24892.31,26972.62,26213.72,25832.67],"smoothedAi":[10967.24,11173.01,11168.86,11754.0,11968.01,12461.26,12983.26,13689.74,14056.3,13866.77,13368.51,13432.26,14029.6,14800.53,15422.43,15878.46,16043.07,16257.43,16708.48,17355.67,17681.87,17834.06,17999.31,18500.83,18874.7,19385.47,19261.84,18591.34,17864.3,17953.13,18976.61,20201.98,20982.58,21746.0,22613.51,23250.22,23444.21,23356.5,23124.01,22573.55,23050.38,24485.19,26026.22,26339.67,26023.2],"display":"up 2.4x since ChatGPT","similar":"Both cycles are led by a single tech-heavy index climbing above trend.","different":"Up about 2.4x since ChatGPT vs roughly 4.3x for the dot-com Nasdaq into 2000, so on price alone AI reads earlier and less stretched.","intensityNow":0.42,"equivalentDotcomDate":"1999-03-10","phase":"Acceleration","daysFromPeak":-328,"compression":1.02,"projectedPeakDate":"2027-06-08","beyondDotcomPeak":false,"equiv":{"progress":80.1,"intensity":0.42,"date":"1999-03-10"},"aiNow":{"progress":81.3,"intensity":0.42}},{"key":"valuation_multiple","label":"Valuation multiple","leaf":"cape","intensityDot":[0.0,0.0055,0.0238,0.0425,0.0567,0.0845,0.0948,0.1061,0.1034,0.109,0.0994,0.0926,0.0878,0.1155,0.1527,0.1877,0.2194,0.2482,0.2667,0.2539,0.2653,0.3073,0.3961,0.4415,0.4657,0.4681,0.4638,0.4702,0.4695,0.5103,0.5662,0.6418,0.6802,0.6889,0.7059,0.6796,0.6236,0.5466,0.58,0.6707,0.7873,0.8392,0.8826,0.9191,0.9559,0.9702,0.9895,0.9789,0.9642,0.908,0.9299,0.9791,1.0343,1.0166,1.0,0.9959,0.9921,0.9846,0.9712,0.9868,0.9715,0.9136,0.8435,0.7643,0.7233,0.6728,0.5879,0.5055,0.4753,0.4882,0.488,0.4422,0.3497,0.2883,0.2645,0.313,0.3421,0.3264,0.3228,0.301,0.2845,0.2177,0.1226,0.0447,-0.0243,-0.0501,-0.0746],"intensityAi":[0.2437,0.2436,0.2528,0.2463,0.2537,0.2509,0.2852,0.3216,0.3444,0.342,0.3044,0.3031,0.3313,0.3874,0.4393,0.4789,0.4971,0.5098,0.5278,0.5698,0.592,0.6073,0.6263,0.6654,0.7,0.7095,0.7065,0.6563,0.579,0.5429,0.5656,0.6488,0.6963,0.7386,0.77,0.7945,0.8159,0.8282,0.8325,0.7952,0.7763,0.8032,0.866,0.9117,0.9179],"unit":"shiller_cape","rawDot":[23.28,23.94,23.93,24.35,25.03,24.76,25.97,25.63,25.42,25.81,25.96,24.86,25.41,25.68,26.48,27.58,27.72,28.33,29.26,28.8,27.58,29.93,31.25,32.76,32.58,32.66,32.9,32.33,33.03,32.86,34.71,36.29,37.27,36.95,36.8,38.26,35.42,33.53,33.77,37.37,38.82,40.57,40.4,41.35,42.7,42.55,42.18,43.83,41.93,41.32,40.55,43.21,44.19,43.77,42.18,43.22,43.53,41.96,42.78,42.75,42.87,41.89,39.37,38.78,37.27,36.98,35.83,32.32,32.17,34.07,33.07,32.16,31.4,27.67,28.58,30.01,30.5,30.28,29.09,30.29,29.01,28.13,26.39,23.46,23.59,22.36,21.96],"smoothedDot":[23.61,23.72,24.07,24.44,24.71,25.25,25.45,25.67,25.62,25.73,25.54,25.41,25.32,25.86,26.58,27.26,27.88,28.44,28.8,28.55,28.77,29.59,31.31,32.2,32.67,32.71,32.63,32.75,32.74,33.53,34.62,36.09,36.84,37.01,37.34,36.83,35.74,34.24,34.89,36.65,38.92,39.93,40.77,41.48,42.2,42.48,42.85,42.65,42.36,41.27,41.69,42.65,43.72,43.38,43.06,42.98,42.9,42.76,42.5,42.8,42.5,41.38,40.01,38.47,37.68,36.69,35.04,33.44,32.85,33.1,33.1,32.21,30.41,29.22,28.75,29.7,30.26,29.96,29.89,29.46,29.14,27.84,25.99,24.48,23.14,22.64,22.16],"rawAi":[28.38,28.32,28.34,28.92,27.94,28.77,28.76,29.94,30.89,30.09,29.8,28.7,30.01,31.45,31.97,33.04,33.76,33.03,33.78,34.81,35.48,35.08,35.7,36.59,37.36,37.72,37.14,37.19,34.79,32.63,35.08,36.12,37.48,37.85,38.59,39.31,39.28,39.84,40.03,39.53,37.66,38.93,41.1,41.32,41.6],"smoothedAi":[28.35,28.35,28.53,28.4,28.54,28.49,29.16,29.86,30.31,30.26,29.53,29.5,30.05,31.14,32.15,32.92,33.28,33.52,33.87,34.69,35.12,35.42,35.79,36.55,37.22,37.41,37.35,36.37,34.87,34.17,34.61,36.23,37.15,37.97,38.58,39.06,39.48,39.72,39.8,39.07,38.71,39.23,40.45,41.34,41.46],"display":"CAPE 41","similar":"Rich broad-market valuations in both booms, driven by the tech leaders.","different":"CAPE is about 41 now against roughly 43 at the 2000 peak, so on valuation multiple AI is already close to dot-com's top.","intensityNow":0.918,"equivalentDotcomDate":"1999-02-28","phase":"Acceleration","daysFromPeak":-338,"compression":1.03,"projectedPeakDate":"2027-06-21","beyondDotcomPeak":false,"equiv":{"progress":79.5,"intensity":0.918,"date":"1999-02-28"},"aiNow":{"progress":81.3,"intensity":0.918}}],"intensityNow":0.669,"equivalentDotcomDate":"1999-03-03","phase":"Acceleration","daysFromPeak":-335,"compression":1.03,"projectedPeakDate":"2027-06-17","beyondDotcomPeak":false,"equiv":{"progress":79.6,"intensity":0.669,"date":"1999-03-03"},"aiNow":{"progress":81.3,"intensity":0.669}},{"key":"market_concentration","label":"Market concentration","wip":true},{"key":"capex","label":"Infrastructure / capex","wip":true},{"key":"speculation","label":"Speculative activity","wip":true}],"intensityNow":0.669,"equivalentDotcomDate":"1999-03-03","phase":"Acceleration","daysFromPeak":-335,"compression":1.03,"projectedPeakDate":"2027-06-17","beyondDotcomPeak":false,"equiv":{"progress":79.6,"intensity":0.669,"date":"1999-03-03"},"aiNow":{"progress":81.3,"intensity":0.669}},"assumptions":["The dot-com bubble is a fair analog: an infrastructure-led tech cycle, narrow leadership, heavy retail speculation, one defining index.","Cycle anchors are chosen: dot-com runs 1995 to its 2000-03 peak to the 2002-10 bottom; the AI cycle starts at the 2022-11 ChatGPT release.","Each metric becomes a 0-1 intensity: 0 at the dot-com starting level, 1 at the 2000 peak. Parents weight-average their children (equal by default, adjustable)."],"limitations":["The date is a bold hook over a transparent method, not a forecast. Change the weights or anchors and it moves.","Price appreciation and valuation multiple tell different stories on purpose: price reads early, CAPE reads late. The parent is where they reconcile.","Small sample: one prior cycle. The band is the spread of the leaf dates, the honest uncertainty.","Concentration, capex and speculation are not wired yet, so today the headline reflects Valuation only."]};
 const $ = (s, el) => (el || document).querySelector(s);
 
 /* ---------- shared constants + tiny date math ---------- */
@@ -479,20 +493,28 @@ function refreshHeadline() {
     `<span><span class="k">metrics live</span><b>1</b> of 4 (valuation)</span>`;
 }
 
-/* ---------- canvas: the shared progress-axis renderer ---------- */
-const PAD = { l: 36, r: 12, t: 20, b: 18 }, XMAX = 150;
+/* ---------- canvas: the dual-axis convergence renderer ---------- */
+const XMAX = 162;
+const PEAK_IDX = DATA.peakIdx;
 function setup(canvas) {
   const dpr = window.devicePixelRatio || 1, w = canvas.clientWidth || 360, h = canvas.clientHeight || 190;
   canvas.width = w * dpr; canvas.height = h * dpr;
   const ctx = canvas.getContext("2d"); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   return { ctx, w, h };
 }
-const xPx = (p, w) => PAD.l + (w - PAD.l - PAD.r) * p / XMAX;
 function ticks(min, max, n) {
   const span = max - min || 1, s0 = span / n, mag = Math.pow(10, Math.floor(Math.log10(s0)));
   const step = [1, 2, 2.5, 5, 10].map(m => m * mag).find(s => span / s <= n) || 10 * mag;
   const out = []; for (let v = Math.ceil(min / step) * step; v <= max + 1e-9; v += step) out.push(v);
   return out;
+}
+function interp(xs, ys, x) {
+  if (x <= xs[0]) return ys[0];
+  for (let i = 1; i < xs.length; i++) {
+    if (x <= xs[i]) { const a = ys[i - 1], b = ys[i]; if (a == null) return b; if (b == null) return a;
+      return a + (x - xs[i - 1]) / ((xs[i] - xs[i - 1]) || 1) * (b - a); }
+  }
+  return ys[ys.length - 1];
 }
 function line(ctx, xs, ys, x2px, y2px, color, width, dash) {
   ctx.strokeStyle = color; ctx.lineWidth = width; ctx.setLineDash(dash || []); ctx.beginPath();
@@ -503,51 +525,182 @@ function line(ctx, xs, ys, x2px, y2px, color, width, dash) {
   }
   ctx.stroke(); ctx.setLineDash([]);
 }
-function pt(ctx, x, y, color) {
-  ctx.fillStyle = "#12202e"; ctx.beginPath(); ctx.arc(x, y, 5, 0, 6.2832); ctx.fill();
-  ctx.strokeStyle = color; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.arc(x, y, 5, 0, 6.2832); ctx.stroke();
+function convMarker(ctx, x, y) {
+  ctx.fillStyle = getCss("--ath"); ctx.beginPath(); ctx.arc(x, y, 6.5, 0, 6.2832); ctx.fill();
+  ctx.fillStyle = getCss("--accent"); ctx.beginPath(); ctx.arc(x, y, 4, 0, 6.2832); ctx.fill();
+  ctx.strokeStyle = "#0a0b10"; ctx.lineWidth = 1; ctx.stroke();
 }
-function drawNode(canvas, node) {
+let _cssCache = null;
+function getCss(v) { _cssCache = _cssCache || getComputedStyle(document.documentElement); return _cssCache.getPropertyValue(v); }
+function fmtNum(v) { return v == null ? "-" : v >= 1000 ? Math.round(v).toLocaleString() : v >= 10 ? v.toFixed(1) : v.toFixed(2); }
+function yearTicks(startIso, progOf, xmax) {
+  const d = new Date(startIso + "T00:00:00Z"), out = [];
+  for (let y = 0; y < 40; y++) {
+    const dd = new Date(Date.UTC(d.getUTCFullYear() + y, d.getUTCMonth(), 1));
+    const p = progOf(Math.round(dd.getTime() / DAYMS));
+    if (p > xmax + 3) break;
+    if (p >= -3) out.push({ prog: p, label: String(dd.getUTCFullYear()) });
+  }
+  return out;
+}
+
+// Per-node plotting model: the AI line is drawn on its own x-scale so today
+// lands on the dot-com equivalent (the blue and grey dots converge). Beyond
+// today, AI is assumed to trace the remaining dot-com path (the projection).
+function nodeModel(node) {
+  const progAiLast = PROG_AI[PROG_AI.length - 1] || 1;
+  const aiK = node.equiv.progress / progAiLast;            // scale AI onto the dot clock
+  const aiP = PROG_AI.map(p => p * aiK);
+  const leaf = !!node.leaf;
+  const dotStart = leaf ? node.smoothedDot[0] : null;
+  const aiStart = leaf ? node.smoothedAi[0] : null;
+  const peakMult = leaf ? node.smoothedDot[PEAK_IDX] / dotStart : null;
+  const dotValAt = p => leaf ? interp(PROG_DOT, node.smoothedDot, p) : null;
+  const dotIntAt = p => interp(PROG_DOT, node.intensityDot, p);
+  const aiValAt = p => !leaf ? null
+    : (p <= node.equiv.progress ? interp(aiP, node.smoothedAi, p)
+       : aiStart * (1 + dotIntAt(p) * (peakMult - 1)));      // projected: follow dot-com shape
+  const aiOrdAt = p => AI_START + Math.round(p / (aiK || 1) * RAMP / 100);
+  const dotOrdAt = p => DOT_START + Math.round(p / 100 * RAMP);
+  return { aiK, aiP, leaf, dotStart, aiStart, peakMult, dotValAt, dotIntAt, aiValAt, aiOrdAt, dotOrdAt, progAiLast };
+}
+
+function drawNode(canvas, node, detail) {
   if (!node.intensityDot) return;
   const { ctx, w, h } = setup(canvas);
-  const css = getComputedStyle(document.documentElement);
+  const M = nodeModel(node);
+  const PADl = detail ? 46 : 36, PADr = 15, PADt = detail ? 34 : 20, PADb = detail ? 54 : 18;
   const all = node.intensityDot.concat(node.intensityAi).filter(v => v != null);
-  if (!all.length) return;
-  const yMax = Math.max(1.15, Math.max(...all) * 1.08), yMin = Math.min(0, Math.min(...all));
-  const y2px = v => PAD.t + (h - PAD.t - PAD.b) * (1 - (v - yMin) / (yMax - yMin || 1));
-  const x2px = p => xPx(p, w);
+  const yMax = Math.max(1.12, Math.max(...all) * 1.06), yMin = Math.min(0, Math.min(...all));
+  const y2px = v => PADt + (h - PADt - PADb) * (1 - (v - yMin) / (yMax - yMin || 1));
+  const x2px = p => PADl + (w - PADl - PADr) * p / XMAX;
+  const px2prog = x => (x - PADl) / ((w - PADl - PADr) || 1) * XMAX;
+  const eqx = x2px(node.equiv.progress), eqy = y2px(node.intensityNow);
   ctx.clearRect(0, 0, w, h);
-  ctx.font = "10px 'Segoe UI', sans-serif";
-  ctx.textAlign = "right"; ctx.textBaseline = "middle";
+
+  // y gridlines (intensity %)
+  ctx.font = "10px 'Segoe UI', sans-serif"; ctx.textAlign = "right"; ctx.textBaseline = "middle";
   for (const t of ticks(yMin, yMax, 4)) {
     const y = y2px(t);
-    ctx.strokeStyle = css.getPropertyValue("--border"); ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(PAD.l, y); ctx.lineTo(w - PAD.r, y); ctx.stroke();
-    ctx.fillStyle = css.getPropertyValue("--muted"); ctx.fillText((t * 100).toFixed(0) + "%", PAD.l - 5, y);
+    ctx.strokeStyle = getCss("--border"); ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(PADl, y); ctx.lineTo(w - PADr, y); ctx.stroke();
+    ctx.fillStyle = getCss("--muted"); ctx.fillText((t * 100).toFixed(0) + "%", PADl - 5, y);
   }
+  // phase bands + labels
   ctx.textAlign = "center"; ctx.textBaseline = "top";
   for (let i = 0; i < BOUNDS.length; i++) {
     const lo = BOUNDS[i], hi = i + 1 < BOUNDS.length ? BOUNDS[i + 1] : XMAX;
     if (lo > 0 && lo <= XMAX) {
       const x = x2px(lo);
       ctx.strokeStyle = "#2a3340"; ctx.setLineDash([3, 4]); ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.moveTo(x, PAD.t); ctx.lineTo(x, h - PAD.b); ctx.stroke(); ctx.setLineDash([]);
+      ctx.beginPath(); ctx.moveTo(x, PADt); ctx.lineTo(x, h - PADb); ctx.stroke(); ctx.setLineDash([]);
     }
-    ctx.fillStyle = css.getPropertyValue("--muted2"); ctx.font = "8px 'Segoe UI', sans-serif";
+    ctx.fillStyle = getCss("--muted2"); ctx.font = "8px 'Segoe UI', sans-serif";
     ctx.fillText(PHASES[i], x2px((Math.min(hi, XMAX) + lo) / 2), 2);
   }
-  const xpk = x2px(100);
-  ctx.strokeStyle = css.getPropertyValue("--trigger"); ctx.setLineDash([2, 3]); ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(xpk, PAD.t); ctx.lineTo(xpk, h - PAD.b); ctx.stroke(); ctx.setLineDash([]);
-  line(ctx, PROG_DOT, node.intensityDot, x2px, y2px, css.getPropertyValue("--ath"), 1.4, [5, 3]);
-  line(ctx, PROG_AI, node.intensityAi, x2px, y2px, css.getPropertyValue("--accent"), 1.9);
-  if (node.equiv && node.aiNow) {
-    ctx.strokeStyle = "rgba(153,161,175,.45)"; ctx.setLineDash([2, 3]); ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(x2px(node.equiv.progress), y2px(node.equiv.intensity));
-    ctx.lineTo(x2px(node.aiNow.progress), y2px(node.aiNow.intensity)); ctx.stroke(); ctx.setLineDash([]);
-    pt(ctx, x2px(node.equiv.progress), y2px(node.equiv.intensity), css.getPropertyValue("--ath"));
-    pt(ctx, x2px(node.aiNow.progress), y2px(node.aiNow.intensity), css.getPropertyValue("--accent"));
+
+  // detail: dual date axes (dot-com on top, AI on bottom, 12-month ticks)
+  if (detail) {
+    ctx.font = "9px 'Segoe UI', sans-serif"; ctx.fillStyle = getCss("--muted2");
+    ctx.textBaseline = "bottom"; ctx.textAlign = "center";
+    yearTicks(DATA.dotcomStart, o => (o - DOT_START) / RAMP * 100, XMAX).forEach(t => {
+      const x = x2px(t.prog);
+      ctx.strokeStyle = "#232b34"; ctx.beginPath(); ctx.moveTo(x, PADt); ctx.lineTo(x, PADt - 4); ctx.stroke();
+      ctx.fillText(t.label, x, PADt - 5);
+    });
+    ctx.textBaseline = "top";
+    yearTicks(DATA.aiStart, o => (o - AI_START) / RAMP * 100 * M.aiK, XMAX).forEach(t => {
+      const x = x2px(t.prog);
+      ctx.strokeStyle = getCss("--accent"); ctx.globalAlpha = .5;
+      ctx.beginPath(); ctx.moveTo(x, h - PADb); ctx.lineTo(x, h - PADb + 4); ctx.stroke(); ctx.globalAlpha = 1;
+      ctx.fillStyle = getCss("--accent"); ctx.fillText(t.label, x, h - PADb + 5);
+    });
+    ctx.fillStyle = getCss("--muted2"); ctx.textAlign = "left";
+    ctx.fillText("Dot-com", PADl, PADt - 15); ctx.textAlign = "left";
+    ctx.fillStyle = getCss("--accent"); ctx.fillText("AI", PADl, h - PADb + 17);
   }
+
+  // 2000 peak line (aligned with the grey high at progress 100)
+  const xpk = x2px(100);
+  ctx.strokeStyle = getCss("--trigger"); ctx.setLineDash([2, 3]); ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(xpk, PADt); ctx.lineTo(xpk, h - PADb); ctx.stroke(); ctx.setLineDash([]);
+  if (detail) { ctx.fillStyle = getCss("--trigger"); ctx.font = "9px 'Segoe UI', sans-serif";
+    ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText("2000 peak", xpk, PADt + 1); }
+
+  if (detail) {
+    // origin event line + start values (below the graph)
+    ctx.strokeStyle = "#3a4453"; ctx.setLineDash([3, 4]); ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(x2px(0), PADt); ctx.lineTo(x2px(0), h - PADb); ctx.stroke(); ctx.setLineDash([]);
+    if (M.leaf) {
+      ctx.font = "8.5px 'Segoe UI', sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "top";
+      ctx.fillStyle = getCss("--ath");
+      ctx.fillText(`${DATA.dotcomStartEvent} · ${fmtNum(node.rawDot[0])}`, x2px(0) + 2, h - PADb + 30);
+      ctx.fillStyle = getCss("--accent");
+      ctx.fillText(`${DATA.aiStartEvent} · ${fmtNum(node.rawAi[0])}`, x2px(0) + 2, h - PADb + 41);
+    }
+    // horizontal "today's level" line + label
+    ctx.strokeStyle = "rgba(0,147,253,.35)"; ctx.setLineDash([4, 3]); ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(x2px(0), eqy); ctx.lineTo(eqx, eqy); ctx.stroke(); ctx.setLineDash([]);
+    if (M.leaf) {
+      const mult = node.smoothedAi[node.smoothedAi.length - 1] / M.aiStart;
+      ctx.fillStyle = getCss("--accent"); ctx.font = "9px 'Segoe UI', sans-serif";
+      ctx.textAlign = "left"; ctx.textBaseline = "bottom";
+      ctx.fillText(`${mult.toFixed(2)}x from start · ${(node.intensityNow * 100).toFixed(0)}% of the run to peak`, x2px(0) + 4, eqy - 3);
+    }
+    // today event line + label below
+    ctx.strokeStyle = "#6b7280"; ctx.setLineDash([3, 4]); ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(eqx, PADt); ctx.lineTo(eqx, h - PADb); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = getCss("--text"); ctx.font = "700 9px 'Segoe UI', sans-serif";
+    ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText("TODAY", eqx, PADt + 1);
+    const daysIn = Math.round(node.equiv.progress / 100 * RAMP);
+    ctx.fillStyle = getCss("--muted"); ctx.font = "8.5px 'Segoe UI', sans-serif"; ctx.textBaseline = "top";
+    ctx.fillText(`${daysIn}d into dot-com · ${node.equiv.progress.toFixed(0)}% to peak`, eqx, h - PADb + 30);
+  }
+
+  // grey dot-com line (solid, real events)
+  line(ctx, PROG_DOT, node.intensityDot, x2px, y2px, getCss("--ath"), 1.7, []);
+  // AI line (solid, real, up to today)
+  line(ctx, M.aiP, node.intensityAi, x2px, y2px, getCss("--accent"), 2.1, []);
+  // projection (blue dotted): from the convergence point forward along the dot-com shape to the peak
+  const projX = [node.equiv.progress], projY = [node.intensityNow];
+  for (let i = 0; i < PROG_DOT.length; i++) {
+    const p = PROG_DOT[i];
+    if (p > node.equiv.progress && p <= 100 && node.intensityDot[i] != null) { projX.push(p); projY.push(node.intensityDot[i]); }
+  }
+  projX.push(100); projY.push(interp(PROG_DOT, node.intensityDot, 100));
+  line(ctx, projX, projY, x2px, y2px, getCss("--accent"), 1.8, [3, 3]);
+  // convergence marker (blue + grey dots at the same point)
+  convMarker(ctx, eqx, eqy);
+
+  canvas._rc = { x2px, y2px, px2prog, PADl, PADr, PADt, PADb, w, h, M, node, eqx, eqy };
+}
+
+// Modal-only hover crosshair + readout
+function drawCrosshair(canvas, clientX) {
+  const rc = canvas._rc; if (!rc) return;
+  drawNode(canvas, rc.node, true);
+  const r = canvas.getBoundingClientRect();
+  let x = clientX - r.left;
+  x = Math.max(rc.PADl, Math.min(rc.w - rc.PADr, x));
+  const p = rc.px2prog(x), ctx = canvas.getContext("2d"), M = rc.M, node = rc.node;
+  ctx.strokeStyle = "rgba(244,244,246,.4)"; ctx.lineWidth = 1; ctx.setLineDash([]);
+  ctx.beginPath(); ctx.moveTo(x, rc.PADt); ctx.lineTo(x, rc.h - rc.PADb); ctx.stroke();
+  const dotMult = M.leaf && M.dotStart ? (M.dotValAt(p) / M.dotStart) : null;
+  const rows = [`${p.toFixed(0)}% through timeline` + (dotMult != null ? ` · ${dotMult.toFixed(2)}x appreciation` : "")];
+  if (M.leaf) {
+    const unit = node.unit === "shiller_cape" ? "CAPE" : "Nasdaq";
+    rows.push(`Dot-com ${unit}: ${fmtNum(M.dotValAt(p))}`);
+    rows.push(`AI ${unit}: ${fmtNum(M.aiValAt(p))}` + (p > node.equiv.progress ? " (proj)" : ""));
+  } else {
+    rows.push(`Dot-com intensity: ${(M.dotIntAt(p) * 100).toFixed(0)}%`);
+  }
+  ctx.font = "10px 'Segoe UI', sans-serif"; ctx.textBaseline = "top";
+  const tw = Math.max(...rows.map(t => ctx.measureText(t).width)) + 14;
+  const bx = x + 10 + tw > rc.w - rc.PADr ? x - tw - 10 : x + 10, by = rc.PADt + 6;
+  ctx.fillStyle = "rgba(20,32,46,.95)"; ctx.strokeStyle = "#3a4453";
+  ctx.beginPath(); ctx.roundRect(bx, by, tw, rows.length * 14 + 8, 6); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = "#f4f4f6"; ctx.textAlign = "left";
+  rows.forEach((t, i) => ctx.fillText(t, bx + 7, by + 5 + i * 14));
 }
 
 /* ---------- click-to-expand modal + data download ---------- */
@@ -557,9 +710,23 @@ function openModal(node) {
   modalNode = node;
   $("#modal-title").innerHTML = `${node.label} <span class="tier">${tierOf(node)}</span>`;
   $("#modal-deriv").innerHTML = derivHtml(node);
+  $("#modal-opts").innerHTML = optionsHtml(node);
   $("#modal-scrim").classList.add("open");
   $("#modal").classList.add("open");
-  requestAnimationFrame(() => drawNode($("#modal-canvas"), node));
+  requestAnimationFrame(() => drawNode($("#modal-canvas"), node, true));
+}
+function fmtMonth(iso) { return new Date(iso + "T00:00:00Z").toLocaleDateString("en-US", { month: "short", year: "numeric", timeZone: "UTC" }); }
+function optionsHtml(node) {
+  const a = [
+    ["Cycle anchors", `AI era starts ${fmtMonth(DATA.aiStart)} (${DATA.aiStartEvent}); dot-com era starts ${fmtMonth(DATA.dotcomStart)} (${DATA.dotcomStartEvent}). Both are pinned to a single defining launch, so the origins line up.`],
+    ["Peak (100%)", `The month the smoothed Nasdaq tops out, ${fmtMonth(DATA.dotcomPeak)}. The raw intraday high was 2000-03-10; smoothing nudges the monthly top a hair earlier.`],
+    ["Smoothing", `A centered 3-month average on the monthly series. It makes the matching point read cleanly but tames the sharp 2000 top, so the smoothed peak sits below the famous 5,048.`],
+    ["Matching point", `Today's AI level maps to the first date the dot-com path reached it on the way up. If the path crosses that level more than once, the earliest wins.`],
+    ["Phase bands", `Editorial splits on the Netscape-to-peak clock (${BOUNDS.join("/")}%), calibrated to the dot-com story. They set the phase label, not the projected date.`],
+    ["Projection", `Past today the AI path is assumed to trace the remaining dot-com shape (the blue dotted line). The projected top is where that reaches the peak on the AI time-scale.`],
+  ];
+  return `<h4 class="mt">Options and Assumptions</h4>` +
+    a.map(([t, d]) => `<div class="assump"><div class="at">${t}</div><div class="ad">${d}</div></div>`).join("");
 }
 function closeModal() {
   $("#modal-scrim").classList.remove("open");
@@ -580,7 +747,7 @@ function derivHtml(node) {
     const kids = liveKids(node), w = node._weights || kids.map(() => 1), tot = w.reduce((a, b) => a + b, 0) || 1;
     rows.push(`Blend of ${kids.map((c, i) => `${c.label} <b>${Math.round(w[i] / tot * 100)}%</b>`).join(", ")} gives intensity <b>${pctv(node.intensityNow)}</b>.`);
   }
-  rows.push(`That matches the dot-com path at <b>${eq.toFixed(1)}%</b> of its timeline: <b>${node.equivalentDotcomDate}</b> (${node.phase}), <b>${Math.abs(node.daysFromPeak)}</b> days ${node.daysFromPeak < 0 ? "before" : "after"} the 2000-03 peak.`);
+  rows.push(`That matches the dot-com path at <b>${eq.toFixed(1)}%</b> of its timeline: <b>${node.equivalentDotcomDate}</b> (${node.phase}), <b>${Math.abs(node.daysFromPeak)}</b> days ${node.daysFromPeak < 0 ? "before" : "after"} the 2000 peak.`);
   rows.push(`AI reached this in <b>${aiElapsed}</b> days; the dot-com path took <b>${dotDone}</b> days to cover the same ground, so AI's pace is <b>${node.compression}&times;</b> (${node.compression < 1 ? "faster" : "slower"}).`);
   rows.push(`Dot-com then took <b>${dotLeft}</b> more days to peak. Scaled by pace: ${node.compression} &times; ${dotLeft} &asymp; <b>${scaled}</b> days from ${DATA.asOf}, so the projected top is <b>${node.projectedPeakDate}</b>.`);
   const note = node.leaf
@@ -589,19 +756,30 @@ function derivHtml(node) {
   return `<h4>How this date is derived</h4><ol>${rows.map(r => `<li>${r}</li>`).join("")}</ol><div class="dl-note">${note}</div>`;
 }
 function csvCell(v) { return v == null ? "" : v; }
+function round1(x) { return Math.round(x * 10) / 10; }
 function downloadCSV(node) {
-  const leaf = !!node.leaf;
-  const lines = [leaf ? `era,month,progress_pct,${node.unit || "raw"},smoothed,intensity`
+  const leaf = !!node.leaf, M = nodeModel(node);
+  const lines = [leaf ? `era,month,progress_pct,${node.unit},smoothed,multiple_x,intensity`
                       : `era,month,progress_pct,intensity`];
-  const push = (era, months, prog, raw, sm, inten) => {
-    for (let i = 0; i < months.length; i++) {
-      lines.push(leaf
-        ? [era, months[i], prog[i], csvCell(raw[i]), csvCell(sm[i]), csvCell(inten[i])].join(",")
-        : [era, months[i], prog[i], csvCell(inten[i])].join(","));
-    }
+  const rd = (era, month, prog, raw, sm, inten, base) => {
+    if (!leaf) { lines.push([era, month, round1(prog), csvCell(inten)].join(",")); return; }
+    const mult = (sm != null && base) ? sm / base : null;
+    lines.push([era, month, round1(prog), csvCell(raw), csvCell(sm), mult != null ? mult.toFixed(3) : "", csvCell(inten)].join(","));
   };
-  push("dotcom", DATA.dotMonths, PROG_DOT, node.rawDot, node.smoothedDot, node.intensityDot);
-  push("ai", DATA.aiMonths, PROG_AI, node.rawAi, node.smoothedAi, node.intensityAi);
+  // dot-com (real, whole cycle) and AI (real, to today)
+  for (let i = 0; i < DATA.dotMonths.length; i++)
+    rd("dotcom", DATA.dotMonths[i], PROG_DOT[i], node.rawDot && node.rawDot[i], node.smoothedDot && node.smoothedDot[i], node.intensityDot[i], M.dotStart);
+  for (let i = 0; i < DATA.aiMonths.length; i++)
+    rd("ai", DATA.aiMonths[i], M.aiP[i], node.rawAi && node.rawAi[i], node.smoothedAi && node.smoothedAi[i], node.intensityAi[i], M.aiStart);
+  // AI projected forward: trace the remaining dot-com shape through the rest of the cycle
+  for (let i = 0; i < DATA.dotMonths.length; i++) {
+    const p = PROG_DOT[i];
+    if (p <= node.equiv.progress) continue;
+    const month = isoFromOrd(M.aiOrdAt(p)), inten = node.intensityDot[i];
+    if (!leaf) { lines.push(["ai_projected", month, round1(p), csvCell(inten)].join(",")); continue; }
+    const val = M.aiValAt(p), mult = (val != null && M.aiStart) ? val / M.aiStart : null;
+    lines.push(["ai_projected", month, round1(p), "", val != null ? Math.round(val * 100) / 100 : "", mult != null ? mult.toFixed(3) : "", csvCell(inten)].join(","));
+  }
   const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
@@ -613,7 +791,12 @@ $("#modal-scrim").addEventListener("click", closeModal);
 $("#modal-close").addEventListener("click", closeModal);
 $("#modal-dl").addEventListener("click", () => downloadCSV(modalNode));
 document.addEventListener("keydown", e => { if (e.key === "Escape") closeModal(); });
-window.addEventListener("resize", () => { if (modalNode) requestAnimationFrame(() => drawNode($("#modal-canvas"), modalNode)); });
+(function () {
+  const c = $("#modal-canvas");
+  c.addEventListener("mousemove", e => { if (modalNode) drawCrosshair(c, e.clientX); });
+  c.addEventListener("mouseleave", () => { if (modalNode) drawNode(c, modalNode, true); });
+})();
+window.addEventListener("resize", () => { if (modalNode) requestAnimationFrame(() => drawNode($("#modal-canvas"), modalNode, true)); });
 
 /* ---------- boot ---------- */
 document.getElementById("hideall").addEventListener("click", () => {

@@ -134,16 +134,25 @@
     font-size: 13px; padding: 7px 13px; border-radius: 8px; cursor: pointer; }
   .mbtn:hover { border-color: var(--accent); color: var(--accent); }
   .mbtn.close { font-size: 18px; line-height: 1; padding: 4px 11px; }
-  .modal-chart { flex: 1; position: relative; margin: 14px 0; min-height: 0; }
-  .modal-chart canvas { width: 100%; height: 100%; display: block; }
-  .modal-deriv { font-size: 12.5px; color: var(--muted); line-height: 1.6; max-height: 32vh; overflow-y: auto;
-    border-top: 1px solid var(--border); padding-top: 12px; }
-  .modal-deriv h4 { font-size: 11px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted2);
+  .modal-body { flex: 1; display: flex; gap: 18px; min-height: 0; margin-top: 12px; }
+  .modal-chart { flex: 1; position: relative; min-height: 0; }
+  .modal-chart canvas { width: 100%; height: 100%; display: block; cursor: crosshair; }
+  .modal-side { width: 344px; flex-shrink: 0; overflow-y: auto; border-left: 1px solid var(--border);
+    padding-left: 16px; font-size: 12.5px; color: var(--muted); line-height: 1.6; }
+  .modal-side h4 { font-size: 11px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted2);
     margin: 0 0 6px; font-weight: 600; }
-  .modal-deriv ol { margin: 0 0 0 18px; }
-  .modal-deriv li { margin: 4px 0; }
-  .modal-deriv b { color: var(--text); font-family: var(--mono); font-variant-numeric: tabular-nums; }
-  .modal-deriv .dl-note { margin-top: 8px; color: var(--muted2); }
+  .modal-side h4.mt { margin-top: 16px; border-top: 1px solid var(--border); padding-top: 14px; }
+  .modal-side ol { margin: 0 0 0 18px; padding: 0; }
+  .modal-side li { margin: 4px 0; }
+  .modal-side b { color: var(--text); font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  .modal-side .dl-note { margin-top: 8px; color: var(--muted2); }
+  .assump { margin: 0 0 9px; padding-left: 11px; border-left: 2px solid var(--border); }
+  .assump .at { color: var(--text); font-weight: 600; font-size: 12px; }
+  .assump .ad { color: var(--muted); font-size: 11.5px; }
+  @media (max-width: 900px) {
+    .modal-body { flex-direction: column; }
+    .modal-side { width: auto; border-left: none; border-top: 1px solid var(--border); padding-left: 0; padding-top: 12px; }
+  }
 </style>
 </head>
 <body>
@@ -189,8 +198,13 @@
       <button id="modal-close" class="mbtn close" aria-label="Close">&times;</button>
     </div>
   </div>
-  <div class="modal-chart"><canvas id="modal-canvas"></canvas></div>
-  <div class="modal-deriv" id="modal-deriv"></div>
+  <div class="modal-body">
+    <div class="modal-chart"><canvas id="modal-canvas"></canvas></div>
+    <div class="modal-side">
+      <div id="modal-deriv"></div>
+      <div id="modal-opts"></div>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -479,20 +493,28 @@ function refreshHeadline() {
     `<span><span class="k">metrics live</span><b>1</b> of 4 (valuation)</span>`;
 }
 
-/* ---------- canvas: the shared progress-axis renderer ---------- */
-const PAD = { l: 36, r: 12, t: 20, b: 18 }, XMAX = 150;
+/* ---------- canvas: the dual-axis convergence renderer ---------- */
+const XMAX = 162;
+const PEAK_IDX = DATA.peakIdx;
 function setup(canvas) {
   const dpr = window.devicePixelRatio || 1, w = canvas.clientWidth || 360, h = canvas.clientHeight || 190;
   canvas.width = w * dpr; canvas.height = h * dpr;
   const ctx = canvas.getContext("2d"); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   return { ctx, w, h };
 }
-const xPx = (p, w) => PAD.l + (w - PAD.l - PAD.r) * p / XMAX;
 function ticks(min, max, n) {
   const span = max - min || 1, s0 = span / n, mag = Math.pow(10, Math.floor(Math.log10(s0)));
   const step = [1, 2, 2.5, 5, 10].map(m => m * mag).find(s => span / s <= n) || 10 * mag;
   const out = []; for (let v = Math.ceil(min / step) * step; v <= max + 1e-9; v += step) out.push(v);
   return out;
+}
+function interp(xs, ys, x) {
+  if (x <= xs[0]) return ys[0];
+  for (let i = 1; i < xs.length; i++) {
+    if (x <= xs[i]) { const a = ys[i - 1], b = ys[i]; if (a == null) return b; if (b == null) return a;
+      return a + (x - xs[i - 1]) / ((xs[i] - xs[i - 1]) || 1) * (b - a); }
+  }
+  return ys[ys.length - 1];
 }
 function line(ctx, xs, ys, x2px, y2px, color, width, dash) {
   ctx.strokeStyle = color; ctx.lineWidth = width; ctx.setLineDash(dash || []); ctx.beginPath();
@@ -503,51 +525,182 @@ function line(ctx, xs, ys, x2px, y2px, color, width, dash) {
   }
   ctx.stroke(); ctx.setLineDash([]);
 }
-function pt(ctx, x, y, color) {
-  ctx.fillStyle = "#12202e"; ctx.beginPath(); ctx.arc(x, y, 5, 0, 6.2832); ctx.fill();
-  ctx.strokeStyle = color; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.arc(x, y, 5, 0, 6.2832); ctx.stroke();
+function convMarker(ctx, x, y) {
+  ctx.fillStyle = getCss("--ath"); ctx.beginPath(); ctx.arc(x, y, 6.5, 0, 6.2832); ctx.fill();
+  ctx.fillStyle = getCss("--accent"); ctx.beginPath(); ctx.arc(x, y, 4, 0, 6.2832); ctx.fill();
+  ctx.strokeStyle = "#0a0b10"; ctx.lineWidth = 1; ctx.stroke();
 }
-function drawNode(canvas, node) {
+let _cssCache = null;
+function getCss(v) { _cssCache = _cssCache || getComputedStyle(document.documentElement); return _cssCache.getPropertyValue(v); }
+function fmtNum(v) { return v == null ? "-" : v >= 1000 ? Math.round(v).toLocaleString() : v >= 10 ? v.toFixed(1) : v.toFixed(2); }
+function yearTicks(startIso, progOf, xmax) {
+  const d = new Date(startIso + "T00:00:00Z"), out = [];
+  for (let y = 0; y < 40; y++) {
+    const dd = new Date(Date.UTC(d.getUTCFullYear() + y, d.getUTCMonth(), 1));
+    const p = progOf(Math.round(dd.getTime() / DAYMS));
+    if (p > xmax + 3) break;
+    if (p >= -3) out.push({ prog: p, label: String(dd.getUTCFullYear()) });
+  }
+  return out;
+}
+
+// Per-node plotting model: the AI line is drawn on its own x-scale so today
+// lands on the dot-com equivalent (the blue and grey dots converge). Beyond
+// today, AI is assumed to trace the remaining dot-com path (the projection).
+function nodeModel(node) {
+  const progAiLast = PROG_AI[PROG_AI.length - 1] || 1;
+  const aiK = node.equiv.progress / progAiLast;            // scale AI onto the dot clock
+  const aiP = PROG_AI.map(p => p * aiK);
+  const leaf = !!node.leaf;
+  const dotStart = leaf ? node.smoothedDot[0] : null;
+  const aiStart = leaf ? node.smoothedAi[0] : null;
+  const peakMult = leaf ? node.smoothedDot[PEAK_IDX] / dotStart : null;
+  const dotValAt = p => leaf ? interp(PROG_DOT, node.smoothedDot, p) : null;
+  const dotIntAt = p => interp(PROG_DOT, node.intensityDot, p);
+  const aiValAt = p => !leaf ? null
+    : (p <= node.equiv.progress ? interp(aiP, node.smoothedAi, p)
+       : aiStart * (1 + dotIntAt(p) * (peakMult - 1)));      // projected: follow dot-com shape
+  const aiOrdAt = p => AI_START + Math.round(p / (aiK || 1) * RAMP / 100);
+  const dotOrdAt = p => DOT_START + Math.round(p / 100 * RAMP);
+  return { aiK, aiP, leaf, dotStart, aiStart, peakMult, dotValAt, dotIntAt, aiValAt, aiOrdAt, dotOrdAt, progAiLast };
+}
+
+function drawNode(canvas, node, detail) {
   if (!node.intensityDot) return;
   const { ctx, w, h } = setup(canvas);
-  const css = getComputedStyle(document.documentElement);
+  const M = nodeModel(node);
+  const PADl = detail ? 46 : 36, PADr = 15, PADt = detail ? 34 : 20, PADb = detail ? 54 : 18;
   const all = node.intensityDot.concat(node.intensityAi).filter(v => v != null);
-  if (!all.length) return;
-  const yMax = Math.max(1.15, Math.max(...all) * 1.08), yMin = Math.min(0, Math.min(...all));
-  const y2px = v => PAD.t + (h - PAD.t - PAD.b) * (1 - (v - yMin) / (yMax - yMin || 1));
-  const x2px = p => xPx(p, w);
+  const yMax = Math.max(1.12, Math.max(...all) * 1.06), yMin = Math.min(0, Math.min(...all));
+  const y2px = v => PADt + (h - PADt - PADb) * (1 - (v - yMin) / (yMax - yMin || 1));
+  const x2px = p => PADl + (w - PADl - PADr) * p / XMAX;
+  const px2prog = x => (x - PADl) / ((w - PADl - PADr) || 1) * XMAX;
+  const eqx = x2px(node.equiv.progress), eqy = y2px(node.intensityNow);
   ctx.clearRect(0, 0, w, h);
-  ctx.font = "10px 'Segoe UI', sans-serif";
-  ctx.textAlign = "right"; ctx.textBaseline = "middle";
+
+  // y gridlines (intensity %)
+  ctx.font = "10px 'Segoe UI', sans-serif"; ctx.textAlign = "right"; ctx.textBaseline = "middle";
   for (const t of ticks(yMin, yMax, 4)) {
     const y = y2px(t);
-    ctx.strokeStyle = css.getPropertyValue("--border"); ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(PAD.l, y); ctx.lineTo(w - PAD.r, y); ctx.stroke();
-    ctx.fillStyle = css.getPropertyValue("--muted"); ctx.fillText((t * 100).toFixed(0) + "%", PAD.l - 5, y);
+    ctx.strokeStyle = getCss("--border"); ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(PADl, y); ctx.lineTo(w - PADr, y); ctx.stroke();
+    ctx.fillStyle = getCss("--muted"); ctx.fillText((t * 100).toFixed(0) + "%", PADl - 5, y);
   }
+  // phase bands + labels
   ctx.textAlign = "center"; ctx.textBaseline = "top";
   for (let i = 0; i < BOUNDS.length; i++) {
     const lo = BOUNDS[i], hi = i + 1 < BOUNDS.length ? BOUNDS[i + 1] : XMAX;
     if (lo > 0 && lo <= XMAX) {
       const x = x2px(lo);
       ctx.strokeStyle = "#2a3340"; ctx.setLineDash([3, 4]); ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.moveTo(x, PAD.t); ctx.lineTo(x, h - PAD.b); ctx.stroke(); ctx.setLineDash([]);
+      ctx.beginPath(); ctx.moveTo(x, PADt); ctx.lineTo(x, h - PADb); ctx.stroke(); ctx.setLineDash([]);
     }
-    ctx.fillStyle = css.getPropertyValue("--muted2"); ctx.font = "8px 'Segoe UI', sans-serif";
+    ctx.fillStyle = getCss("--muted2"); ctx.font = "8px 'Segoe UI', sans-serif";
     ctx.fillText(PHASES[i], x2px((Math.min(hi, XMAX) + lo) / 2), 2);
   }
-  const xpk = x2px(100);
-  ctx.strokeStyle = css.getPropertyValue("--trigger"); ctx.setLineDash([2, 3]); ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(xpk, PAD.t); ctx.lineTo(xpk, h - PAD.b); ctx.stroke(); ctx.setLineDash([]);
-  line(ctx, PROG_DOT, node.intensityDot, x2px, y2px, css.getPropertyValue("--ath"), 1.4, [5, 3]);
-  line(ctx, PROG_AI, node.intensityAi, x2px, y2px, css.getPropertyValue("--accent"), 1.9);
-  if (node.equiv && node.aiNow) {
-    ctx.strokeStyle = "rgba(153,161,175,.45)"; ctx.setLineDash([2, 3]); ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(x2px(node.equiv.progress), y2px(node.equiv.intensity));
-    ctx.lineTo(x2px(node.aiNow.progress), y2px(node.aiNow.intensity)); ctx.stroke(); ctx.setLineDash([]);
-    pt(ctx, x2px(node.equiv.progress), y2px(node.equiv.intensity), css.getPropertyValue("--ath"));
-    pt(ctx, x2px(node.aiNow.progress), y2px(node.aiNow.intensity), css.getPropertyValue("--accent"));
+
+  // detail: dual date axes (dot-com on top, AI on bottom, 12-month ticks)
+  if (detail) {
+    ctx.font = "9px 'Segoe UI', sans-serif"; ctx.fillStyle = getCss("--muted2");
+    ctx.textBaseline = "bottom"; ctx.textAlign = "center";
+    yearTicks(DATA.dotcomStart, o => (o - DOT_START) / RAMP * 100, XMAX).forEach(t => {
+      const x = x2px(t.prog);
+      ctx.strokeStyle = "#232b34"; ctx.beginPath(); ctx.moveTo(x, PADt); ctx.lineTo(x, PADt - 4); ctx.stroke();
+      ctx.fillText(t.label, x, PADt - 5);
+    });
+    ctx.textBaseline = "top";
+    yearTicks(DATA.aiStart, o => (o - AI_START) / RAMP * 100 * M.aiK, XMAX).forEach(t => {
+      const x = x2px(t.prog);
+      ctx.strokeStyle = getCss("--accent"); ctx.globalAlpha = .5;
+      ctx.beginPath(); ctx.moveTo(x, h - PADb); ctx.lineTo(x, h - PADb + 4); ctx.stroke(); ctx.globalAlpha = 1;
+      ctx.fillStyle = getCss("--accent"); ctx.fillText(t.label, x, h - PADb + 5);
+    });
+    ctx.fillStyle = getCss("--muted2"); ctx.textAlign = "left";
+    ctx.fillText("Dot-com", PADl, PADt - 15); ctx.textAlign = "left";
+    ctx.fillStyle = getCss("--accent"); ctx.fillText("AI", PADl, h - PADb + 17);
   }
+
+  // 2000 peak line (aligned with the grey high at progress 100)
+  const xpk = x2px(100);
+  ctx.strokeStyle = getCss("--trigger"); ctx.setLineDash([2, 3]); ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(xpk, PADt); ctx.lineTo(xpk, h - PADb); ctx.stroke(); ctx.setLineDash([]);
+  if (detail) { ctx.fillStyle = getCss("--trigger"); ctx.font = "9px 'Segoe UI', sans-serif";
+    ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText("2000 peak", xpk, PADt + 1); }
+
+  if (detail) {
+    // origin event line + start values (below the graph)
+    ctx.strokeStyle = "#3a4453"; ctx.setLineDash([3, 4]); ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(x2px(0), PADt); ctx.lineTo(x2px(0), h - PADb); ctx.stroke(); ctx.setLineDash([]);
+    if (M.leaf) {
+      ctx.font = "8.5px 'Segoe UI', sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "top";
+      ctx.fillStyle = getCss("--ath");
+      ctx.fillText(`${DATA.dotcomStartEvent} · ${fmtNum(node.rawDot[0])}`, x2px(0) + 2, h - PADb + 30);
+      ctx.fillStyle = getCss("--accent");
+      ctx.fillText(`${DATA.aiStartEvent} · ${fmtNum(node.rawAi[0])}`, x2px(0) + 2, h - PADb + 41);
+    }
+    // horizontal "today's level" line + label
+    ctx.strokeStyle = "rgba(0,147,253,.35)"; ctx.setLineDash([4, 3]); ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(x2px(0), eqy); ctx.lineTo(eqx, eqy); ctx.stroke(); ctx.setLineDash([]);
+    if (M.leaf) {
+      const mult = node.smoothedAi[node.smoothedAi.length - 1] / M.aiStart;
+      ctx.fillStyle = getCss("--accent"); ctx.font = "9px 'Segoe UI', sans-serif";
+      ctx.textAlign = "left"; ctx.textBaseline = "bottom";
+      ctx.fillText(`${mult.toFixed(2)}x from start · ${(node.intensityNow * 100).toFixed(0)}% of the run to peak`, x2px(0) + 4, eqy - 3);
+    }
+    // today event line + label below
+    ctx.strokeStyle = "#6b7280"; ctx.setLineDash([3, 4]); ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(eqx, PADt); ctx.lineTo(eqx, h - PADb); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = getCss("--text"); ctx.font = "700 9px 'Segoe UI', sans-serif";
+    ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillText("TODAY", eqx, PADt + 1);
+    const daysIn = Math.round(node.equiv.progress / 100 * RAMP);
+    ctx.fillStyle = getCss("--muted"); ctx.font = "8.5px 'Segoe UI', sans-serif"; ctx.textBaseline = "top";
+    ctx.fillText(`${daysIn}d into dot-com · ${node.equiv.progress.toFixed(0)}% to peak`, eqx, h - PADb + 30);
+  }
+
+  // grey dot-com line (solid, real events)
+  line(ctx, PROG_DOT, node.intensityDot, x2px, y2px, getCss("--ath"), 1.7, []);
+  // AI line (solid, real, up to today)
+  line(ctx, M.aiP, node.intensityAi, x2px, y2px, getCss("--accent"), 2.1, []);
+  // projection (blue dotted): from the convergence point forward along the dot-com shape to the peak
+  const projX = [node.equiv.progress], projY = [node.intensityNow];
+  for (let i = 0; i < PROG_DOT.length; i++) {
+    const p = PROG_DOT[i];
+    if (p > node.equiv.progress && p <= 100 && node.intensityDot[i] != null) { projX.push(p); projY.push(node.intensityDot[i]); }
+  }
+  projX.push(100); projY.push(interp(PROG_DOT, node.intensityDot, 100));
+  line(ctx, projX, projY, x2px, y2px, getCss("--accent"), 1.8, [3, 3]);
+  // convergence marker (blue + grey dots at the same point)
+  convMarker(ctx, eqx, eqy);
+
+  canvas._rc = { x2px, y2px, px2prog, PADl, PADr, PADt, PADb, w, h, M, node, eqx, eqy };
+}
+
+// Modal-only hover crosshair + readout
+function drawCrosshair(canvas, clientX) {
+  const rc = canvas._rc; if (!rc) return;
+  drawNode(canvas, rc.node, true);
+  const r = canvas.getBoundingClientRect();
+  let x = clientX - r.left;
+  x = Math.max(rc.PADl, Math.min(rc.w - rc.PADr, x));
+  const p = rc.px2prog(x), ctx = canvas.getContext("2d"), M = rc.M, node = rc.node;
+  ctx.strokeStyle = "rgba(244,244,246,.4)"; ctx.lineWidth = 1; ctx.setLineDash([]);
+  ctx.beginPath(); ctx.moveTo(x, rc.PADt); ctx.lineTo(x, rc.h - rc.PADb); ctx.stroke();
+  const dotMult = M.leaf && M.dotStart ? (M.dotValAt(p) / M.dotStart) : null;
+  const rows = [`${p.toFixed(0)}% through timeline` + (dotMult != null ? ` · ${dotMult.toFixed(2)}x appreciation` : "")];
+  if (M.leaf) {
+    const unit = node.unit === "shiller_cape" ? "CAPE" : "Nasdaq";
+    rows.push(`Dot-com ${unit}: ${fmtNum(M.dotValAt(p))}`);
+    rows.push(`AI ${unit}: ${fmtNum(M.aiValAt(p))}` + (p > node.equiv.progress ? " (proj)" : ""));
+  } else {
+    rows.push(`Dot-com intensity: ${(M.dotIntAt(p) * 100).toFixed(0)}%`);
+  }
+  ctx.font = "10px 'Segoe UI', sans-serif"; ctx.textBaseline = "top";
+  const tw = Math.max(...rows.map(t => ctx.measureText(t).width)) + 14;
+  const bx = x + 10 + tw > rc.w - rc.PADr ? x - tw - 10 : x + 10, by = rc.PADt + 6;
+  ctx.fillStyle = "rgba(20,32,46,.95)"; ctx.strokeStyle = "#3a4453";
+  ctx.beginPath(); ctx.roundRect(bx, by, tw, rows.length * 14 + 8, 6); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = "#f4f4f6"; ctx.textAlign = "left";
+  rows.forEach((t, i) => ctx.fillText(t, bx + 7, by + 5 + i * 14));
 }
 
 /* ---------- click-to-expand modal + data download ---------- */
@@ -557,9 +710,23 @@ function openModal(node) {
   modalNode = node;
   $("#modal-title").innerHTML = `${node.label} <span class="tier">${tierOf(node)}</span>`;
   $("#modal-deriv").innerHTML = derivHtml(node);
+  $("#modal-opts").innerHTML = optionsHtml(node);
   $("#modal-scrim").classList.add("open");
   $("#modal").classList.add("open");
-  requestAnimationFrame(() => drawNode($("#modal-canvas"), node));
+  requestAnimationFrame(() => drawNode($("#modal-canvas"), node, true));
+}
+function fmtMonth(iso) { return new Date(iso + "T00:00:00Z").toLocaleDateString("en-US", { month: "short", year: "numeric", timeZone: "UTC" }); }
+function optionsHtml(node) {
+  const a = [
+    ["Cycle anchors", `AI era starts ${fmtMonth(DATA.aiStart)} (${DATA.aiStartEvent}); dot-com era starts ${fmtMonth(DATA.dotcomStart)} (${DATA.dotcomStartEvent}). Both are pinned to a single defining launch, so the origins line up.`],
+    ["Peak (100%)", `The month the smoothed Nasdaq tops out, ${fmtMonth(DATA.dotcomPeak)}. The raw intraday high was 2000-03-10; smoothing nudges the monthly top a hair earlier.`],
+    ["Smoothing", `A centered 3-month average on the monthly series. It makes the matching point read cleanly but tames the sharp 2000 top, so the smoothed peak sits below the famous 5,048.`],
+    ["Matching point", `Today's AI level maps to the first date the dot-com path reached it on the way up. If the path crosses that level more than once, the earliest wins.`],
+    ["Phase bands", `Editorial splits on the Netscape-to-peak clock (${BOUNDS.join("/")}%), calibrated to the dot-com story. They set the phase label, not the projected date.`],
+    ["Projection", `Past today the AI path is assumed to trace the remaining dot-com shape (the blue dotted line). The projected top is where that reaches the peak on the AI time-scale.`],
+  ];
+  return `<h4 class="mt">Options and Assumptions</h4>` +
+    a.map(([t, d]) => `<div class="assump"><div class="at">${t}</div><div class="ad">${d}</div></div>`).join("");
 }
 function closeModal() {
   $("#modal-scrim").classList.remove("open");
@@ -580,7 +747,7 @@ function derivHtml(node) {
     const kids = liveKids(node), w = node._weights || kids.map(() => 1), tot = w.reduce((a, b) => a + b, 0) || 1;
     rows.push(`Blend of ${kids.map((c, i) => `${c.label} <b>${Math.round(w[i] / tot * 100)}%</b>`).join(", ")} gives intensity <b>${pctv(node.intensityNow)}</b>.`);
   }
-  rows.push(`That matches the dot-com path at <b>${eq.toFixed(1)}%</b> of its timeline: <b>${node.equivalentDotcomDate}</b> (${node.phase}), <b>${Math.abs(node.daysFromPeak)}</b> days ${node.daysFromPeak < 0 ? "before" : "after"} the 2000-03 peak.`);
+  rows.push(`That matches the dot-com path at <b>${eq.toFixed(1)}%</b> of its timeline: <b>${node.equivalentDotcomDate}</b> (${node.phase}), <b>${Math.abs(node.daysFromPeak)}</b> days ${node.daysFromPeak < 0 ? "before" : "after"} the 2000 peak.`);
   rows.push(`AI reached this in <b>${aiElapsed}</b> days; the dot-com path took <b>${dotDone}</b> days to cover the same ground, so AI's pace is <b>${node.compression}&times;</b> (${node.compression < 1 ? "faster" : "slower"}).`);
   rows.push(`Dot-com then took <b>${dotLeft}</b> more days to peak. Scaled by pace: ${node.compression} &times; ${dotLeft} &asymp; <b>${scaled}</b> days from ${DATA.asOf}, so the projected top is <b>${node.projectedPeakDate}</b>.`);
   const note = node.leaf
@@ -589,19 +756,30 @@ function derivHtml(node) {
   return `<h4>How this date is derived</h4><ol>${rows.map(r => `<li>${r}</li>`).join("")}</ol><div class="dl-note">${note}</div>`;
 }
 function csvCell(v) { return v == null ? "" : v; }
+function round1(x) { return Math.round(x * 10) / 10; }
 function downloadCSV(node) {
-  const leaf = !!node.leaf;
-  const lines = [leaf ? `era,month,progress_pct,${node.unit || "raw"},smoothed,intensity`
+  const leaf = !!node.leaf, M = nodeModel(node);
+  const lines = [leaf ? `era,month,progress_pct,${node.unit},smoothed,multiple_x,intensity`
                       : `era,month,progress_pct,intensity`];
-  const push = (era, months, prog, raw, sm, inten) => {
-    for (let i = 0; i < months.length; i++) {
-      lines.push(leaf
-        ? [era, months[i], prog[i], csvCell(raw[i]), csvCell(sm[i]), csvCell(inten[i])].join(",")
-        : [era, months[i], prog[i], csvCell(inten[i])].join(","));
-    }
+  const rd = (era, month, prog, raw, sm, inten, base) => {
+    if (!leaf) { lines.push([era, month, round1(prog), csvCell(inten)].join(",")); return; }
+    const mult = (sm != null && base) ? sm / base : null;
+    lines.push([era, month, round1(prog), csvCell(raw), csvCell(sm), mult != null ? mult.toFixed(3) : "", csvCell(inten)].join(","));
   };
-  push("dotcom", DATA.dotMonths, PROG_DOT, node.rawDot, node.smoothedDot, node.intensityDot);
-  push("ai", DATA.aiMonths, PROG_AI, node.rawAi, node.smoothedAi, node.intensityAi);
+  // dot-com (real, whole cycle) and AI (real, to today)
+  for (let i = 0; i < DATA.dotMonths.length; i++)
+    rd("dotcom", DATA.dotMonths[i], PROG_DOT[i], node.rawDot && node.rawDot[i], node.smoothedDot && node.smoothedDot[i], node.intensityDot[i], M.dotStart);
+  for (let i = 0; i < DATA.aiMonths.length; i++)
+    rd("ai", DATA.aiMonths[i], M.aiP[i], node.rawAi && node.rawAi[i], node.smoothedAi && node.smoothedAi[i], node.intensityAi[i], M.aiStart);
+  // AI projected forward: trace the remaining dot-com shape through the rest of the cycle
+  for (let i = 0; i < DATA.dotMonths.length; i++) {
+    const p = PROG_DOT[i];
+    if (p <= node.equiv.progress) continue;
+    const month = isoFromOrd(M.aiOrdAt(p)), inten = node.intensityDot[i];
+    if (!leaf) { lines.push(["ai_projected", month, round1(p), csvCell(inten)].join(",")); continue; }
+    const val = M.aiValAt(p), mult = (val != null && M.aiStart) ? val / M.aiStart : null;
+    lines.push(["ai_projected", month, round1(p), "", val != null ? Math.round(val * 100) / 100 : "", mult != null ? mult.toFixed(3) : "", csvCell(inten)].join(","));
+  }
   const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
@@ -613,7 +791,12 @@ $("#modal-scrim").addEventListener("click", closeModal);
 $("#modal-close").addEventListener("click", closeModal);
 $("#modal-dl").addEventListener("click", () => downloadCSV(modalNode));
 document.addEventListener("keydown", e => { if (e.key === "Escape") closeModal(); });
-window.addEventListener("resize", () => { if (modalNode) requestAnimationFrame(() => drawNode($("#modal-canvas"), modalNode)); });
+(function () {
+  const c = $("#modal-canvas");
+  c.addEventListener("mousemove", e => { if (modalNode) drawCrosshair(c, e.clientX); });
+  c.addEventListener("mouseleave", () => { if (modalNode) drawNode(c, modalNode, true); });
+})();
+window.addEventListener("resize", () => { if (modalNode) requestAnimationFrame(() => drawNode($("#modal-canvas"), modalNode, true)); });
 
 /* ---------- boot ---------- */
 document.getElementById("hideall").addEventListener("click", () => {
