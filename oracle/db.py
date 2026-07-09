@@ -97,6 +97,26 @@ CREATE TABLE IF NOT EXISTS cape_history (
     date TEXT PRIMARY KEY,
     cape REAL NOT NULL
 );
+
+-- FRED series (keyless fredgraph.csv), one table for all Then-and-Now macro
+-- leaves: IT investment, GDP, margin loans, semiconductor production, corporate
+-- equities, yield-curve spread, consumer sentiment. Public-domain US data.
+CREATE TABLE IF NOT EXISTS fred_series (
+    series_id TEXT NOT NULL,
+    date      TEXT NOT NULL,
+    value     REAL NOT NULL,
+    PRIMARY KEY (series_id, date)
+);
+
+-- Monthly IPO stats authored from Jay Ritter's IPOALL.xlsx (Univ. of Florida),
+-- committed as a seed (data/ipo_issuance.csv), refreshed ~annually when Ritter
+-- updates. avg_first_day_return is the froth gauge (1999 months ran 60-120%).
+CREATE TABLE IF NOT EXISTS ipo_issuance (
+    month                TEXT PRIMARY KEY,
+    avg_first_day_return REAL,
+    ipo_count_gross      INTEGER,
+    ipo_count_net        INTEGER
+);
 """
 
 
@@ -153,6 +173,45 @@ def upsert_cape(conn, rows):
 
 def load_cape(conn):
     return conn.execute("SELECT date, cape FROM cape_history ORDER BY date").fetchall()
+
+
+def upsert_fred(conn, series_id, rows):
+    """rows: iterable of (date_iso, value_float)."""
+    conn.executemany(
+        "INSERT OR REPLACE INTO fred_series (series_id, date, value) VALUES (?, ?, ?)",
+        [(series_id, d, v) for d, v in rows],
+    )
+    conn.commit()
+
+
+def load_fred(conn, series_id):
+    return conn.execute(
+        "SELECT date, value FROM fred_series WHERE series_id = ? ORDER BY date",
+        (series_id,),
+    ).fetchall()
+
+
+def load_fred_all(conn):
+    return conn.execute(
+        "SELECT series_id, date, value FROM fred_series ORDER BY series_id, date"
+    ).fetchall()
+
+
+def upsert_ipo(conn, rows):
+    """rows: iterable of (month_iso, avg_first_day_return, gross, net)."""
+    conn.executemany(
+        "INSERT OR REPLACE INTO ipo_issuance (month, avg_first_day_return, ipo_count_gross, ipo_count_net)"
+        " VALUES (?, ?, ?, ?)",
+        list(rows),
+    )
+    conn.commit()
+
+
+def load_ipo(conn):
+    return conn.execute(
+        "SELECT month, avg_first_day_return, ipo_count_gross, ipo_count_net"
+        " FROM ipo_issuance ORDER BY month"
+    ).fetchall()
 
 
 def replace_events(conn, events):

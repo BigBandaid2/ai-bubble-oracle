@@ -58,8 +58,10 @@ BOTTOM_PROG = _days(CLOCK["start"], CLOCK["bottom"]) / RAMP * 100.0
 
 
 # ---------------------------------------------------------------- metric registry
-# formula: maps a raw row (the declared columns) to the metric's input value; it
-# MAY combine fields (a ratio, a spread). `type` then governs normalization.
+# formula: maps a raw row (single `source`) or an alias dict (multi-`series`
+# composite) to the metric's input value. `type` then governs normalization.
+# Optional `minRange` relaxes the validator's dynamic-range gate (default 0.2,
+# tuned for prices; bounded indexes like sentiment move less and say as much).
 PRICE = {
     "kind": "price", "source": ("prices", "^IXIC"), "columns": ["close"],
     "formula": lambda r: r["close"], "cadence": "daily",
@@ -78,21 +80,116 @@ CAPE = {
     "type": "absolute_level", "direction": "up", "unit": "shiller_cape",
     "unitLabel": "CAPE",
 }
+# Total US market value against GDP (the Buffett indicator): nonfinancial
+# corporate equities (Z.1, $mn) over nominal GDP ($bn). Comparable across eras
+# in absolute terms; today it reads ABOVE the 2000 peak, so it is expected to
+# render as a beyond-the-peak counter-argument, projection suppressed.
+BUFFETT = {
+    "kind": "buffett",
+    "series": {"eq": ("fred", "NCBEILQ027S"), "gdp": ("fred", "GDP")},
+    "formula": lambda r: (r["eq"] / 1000.0) / r["gdp"], "cadence": "quarterly",
+    "type": "absolute_level", "direction": "up", "unit": "mktcap_gdp",
+    "unitLabel": "x GDP",
+}
+# How far the tech-heavy index outruns the broad market: the concentration /
+# narrow-leadership proxy that is computable daily back to the 1970s.
+TECH_LEAD = {
+    "kind": "tech_leadership",
+    "series": {"ixic": ("prices", "^IXIC"), "gspc": ("prices", "^GSPC")},
+    "formula": lambda r: r["ixic"] / r["gspc"], "cadence": "daily",
+    "type": "ratio_from_start", "direction": "up", "unit": "ixic_gspc_ratio",
+    "unitLabel": "Nasdaq/S&P ratio",
+}
+# The economy-wide capex commitment to the boom's tooling: private fixed
+# investment in information processing equipment + software as a share of GDP.
+IT_INVEST = {
+    "kind": "it_invest",
+    "series": {"it": ("fred", "A679RC1Q027SBEA"), "gdp": ("fred", "GDP")},
+    "formula": lambda r: r["it"] / r["gdp"] * 100.0, "cadence": "quarterly",
+    "type": "absolute_level", "direction": "up", "unit": "pct_gdp",
+    "unitLabel": "% of GDP",
+}
+# The picks-and-shovels output index: chips carried both booms (fabs then,
+# GPUs now). Volume index, so each era is measured by its own growth. NOTE:
+# quality-adjusted chip VOLUME grew straight through the 2001 bust (the crash
+# was in dollars), so this leaf is expected to render as an honest counter.
+SEMIS = {
+    "kind": "semis", "source": ("fred", "IPG3344S"), "columns": ["value"],
+    "formula": lambda r: r["value"], "cadence": "monthly",
+    "type": "ratio_from_start", "direction": "up", "unit": "ip_index",
+    "unitLabel": "Semis production",
+}
+# The dollar capex cycle that DID rise, peak, and crash: manufacturers' new
+# orders for computers and electronic products (excludes semiconductor orders,
+# a Census reporting gap; the semis volume leaf above covers chips).
+TECH_ORDERS = {
+    "kind": "tech_orders", "source": ("fred", "A34SNO"), "columns": ["value"],
+    "formula": lambda r: r["value"] / 1000.0, "cadence": "monthly",
+    "type": "ratio_from_start", "direction": "up", "unit": "usd_bn",
+    "unitLabel": "Tech orders $bn",
+}
+# Leverage behind the trade: broker-dealer margin loans (Z.1). Nominal dollars,
+# so each era is indexed to its own start (ratio) rather than compared raw.
+MARGIN = {
+    "kind": "margin", "source": ("fred", "BOGZ1FL663067003Q"), "columns": ["value"],
+    "formula": lambda r: r["value"] / 1000.0, "cadence": "quarterly",
+    "type": "ratio_from_start", "direction": "up", "unit": "usd_bn",
+    "unitLabel": "Margin loans $bn",
+}
+# IPO froth: the average first-day pop, Ritter's classic speculation gauge
+# (1999 months ran 60-120%). Zero-IPO months carry no reading (forward-filled).
+IPO_FROTH = {
+    "kind": "ipo", "source": ("ipo", None), "columns": ["avg_first_day_return"],
+    "formula": lambda r: r["avg_first_day_return"], "cadence": "monthly",
+    "type": "absolute_level", "direction": "up", "unit": "pct",
+    "unitLabel": "IPO first-day %",
+}
+# The late-cycle monetary tell: the 10Y-3M spread inverts near tops. Direction
+# DOWN (falling spread = later cycle). The AI era already inverted deeper than
+# 2000 and has re-steepened, so this is expected to render as a counter.
+CURVE = {
+    "kind": "curve", "source": ("fred", "T10Y3M"), "columns": ["value"],
+    "formula": lambda r: r["value"], "cadence": "daily",
+    "type": "absolute_level", "direction": "down", "unit": "pct_spread",
+    "unitLabel": "10Y-3M spread",
+}
+# Main Street euphoria check: Michigan sentiment hit all-time highs into the
+# 2000 peak; today it sits near record lows. Expected counter-argument.
+SENTIMENT = {
+    "kind": "sentiment", "source": ("fred", "UMCSENT"), "columns": ["value"],
+    "formula": lambda r: r["value"], "cadence": "monthly",
+    "type": "absolute_level", "direction": "up", "unit": "umich_index",
+    "unitLabel": "UMich sentiment", "minRange": 0.08,
+}
 
 THENNOW_TREE = {
     "key": "ai_peak", "label": "AI bubble bursts", "children": [
         {"key": "valuation", "label": "Valuation", "children": [
-            # Price appreciation is now a sub-blend of two indices (Phase 3), so no
+            # Price appreciation is a sub-blend of two indices (Phase 3), so no
             # single index carries the whole "price" argument on its own.
             {"key": "price_appreciation", "label": "Price appreciation", "children": [
                 {"key": "nasdaq", "label": "Nasdaq", "metric": PRICE},
                 {"key": "sp500", "label": "S&P 500", "metric": SP500},
             ]},
             {"key": "valuation_multiple", "label": "Valuation multiple", "metric": CAPE},
+            {"key": "buffett", "label": "Market cap to GDP", "metric": BUFFETT},
         ]},
-        {"key": "market_concentration", "label": "Market concentration", "wip": True},
-        {"key": "capex", "label": "Infrastructure / capex", "wip": True},
-        {"key": "speculation", "label": "Speculative activity", "wip": True},
+        {"key": "market_concentration", "label": "Market concentration", "children": [
+            {"key": "tech_leadership", "label": "Tech leadership", "metric": TECH_LEAD},
+        ]},
+        {"key": "capex", "label": "Infrastructure / capex", "children": [
+            {"key": "it_invest", "label": "IT investment share", "metric": IT_INVEST},
+            {"key": "tech_orders", "label": "Tech equipment orders", "metric": TECH_ORDERS},
+            {"key": "semis", "label": "Semiconductor production", "metric": SEMIS},
+        ]},
+        {"key": "speculation", "label": "Speculative activity", "children": [
+            {"key": "margin_debt", "label": "Margin debt", "metric": MARGIN},
+            {"key": "ipo_froth", "label": "IPO froth", "metric": IPO_FROTH},
+        ]},
+        {"key": "monetary", "label": "Monetary & sentiment", "children": [
+            {"key": "yield_curve", "label": "Yield curve", "metric": CURVE},
+            {"key": "sentiment", "label": "Consumer sentiment", "metric": SENTIMENT},
+        ]},
     ],
 }
 
@@ -104,16 +201,54 @@ def _grid(start_iso, end_iso):
     return [(d0 + timedelta(days=i)).isoformat() for i in range((d1 - d0).days + 1)]
 
 
-def _load_metric(conn, metric):
-    """Return sorted [(date_iso, value)] with the metric's formula applied."""
-    src, arg = metric["source"]
+# Per-source loader, plus the column each source contributes when it appears as
+# one leg of a composite (and the date column, where it isn't literally "date").
+def _load_rows(conn, src, arg):
     if src == "prices":
-        rows = db.load_prices(conn, arg)
-    elif src == "cape":
-        rows = db.load_cape(conn)
-    else:
-        return []
+        return db.load_prices(conn, arg)
+    if src == "cape":
+        return db.load_cape(conn)
+    if src == "fred":
+        return db.load_fred(conn, arg)
+    if src == "ipo":
+        return db.load_ipo(conn)
+    return []
+
+
+_SCALAR_COL = {"prices": "close", "cape": "cape", "fred": "value", "ipo": "avg_first_day_return"}
+_DATE_COL = {"ipo": "month"}
+
+
+def _load_metric(conn, metric):
+    """Return sorted [(date_iso, value)] with the metric's formula applied.
+
+    Single `source`: the formula receives each raw row. Multi-`series` composite
+    (a ratio, a share-of-GDP): each alias's scalar column is inner-joined on
+    date, and the formula receives {alias: value}. Every composite in the
+    registry joins same-cadence series, so an inner join loses nothing."""
     f = metric["formula"]
+    if "series" in metric:
+        maps = {}
+        for alias, (src, arg) in metric["series"].items():
+            dcol, scol = _DATE_COL.get(src, "date"), _SCALAR_COL[src]
+            maps[alias] = {r[dcol]: r[scol] for r in _load_rows(conn, src, arg)
+                           if r[scol] is not None}
+        if not maps or any(not m for m in maps.values()):
+            return []
+        common = set.intersection(*(set(m) for m in maps.values()))
+        out = []
+        for d in common:
+            try:
+                v = f({a: m[d] for a, m in maps.items()})
+            except (KeyError, TypeError, ZeroDivisionError):
+                v = None
+            if v is not None:
+                out.append((d, float(v)))
+        out.sort()
+        return out
+    src, arg = metric["source"]
+    rows = _load_rows(conn, src, arg)
+    dcol = _DATE_COL.get(src, "date")
     out = []
     for r in rows:
         try:
@@ -121,7 +256,7 @@ def _load_metric(conn, metric):
         except (KeyError, TypeError, ZeroDivisionError):
             v = None
         if v is not None:
-            out.append((r["date"], float(v)))
+            out.append((r[dcol], float(v)))
     out.sort()
     return out
 
@@ -256,7 +391,7 @@ def _last_val(a):
     return next((v for v in reversed(a) if v is not None), None)
 
 
-def _validate(sm_dot, sm_ai, int_dot, int_ai, direction):
+def _validate(sm_dot, sm_ai, int_dot, int_ai, direction, min_range=0.2):
     up = direction != "down"
     checks = []
 
@@ -269,7 +404,8 @@ def _validate(sm_dot, sm_ai, int_dot, int_ai, direction):
     add("covers both eras", covers,
         "real data at both era starts" if covers else "missing one era's start")
     rng = abs(peak_dot - start_dot) / abs(start_dot) if start_dot else 0.0
-    add("dynamic range", rng >= 0.2, f"dot-com moved {rng * 100:.0f}% from start to peak")
+    add("dynamic range", rng >= min_range,
+        f"dot-com moved {rng * 100:.0f}% from start to peak")
 
     # pass 2 — shape (after smoothing)
     seq = [v for v in sm_dot if v is not None]
@@ -284,9 +420,13 @@ def _validate(sm_dot, sm_ai, int_dot, int_ai, direction):
     ai_now = _last_val(int_ai) or 0.0
     add("AI below the peak", ai_now < 1.02, f"AI at {ai_now * 100:.0f}% of the dot-com peak")
     ai_start = _first(int_ai) or 0.0
-    rising = (ai_now > ai_start) if up else (ai_now < ai_start)
+    # Intensity space is already direction-normalized (1 = the peak state, for
+    # up- and down-direction metrics alike), so "toward the peak" is simply
+    # rising intensity here; no direction flip.
+    rising = ai_now > ai_start
     add("AI moving toward the peak", rising,
-        "AI has risen over its era" if rising else "AI is flat or moving away from the peak")
+        "AI is moving toward the peak state" if rising
+        else "AI is flat or moving away from the peak")
 
     # AI's current level crossed on the dot-com ramp (informational, not gating)
     lim = min(len(int_dot) - 1, RAMP)
@@ -360,21 +500,30 @@ def _blend(arrays):
 
 
 # ------------------------------------------------------------------- build tree
+def _fmt_level(v):
+    """Native-value formatting by magnitude, so a 0.85 spread keeps its decimals
+    and a 41.6 CAPE reads as before."""
+    return f"{v:,.0f}" if abs(v) >= 100 else f"{v:.1f}" if abs(v) >= 10 else f"{v:.2f}"
+
+
 def _leaf_copy(m, node, sm_dot, sm_ai):
     """The 'today' display and the 'vs dot-com' note for a leaf, from a given
     smoothed series (so it can be recomputed per smoothing window)."""
+    name = node["label"]
     if m["type"] == "ratio_from_start":
         ai_mult = sm_ai[-1] / sm_ai[0]
         peak_mult = sm_dot[RAMP] / sm_dot[0]
-        name = node["label"]
         display = f"up {ai_mult:.1f}x since ChatGPT"
         different = (f"{name} is up about {ai_mult:.1f}x since ChatGPT against roughly "
-                     f"{peak_mult:.1f}x for the same index into 2000, so on price alone it "
-                     "reads earlier and less stretched than the dot-com run.")
+                     f"{peak_mult:.1f}x for the same series into 2000, so on this measure "
+                     "the AI era reads earlier than the dot-com run.")
     else:
-        display = f"CAPE {sm_ai[-1]:.0f}"
-        different = (f"CAPE is about {sm_ai[-1]:.0f} now against roughly {sm_dot[RAMP]:.0f} at "
-                     "the 2000 peak, so on valuation multiple AI is already close to dot-com's top.")
+        now, pk = sm_ai[-1], sm_dot[RAMP]
+        rel = ("already past" if now > pk else "close to" if now > 0.9 * pk and pk > 0
+               else "still below")
+        display = f"{m['unitLabel']} {_fmt_level(now)}"
+        different = (f"{name} reads {_fmt_level(now)} now against roughly {_fmt_level(pk)} "
+                     f"at the 2000 peak, {rel} the dot-com top on this measure.")
     return display, different
 
 
@@ -402,7 +551,8 @@ def _build_leaf(conn, node, dot_dates, ai_dates, today):
 
     d = perms[DEFAULT_SMOOTH]      # scalars, validation, and prose come from the default window
     result = _evaluate(d["int_dot"], d["int_ai"], today)
-    validation = _validate(d["sm_dot"], d["sm_ai"], d["int_dot"], d["int_ai"], m["direction"])
+    validation = _validate(d["sm_dot"], d["sm_ai"], d["int_dot"], d["int_ai"],
+                           m["direction"], m.get("minRange", 0.2))
     display, different = _leaf_copy(m, node, d["sm_dot"], d["sm_ai"])
 
     return {"key": node["key"], "label": node["label"], "leaf": m["kind"], "unit": m["unit"],

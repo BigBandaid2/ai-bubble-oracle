@@ -555,8 +555,22 @@ function tilesHtml(n) {
 function peakDisplay(n) {
   if (!n.leaf) return null;
   const lv = leafVals(n);
-  return lv.ratio ? `up ${lv.peakMult.toFixed(1)}x` : `${n.unitLabel} ${Math.round(n.smoothedDot[PEAK_IDX])}`;
+  if (lv.ratio) return `up ${lv.peakMult.toFixed(1)}x`;
+  const pk = n.smoothedDot[PEAK_IDX];   // magnitude-aware: a 0.85 spread keeps decimals
+  const s = Math.abs(pk) >= 100 ? Math.round(pk).toLocaleString() : Math.abs(pk) >= 10 ? pk.toFixed(1) : pk.toFixed(2);
+  return `${n.unitLabel} ${s}`;
 }
+// Leaf kind (or blend key) → its Data Sources group anchor. The root links to
+// the datasources landing (no single group covers the whole tree).
+const SRC_GROUP = {
+  price: "tn_price", sp500: "tn_sp500", cape: "tn_cape", buffett: "tn_buffett",
+  tech_leadership: "tn_tech_leadership", it_invest: "tn_it_invest",
+  tech_orders: "tn_tech_orders", semis: "tn_semis", margin: "tn_margin",
+  ipo: "tn_ipo", curve: "tn_curve", sentiment: "tn_sentiment",
+  price_appreciation: "tn_price_appreciation", valuation: "tn_valuation",
+  market_concentration: "tn_concentration", capex: "tn_capex",
+  speculation: "tn_speculation", monetary: "tn_monetary",
+};
 function derivHtml(n) {
   const bd = n.projectedBottomDate;
   const lead = n.leaf
@@ -565,12 +579,11 @@ function derivHtml(n) {
   const rows = [lead,
     `Matches the dot-com path at <b>${n.equiv.progress.toFixed(1)}%</b> — <b>${n.equivalentDotcomDate}</b> (${n.phase}), ${Math.abs(n.daysFromPeak)} days ${n.daysFromPeak < 0 ? "before" : "after"} the peak.`,
     `Extending that arc at <b>${n.compression}×</b> pace projects the peak on <b>${n.projectedPeakDate}</b> and the bottom around <b>${bd}</b>.`];
-  const src = n.leaf === "price" ? "tn_price" : n.leaf === "sp500" ? "tn_sp500" : n.leaf === "cape" ? "tn_cape"
-    : n.key === "price_appreciation" ? "tn_price_appreciation" : "tn_valuation";
+  const src = SRC_GROUP[n.leaf] || SRC_GROUP[n.key] || "";
   const ok = n.valid !== false;
   const steps = ok ? `<ol class="steps">${rows.map((r, i) => `<li data-n="${i + 1}">${r}</li>`).join("")}</ol>`
     : `<div class="dcnote">This metric does not fit the rise-peak-fall analog, so no date is projected from it. The curves below are shown for context only.</div>`;
-  return `<h4>How this date is derived <span class="more"><a href="datasources.html#src:${src}" target="_blank" rel="noopener">full method &amp; sources ↗</a></span></h4>` +
+  return `<h4>How this date is derived <span class="more"><a href="${src ? "datasources.html#src:" + src : "datasources.html"}" target="_blank" rel="noopener">full method &amp; sources ↗</a></span></h4>` +
     steps +
     (ok && n.leaf && n.different ? `<div class="dcnote"><span class="k">vs dot-com</span>${n.different}</div>` : "") +
     validationHtml(n);

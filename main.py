@@ -17,6 +17,8 @@ from datetime import datetime, timezone
 
 from oracle import db
 from oracle.cape import fetch_cape, import_cape_csv, export_cape_csv
+from oracle.fred import fetch_all_fred, import_fred_csv, export_fred_csv
+from oracle.ipo import import_ipo_csv
 from oracle.config import SP500_TICKER, THENNOW_TICKERS, TICKERS
 from oracle.dashboard import write_dashboard
 from oracle.datasources import write_datasources
@@ -63,6 +65,21 @@ def cmd_update(conn):
         print(f"CAPE: fetch failed (kept {cape_restored} cached points)")
     cape_kept = export_cape_csv(conn)
     print(f"CAPE history: {cape_kept} points in data/cape_history.csv")
+
+    # FRED macro series (Then-and-Now leaves: capex share, margin loans, semis,
+    # Buffett numerator, yield curve, sentiment). Keyless; committed CSV is the
+    # outage fallback, and one failed series never blanks the rest.
+    fred_restored = import_fred_csv(conn)
+    fred_counts = fetch_all_fred(conn)
+    ok = sum(1 for n in fred_counts.values() if n)
+    print(f"FRED: {ok}/{len(fred_counts)} series fetched "
+          f"({sum(fred_counts.values())} rows; {fred_restored} restored from CSV)")
+    fred_kept = export_fred_csv(conn)
+    print(f"FRED history: {fred_kept} rows in data/fred_history.csv")
+
+    # IPO froth seed (Ritter monthly stats; authored CSV, refreshed ~annually).
+    ipo_rows = import_ipo_csv(conn)
+    print(f"IPO seed: {ipo_rows} monthly rows from data/ipo_issuance.csv")
 
     # H100 rental proxy (condition 5). Restore accumulated readings from the
     # committed CSV, seed the published index points (both tiers), append
