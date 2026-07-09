@@ -168,7 +168,39 @@ def _thennow_example(conn):
         "priceObs": price.get("observations"), "capeObs": cape.get("observations"),
         "sp500Obs": sp.get("observations"), "prApprObs": pa.get("observations"),
         "valObs": val.get("observations"),
+        # per-node scalar map for the big-bang chains (every leaf + roll-up):
+        # native now / smoothed now / value at the declared peak / intensity /
+        # match + projection / verdict + check tally / cached observation.
+        "nodes": _node_examples(t, pk),
     }
+
+
+def _node_examples(t, pk):
+    out = {}
+
+    def walk(n):
+        if n.get("wip"):
+            return
+        checks = (n.get("validation") or {}).get("checks", [])
+        e = {
+            "intensity": n.get("intensityNow"), "equiv": n.get("equivalentDotcomDate"),
+            "proj": n.get("projectedPeakDate"), "daysFromPeak": n.get("daysFromPeak"),
+            "phase": n.get("phase"), "valid": n.get("valid"),
+            "checksPass": sum(1 for c in checks if c["pass"]), "checksN": len(checks),
+            "obs": n.get("observations"), "display": n.get("display"),
+        }
+        if n.get("leaf"):
+            raw_ai, sm_ai, sm_dot = n.get("rawAi"), n.get("smoothedAi"), n.get("smoothedDot")
+            e["rawNow"] = raw_ai[-1] if raw_ai else None
+            e["smNow"] = sm_ai[-1] if sm_ai else None
+            e["peak"] = sm_dot[pk] if sm_dot and 0 <= pk < len(sm_dot) else None
+            e["unitLabel"] = n.get("unitLabel")
+        out[n["key"]] = e
+        for c in n.get("children", []):
+            walk(c)
+
+    walk(t["tree"])
+    return out
 
 
 def build_payload(conn):
