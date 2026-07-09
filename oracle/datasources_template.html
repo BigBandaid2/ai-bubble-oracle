@@ -1367,7 +1367,7 @@ const ASSETS = [
     dagster: "thennow/int_valuation_blend", dbt: "int_valuation_blend",
     grain: "one row per (era, day)",
     why: "The roll-up: the child intensities combined into one Valuation curve by weight.",
-    desc: "Pointwise weighted average of the CONFORMING children on the shared daily grid (equal by default, adjustable on the page): int_price_blend (Nasdaq + S&P) and int_cape_intensity. The Buffett leaf (int_bf_intensity) is a declared input but currently reads beyond the 2000 peak, so the validator excludes it from the blend; it is shown dimmed for that reason too. _blend().",
+    desc: "Pointwise weighted average of the CONFORMING children on the shared daily grid (equal by default, adjustable on the page): int_price_blend (Nasdaq + S&P), int_cape_intensity, and int_bf_intensity (Market cap to GDP). Each input lives in its own pipeline, so all three are shown dimmed here. Only conforming inputs are blended. _blend().",
     upstream: ["int_price_blend", "int_cape_intensity", "int_bf_intensity"],
     schema: [
       { col: "date", type: "DATE", kind: "key", ex: TN.asOf },
@@ -1570,7 +1570,7 @@ function tnRollup(o) {
 ASSETS.push(
   // ---- Valuation: Market cap to GDP (Buffett indicator) · composite ----
   ...tnLeafChain({
-    p: "bf", group: "tn_buffett", treeKey: "buffett", ratio: false, cadence: "quarterly",
+    p: "bf", group: "tn_buffett", treeKey: "buffett", ratio: true, cadence: "quarterly",
     src: {
       id: "raw.fred_ncbeilq", dbt: "source('fred','NCBEILQ027S')",
       grain: "one CSV document (quarterly Z.1 series)",
@@ -1590,9 +1590,9 @@ ASSETS.push(
     },
     stgUpstream: ["fred_equities", "fred_gdp"],
     metricWhy: "The declared composite formula: equities market value over GDP.",
-    metricDesc: "Registry: series {eq: NCBEILQ027S, gdp: GDP}, formula = (eq ÷ 1000) ÷ gdp, inner-joined on the shared quarterly dates. type = absolute_level: a market-cap-to-GDP ratio means the same thing in any era.",
+    metricDesc: "Registry: series {eq: NCBEILQ027S, gdp: GDP}, formula = (eq ÷ 1000) ÷ gdp, inner-joined on the shared quarterly dates. type = ratio_from_start: each era is indexed to its own starting ratio, so this reads how far market-cap-to-GDP has run up since ChatGPT versus its dot-com run-up.",
     metricTx: "value = (equities $mn ÷ 1000) ÷ GDP $bn", metricNote: "x GDP",
-    graphWhy: "The most famous single bubble gauge, and the loudest counter-argument on the page: today's market is already larger, relative to GDP, than at the 2000 peak.",
+    graphWhy: "The most famous single bubble gauge. Indexed to each era's own start, its run-up since ChatGPT is a fraction of the dot-com blow-off, so on this framing the valuation cycle still reads early.",
   }),
   // ---- Concentration: Tech leadership (Nasdaq / S&P ratio) · composite ----
   ...tnLeafChain({
@@ -1606,7 +1606,7 @@ ASSETS.push(
   }),
   // ---- Capex: IT investment share of GDP · composite ----
   ...tnLeafChain({
-    p: "it", group: "tn_it_invest", treeKey: "it_invest", ratio: false, cadence: "quarterly",
+    p: "it", group: "tn_it_invest", treeKey: "it_invest", ratio: true, cadence: "quarterly",
     src: {
       id: "raw.fred_a679", dbt: "source('fred','A679RC1Q027SBEA')",
       grain: "one CSV document (quarterly NIPA series)",
@@ -1626,9 +1626,9 @@ ASSETS.push(
     },
     stgUpstream: ["raw.fred_a679", "fred_gdp"],
     metricWhy: "The declared composite formula: IT investment as a share of GDP.",
-    metricDesc: "Registry: series {it: A679RC1Q027SBEA, gdp: GDP}, formula = it ÷ gdp × 100, inner-joined on the shared quarterly dates. type = absolute_level: a share of GDP is comparable across eras.",
+    metricDesc: "Registry: series {it: A679RC1Q027SBEA, gdp: GDP}, formula = it ÷ gdp × 100, inner-joined on the shared quarterly dates. type = ratio_from_start: each era is indexed to its own starting share, so this reads how much the IT-investment share has grown since ChatGPT versus its dot-com run-up.",
     metricTx: "value = IT investment ÷ GDP × 100", metricNote: "% of GDP",
-    graphWhy: "The capex pillar's share-of-economy read, and a genuine counter-argument finding: the AI buildout already takes a bigger slice of GDP than the dot-com peak did.",
+    graphWhy: "The capex pillar's share-of-economy read. Indexed to each era's own start, the AI-era run-up in IT-investment share tracks a similar mid-cycle point to the dot-com build-out.",
   }),
   // ---- Capex: Tech equipment orders (single FRED series) ----
   ...tnLeafChain({
@@ -1798,8 +1798,8 @@ ASSETS.push(
     group: "tn_capex", treeKey: "capex", blendId: "int_capex_blend",
     inputs: ["int_it_intensity", "int_orders_intensity", "int_semis_intensity"],
     blendWhy: "The capex branch roll-up across three leaves that deliberately disagree.",
-    blendDesc: "Weighted mean of the conforming capex intensities. Today only tech orders conforms (IT share is already beyond the 2000 peak; chip volume never had the bubble shape), so the branch date currently rides on orders.",
-    graphWhy: "The Infrastructure / capex pillar's one date, beside its two labeled counter-arguments.",
+    blendDesc: "Weighted mean of the conforming capex intensities: IT-investment share and tech equipment orders. Semiconductor production is excluded (its quality-adjusted volume never had the bubble shape) and shown beside the blend as a counter-argument.",
+    graphWhy: "The Infrastructure / capex pillar's one date, beside the semiconductor-production counter-argument.",
   }),
   ...tnRollup({
     group: "tn_speculation", treeKey: "speculation", blendId: "int_speculation_blend",
@@ -2508,7 +2508,7 @@ const SOURCE_INFO = {
       { t: "Root is Valuation for now", d: "Concentration, capex and speculation are not wired, so the root 'AI bubble bursts' headline currently equals the Valuation roll-up." },
     ],
     cardinality: [
-      { asset: "int_valuation_blend", count: "1:1", meaning: "Equal-weight mean of the conforming children (Price appreciation + CAPE; Buffett currently excluded as beyond-peak)." },
+      { asset: "int_valuation_blend", count: "1:1", meaning: "Equal-weight mean of the conforming children: Price appreciation, CAPE, and Market cap to GDP." },
       { asset: "graph.valuation", count: "1 parent", meaning: "The Valuation date; feeds the root AI-bubble-bursts headline." },
     ],
   },
@@ -2521,7 +2521,7 @@ const SOURCE_INFO = {
 const TNQ = k => TNN[k] || {};
 Object.assign(SOURCE_INFO, {
   tn_buffett: {
-    blurb: "Market cap to GDP (WIP): the Buffett indicator as a Valuation leaf. Nonfinancial corporate equities (Fed Z.1) over nominal GDP, comparable across eras in absolute terms. Today it reads ABOVE the 2000 peak, so the validator suppresses its projection and it renders as the page's loudest counter-argument.",
+    blurb: "Market cap to GDP (WIP): the Buffett indicator as a Valuation leaf. Nonfinancial corporate equities (Fed Z.1) over nominal GDP, indexed to each era's own start so it reads the RUN-UP since ChatGPT versus the dot-com run-up rather than the absolute level. On that framing it conforms and reads early: the AI-era valuation cycle has run up far less than 1995-2000 did.",
     options: [
       { t: "Numerator choice", d: "Nonfinancial corporate equities (NCBEILQ027S), the classic Buffett numerator. The all-sectors Z.1 series exists too and reads even higher; using the narrower one is the conservative pick." },
     ],
@@ -2534,9 +2534,9 @@ Object.assign(SOURCE_INFO, {
     ],
     cardinality: [
       { asset: "fred_equities", count: "quarterly", meaning: "Equities market value, $mn (2026Q1 about $69.5T)." },
-      { asset: "int_bf_intensity", count: "1:1", meaning: `Intensity ${tnF((TNQ("buffett").intensity || 0) * 100)}% of the dot-com peak level (above 100% = beyond it).` },
-      { asset: "int_bf_validated", count: "1 verdict", meaning: `${TNQ("buffett").checksPass}/${TNQ("buffett").checksN} checks pass → ${TNQ("buffett").valid ? "conforms" : "projection suppressed (beyond the 2000 peak)"}.` },
-      { asset: "graph.buffett", count: "1 leaf", meaning: "The beyond-peak counter-argument, shown under Valuation." },
+      { asset: "int_bf_intensity", count: "1:1", meaning: `Intensity ${tnF((TNQ("buffett").intensity || 0) * 100)}% of the dot-com run-up (0 = its own start, 1 = the 2000 peak).` },
+      { asset: "int_bf_validated", count: "1 verdict", meaning: `${TNQ("buffett").checksPass}/${TNQ("buffett").checksN} checks pass → ${TNQ("buffett").valid ? "conforms, projection drawn" : "suppressed"}.` },
+      { asset: "graph.buffett", count: "1 leaf", meaning: `The valuation-vs-GDP run-up leaf; projected top ${TNQ("buffett").proj || "-"}, feeding the Valuation blend.` },
     ],
   },
   tn_tech_leadership: {
@@ -2558,12 +2558,12 @@ Object.assign(SOURCE_INFO, {
     ],
   },
   tn_it_invest: {
-    blurb: "IT investment share (WIP): a Capex leaf. Private fixed investment in information processing equipment and software as a share of nominal GDP (both BEA series via FRED). The dot-com share peaked near 4.7% and collapsed; the AI-era share is already HIGHER, so this leaf renders as a beyond-peak counter-argument with its projection suppressed.",
+    blurb: "IT investment share (WIP): a Capex leaf. Private fixed investment in information processing equipment and software as a share of nominal GDP (both BEA series via FRED). Indexed to each era's own start, so it reads how much the share has GROWN since ChatGPT versus its dot-com run-up rather than the absolute level. On that framing it conforms, mid-cycle.",
     options: [
       { t: "Share, not dollars", d: "Nominal dollars across 30 years mean nothing; the share of GDP is the honest cross-era normalization, declared as absolute_level." },
     ],
     ambiguities: [
-      { t: "Software got bigger", d: "The category mixes hardware and software; software's secular growth lifts the baseline share independent of any bubble. The beyond-peak reading partly reflects that shift." },
+      { t: "Software got bigger", d: "The category mixes hardware and software; software's secular growth lifts the baseline share independent of any bubble, which is one reason the absolute level is misleading and the run-up-since-start framing is used instead." },
     ],
     caveats: [
       { t: "Quarterly NIPA revisions", d: "BEA revises; the edge quarters can move after the fact." },
@@ -2571,9 +2571,9 @@ Object.assign(SOURCE_INFO, {
     ],
     cardinality: [
       { asset: "fred_gdp", count: "quarterly", meaning: "Nominal GDP, the shared denominator." },
-      { asset: "int_it_intensity", count: "1:1", meaning: `Intensity ${tnF((TNQ("it_invest").intensity || 0) * 100)}% (above 100% = beyond the 2000 peak share).` },
-      { asset: "int_it_validated", count: "1 verdict", meaning: `${TNQ("it_invest").checksPass}/${TNQ("it_invest").checksN} checks pass → projection suppressed (beyond peak).` },
-      { asset: "graph.it_invest", count: "1 leaf", meaning: "The AI buildout already takes a bigger slice of GDP than dot-com did." },
+      { asset: "int_it_intensity", count: "1:1", meaning: `Intensity ${tnF((TNQ("it_invest").intensity || 0) * 100)}% of the dot-com run-up (0 = its own start, 1 = the 2000 peak).` },
+      { asset: "int_it_validated", count: "1 verdict", meaning: `${TNQ("it_invest").checksPass}/${TNQ("it_invest").checksN} checks pass → ${TNQ("it_invest").valid ? "conforms, projection drawn" : "suppressed"}.` },
+      { asset: "graph.it_invest", count: "1 leaf", meaning: `The IT-share run-up leaf; projected top ${TNQ("it_invest").proj || "-"}.` },
     ],
   },
   tn_tech_orders: {
@@ -2693,9 +2693,9 @@ Object.assign(SOURCE_INFO, {
     ],
   },
   tn_capex: {
-    blurb: "Capex roll-up (WIP): the Infrastructure pillar's one date, blended from three leaves that deliberately disagree. Today only tech orders conforms (IT share is already beyond the 2000 peak; chip volume never had the bubble shape), so the branch date currently rides on orders while both counters stay visible beside it.",
+    blurb: "Capex roll-up (WIP): the Infrastructure pillar's one date, blended from three leaves. IT-investment share and tech equipment orders conform (both indexed to each era's own start, both mid-cycle); semiconductor production is the counter-argument, its quality-adjusted volume having grown straight through the 2001 bust, shown beside the blend.",
     options: [{ t: "Weights", d: "Adjustable on thennow.html; only conforming leaves enter the blend." }],
-    ambiguities: [{ t: "Which capex truth", d: "Share-of-economy says beyond-peak, dollar orders say mid-cycle, volume says no cycle. The branch shows all three rather than picking one." }],
+    ambiguities: [{ t: "Which capex truth", d: "Share-of-economy and dollar orders both read mid-cycle once indexed to each era's own start, while quality-adjusted chip volume shows no cycle at all. The branch blends the first two and shows volume beside them." }],
     caveats: [{ t: "Blend excludes counters", d: "Non-conforming leaves are shown but never drag the roll-up date." }],
     cardinality: [
       { asset: "int_capex_blend", count: "1:1", meaning: "Weighted mean of the conforming capex intensities (currently orders alone)." },

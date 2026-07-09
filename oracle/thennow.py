@@ -81,14 +81,15 @@ CAPE = {
     "unitLabel": "CAPE",
 }
 # Total US market value against GDP (the Buffett indicator): nonfinancial
-# corporate equities (Z.1, $mn) over nominal GDP ($bn). Comparable across eras
-# in absolute terms; today it reads ABOVE the 2000 peak, so it is expected to
-# render as a beyond-the-peak counter-argument, projection suppressed.
+# corporate equities (Z.1, $mn) over nominal GDP ($bn). Indexed to each era's own
+# start (ratio_from_start), so it measures how much the market-cap-to-GDP ratio
+# has RUN UP since ChatGPT versus its dot-com run-up, rather than comparing
+# absolute levels across eras (which structural shifts make less comparable).
 BUFFETT = {
     "kind": "buffett",
     "series": {"eq": ("fred", "NCBEILQ027S"), "gdp": ("fred", "GDP")},
     "formula": lambda r: (r["eq"] / 1000.0) / r["gdp"], "cadence": "quarterly",
-    "type": "absolute_level", "direction": "up", "unit": "mktcap_gdp",
+    "type": "ratio_from_start", "direction": "up", "unit": "mktcap_gdp",
     "unitLabel": "x GDP",
 }
 # How far the tech-heavy index outruns the broad market: the concentration /
@@ -102,11 +103,13 @@ TECH_LEAD = {
 }
 # The economy-wide capex commitment to the boom's tooling: private fixed
 # investment in information processing equipment + software as a share of GDP.
+# Indexed to each era's own start (ratio_from_start): how much the IT-investment
+# share has grown since ChatGPT versus its dot-com run-up, not the absolute level.
 IT_INVEST = {
     "kind": "it_invest",
     "series": {"it": ("fred", "A679RC1Q027SBEA"), "gdp": ("fred", "GDP")},
     "formula": lambda r: r["it"] / r["gdp"] * 100.0, "cadence": "quarterly",
-    "type": "absolute_level", "direction": "up", "unit": "pct_gdp",
+    "type": "ratio_from_start", "direction": "up", "unit": "pct_gdp",
     "unitLabel": "% of GDP",
 }
 # The picks-and-shovels output index: chips carried both booms (fabs then,
