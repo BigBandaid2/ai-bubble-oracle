@@ -710,17 +710,18 @@ function refreshMetric(n) {
 // reads as suppressed and the copy says why, rather than showing a made-up peak.
 function setHead(n) {
   const ok = n.valid !== false;
-  el("m-lbl").textContent = (ok ? "Projected peak — " : "No projection — ") + n.label + (n.leaf ? "" : " (blended)");
-  el("m-date").textContent = ok ? fmtNice(n.projectedPeakDate) : "—";
+  el("m-lbl").textContent = (ok ? "Projected peak — " : "Counter-argument — ") + n.label + (n.leaf ? "" : " (blended)");
+  el("m-date").textContent = ok ? fmtNice(n.projectedPeakDate) : "No Projection";
   el("m-sub").innerHTML = ok
     ? `Today it's <b>${(n.intensityNow * 100).toFixed(0)}%</b> of the way to the 2000 peak (${n.phase}); if the arc holds, a projected bottom around <b>${fmtMY(n.projectedBottomDate)}</b>.`
-    : `This metric does not fit the rise-peak-fall analogy, so no peak date is projected from it. Today it sits at <b>${(n.intensityNow * 100).toFixed(0)}%</b> of the 2000 peak level (${n.phase}); the curve is shown for context.`;
+    : `This metric does not fit the rise-peak-fall analogy, so no peak date is projected from it. Today it reads <b>${(n.intensityNow * 100).toFixed(0)}%</b> of the 2000 peak level; the curve is shown for context.`;
 }
 function buildRibbon(n) {
   const r = el("m-ribbon"); r.innerHTML = "";
+  const tp = todayProg(n);   // align the marker with where the AI line stops
   [["Early Ramp", 0, 35], ["Acceleration", 35, 85], ["Late Bubble", 85, 100], ["Crash & Bottom", 100, 162]].forEach(([nm, lo, hi]) => {
-    const s = document.createElement("div"); s.className = "seg" + (n.equiv.progress >= lo && n.equiv.progress < hi ? " on" : ""); s.style.flex = (hi - lo) / 162; s.textContent = nm; r.appendChild(s); });
-  const y = document.createElement("div"); y.className = "youare"; y.style.left = (n.equiv.progress / 162 * 100) + "%"; r.appendChild(y);
+    const s = document.createElement("div"); s.className = "seg" + (tp >= lo && tp < hi ? " on" : ""); s.style.flex = (hi - lo) / 162; s.textContent = nm; r.appendChild(s); });
+  const y = document.createElement("div"); y.className = "youare"; y.style.left = (tp / 162 * 100) + "%"; r.appendChild(y);
 }
 
 /* ---------- the big detail chart (canvas) ---------- */
