@@ -1,7 +1,35 @@
 {
   "ai_peak": {
-    "hash": "526c984331e0",
-    "text": "This metric suggests AI enthusiasm is climbing steeply, matching dot-com's acceleration phase. If the pattern holds, peak exuberance could arrive around mid-2027. Caveat: only one input feeds this analogy, so it captures a narrow slice of market dynamics."
+    "hash": "f2d5eb9969a9",
+    "text": "AI valuations are rising faster than dot-com did at this stage, suggesting more runway before any peak. The caveat: analogies to past bubbles often fail because market conditions and dynamics have fundamentally changed."
+  },
+  "buffett": {
+    "hash": "689ef897f9be",
+    "text": "Market cap to GDP has grown 40% since ChatGPT's launch, tracking the pattern seen during dot-com's rise phase. The metric suggests AI is roughly where dot-com was three years before its peak, though compressed timelines mean nothing about actual outcomes.\n\nCaveat: Market cap to GDP can rise from genuine productivity gains, not just speculation, so historical pattern-matching tells you little about whether this boom has real foundations."
+  },
+  "capex": {
+    "hash": "86554553736a",
+    "text": "AI capex is climbing steeply but hasn't yet matched the frenzied dot-com spending peak. The analogy suggests the surge could crest in mid-2027 if historical compression holds. Caveat: AI infrastructure may sustain higher spending longer than dot-com did, since actual revenue-generating services now exist."
+  },
+  "ipo_froth": {
+    "hash": "3f5cb77e657b",
+    "text": "IPO enthusiasm shows similar early-stage dynamics to the dot-com boom, with first-day pops still modest relative to peak froth. The pattern suggests room for further euphoria before any potential reversal. Caveat: IPO metrics lag actual market peaks, so this analogy may understate how far sentiment has already advanced."
+  },
+  "it_invest": {
+    "hash": "4b5d3259f319",
+    "text": "IT investment share rose sharply in both eras, with AI now at roughly two-thirds of dot-com peak intensity. The acceleration phase matches 1999's early surge, suggesting similar structural shifts in capital allocation. Caveat: investment patterns can diverge from valuation bubbles, so matching spending trajectories doesn't guarantee matching crashes."
+  },
+  "margin_debt": {
+    "hash": "b0ae5058b082",
+    "text": "Margin debt shows similar acceleration patterns in both eras, with AI leverage currently climbing at a pace that mirrors dot-com's mid-rise phase. The comparison suggests shared investor confidence, though leverage remains well below prior extremes. Caveat: debt behavior could diverge sharply if AI monetization proves more durable than dot-com business models."
+  },
+  "market_concentration": {
+    "hash": "34d399d75f0a",
+    "text": "Market concentration is rising as it did before the dot-com peak, though today's intensity remains well below 2000 levels. Caveat: concentration alone says little about whether valuations are justified or whether winners will survive the next downturn."
+  },
+  "monetary": {
+    "hash": "63e91414272b",
+    "text": "Monetary and sentiment conditions today are much weaker than they were at the dot-com peak, suggesting less exuberance. A skeptical reader should remember that sentiment can shift rapidly and dramatically without warning."
   },
   "nasdaq": {
     "hash": "1a682d9f2472",
@@ -11,16 +39,40 @@
     "hash": "c046c92f71fc",
     "text": "AI valuations are accelerating at a pace similar to late 1998, suggesting the boom phase still has runway. Caveat: compressed timelines may reflect faster information spread rather than fundamentally different bubble dynamics."
   },
+  "semis": {
+    "hash": "a8a3115c57f5",
+    "text": "Semiconductor production lacks the clear boom-and-bust pattern of the dot-com era, making it a poor analog for predicting AI's trajectory. Unlike internet stocks, chip manufacturing has structural demand that persists through cycles. Skeptics should note that semiconductors serve multiple industries, so AI's semiconductor consumption alone may not recapitulate dot-com volatility."
+  },
+  "sentiment": {
+    "hash": "b7e707033f5b",
+    "text": "Consumer sentiment shows no sign of following the dot-com pattern, remaining flat instead of building toward the euphoric peaks that preceded that bubble's burst. This suggests either fundamentally different market psychology or that sentiment may not be a reliable indicator for this cycle.\n\nCaveat: Consumer sentiment data quality and methodology have evolved significantly since the 1990s, making direct comparison imperfect."
+  },
   "sp500": {
     "hash": "eb3f904521cb",
     "text": "The S&P 500 has risen sharply since ChatGPT's launch, tracking a similar acceleration phase to the dot-com bubble's 1998 advance. If the current compression holds, the broad market could peak around early 2028. Caveat: stock indexes reflect many sectors beyond AI, so this analogy conflates bubble dynamics in one industry with economy-wide valuation."
   },
+  "speculation": {
+    "hash": "7cf1debc72e7",
+    "text": "Speculative activity in AI is rising fast but remains far below dot-com frenzy levels, suggesting the boom has room to run before peaking. Caveat: compressed timelines don't account for structural differences in modern markets or circuit breakers designed after 2000."
+  },
+  "tech_leadership": {
+    "hash": "184640fed4b2",
+    "text": "Tech leadership sentiment has risen 1.3x since ChatGPT but remains well below dot-com peak intensity, suggesting the AI boom could follow a similar arc. The analogy projects peak enthusiasm in late 2026, though this assumes sentiment dynamics will match a quarter-century-old bubble. Caveat: sentiment metrics may behave differently when information spreads instantly and institutional capital is vastly larger."
+  },
+  "tech_orders": {
+    "hash": "4b5d3259f319",
+    "text": "Equipment orders show AI accelerating much as the dot-com sector did before 2000, but AI remains well below peak dot-com intensity. The parallel suggests sustained growth ahead, though past bubbles have surprised with speed and severity.\n\nCaveat: Equipment orders reflect business confidence, which can reverse sharply if sentiment shifts faster than this metric suggests."
+  },
   "valuation": {
-    "hash": "526c984331e0",
-    "text": "AI valuations are climbing at a pace matching the dot-com acceleration phase, about 14 months before that bubble peaked. Caveat: this assumes compression ratios stay constant, but market dynamics often shift unpredictably."
+    "hash": "be47b91100bd",
+    "text": "AI valuations are rising fast, though still below dot-com peak intensity. The pattern suggests continued gains ahead, but sector concentration and fundamental differences in profitability make valuation comparisons inherently uncertain."
   },
   "valuation_multiple": {
     "hash": "6a8fd531f129",
     "text": "Valuation multiples have climbed to levels comparable to late 1999, suggesting AI euphoria has reached a similar intensity to the dot-com peak. If this metric's historical analogy holds, markets face potential pressure around late 2026. Caveat: valuation alone cannot predict crashes, which often require a triggering catalyst that may never materialize."
+  },
+  "yield_curve": {
+    "hash": "157471395999",
+    "text": "The yield curve shows no sign of mimicking the dot-com era's tightening pattern, remaining flat while the tech bubble saw sharp compression approaching its peak. This suggests either different monetary conditions or that financial stress indicators may not track the same way across bubbles. Caveat: yield curve dynamics depend heavily on Fed policy, which differs fundamentally between 2000 and today."
   }
 }
