@@ -83,4 +83,36 @@ cached + hash-gated (rare regeneration after first populate).
 3. **S&P 500** leaf + the Price-appreciation sub-blend.
 4. **Smoothing permutations** + the Options-drawer toggle.
 
+## Big bang (shipped 2026-07-09): nine new metrics + the Monetary & sentiment branch
+
+Sources verified live against endpoints before wiring; every one is open and
+reproducible. massive.com (Polygon rebranded) was evaluated as the fallback and
+deliberately NOT used: nothing it sells reaches the dot-com window (stocks
+2003+, indices 2023+, IPOs 2002+ without first-day prices, fundamentals 2009+),
+and its terms bar committing fetched data to a public repo, which the pipeline's
+CSV-fallback architecture requires. FRED (keyless fredgraph.csv, public domain),
+Yahoo (already in the repo), and one authored seed cover everything.
+
+Expected vs actual validator verdicts (the surprises are findings, kept):
+
+| leaf | source | expected | actual |
+|---|---|---|---|
+| Market cap to GDP | NCBEILQ027S / GDP | counter (beyond peak) | counter: 172% of the 2000-peak level |
+| Tech leadership | ^IXIC / ^GSPC | conforming | conforming (38%, proj 2026-10) |
+| IT investment / GDP | A679 / GDP | conforming | COUNTER: 4.88% of GDP, already past the ~4.5% 2000 peak |
+| Tech equipment orders | A34SNO | (added after the semis surprise) | conforming (66%, proj 2027-07) |
+| Semiconductor production | IPG3344S | conforming | COUNTER: quality-adjusted chip VOLUME grew straight through the 2001 bust (the crash was in dollars); no rise-peak-fall shape |
+| Margin debt | BOGZ1FL663067003Q | conforming | conforming (27%, reads early) |
+| IPO froth | Ritter seed (monthly) | conforming, early | conforming, very early (AI era started negative) |
+| Yield curve | T10Y3M, direction down | counter | counter: inverted deeper than 2000 in 2023, then re-steepened |
+| Consumer sentiment | UMCSENT, minRange 0.08 | counter | counter: near record lows vs all-time highs into 2000 |
+
+Twelve leaves total: 7 conforming, 5 labeled counter-arguments. The root blends
+the 4 conforming branches (Monetary & sentiment argues beside the headline, not
+in it). Engine gained composite multi-series metrics (inner-join + formula over
+aliases), fred/ipo source kinds, per-metric minRange, and a fix to the
+AI-moving-toward-peak check (intensity space is already direction-normalized).
+Seeds: data/ipo_issuance.csv authored from Ritter's IPOALL.xlsx (monthly,
+1990-2025-12, cited; refresh ~annually when he updates).
+
 _Reference doc; not used by the build._
