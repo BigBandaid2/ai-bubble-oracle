@@ -47,7 +47,8 @@
   .topnav { display: flex; gap: 4px; margin-left: 18px; }
   .topnav a { color: var(--muted); text-decoration: none; font-size: 13px; font-weight: 500; padding: 6px 12px; border-radius: 7px; }
   .topnav a:hover { color: var(--text); background: var(--panel2); }
-  .topnav a.active { color: var(--text); background: var(--panel); }
+  .topnav a.active { color: var(--text); background: var(--panel3); }
+  #topbar .home { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; color: inherit; }
   #topbar .sub { color: var(--muted); font-size: 12.5px; text-align: right; }
   #opts-btn { margin-left: auto; background: var(--panel); border: 1px solid var(--border); color: var(--text);
     font: inherit; font-size: 13px; padding: 6px 12px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 6px; }
@@ -239,10 +240,10 @@
 </head>
 <body>
 <div id="topbar">
-  <div class="mark">AI</div>
-  <div class="brand">Bubble Oracle</div>
+  <a class="home" href="thennow.html"><span class="mark">AI</span><span class="brand">Bubble Oracle</span></a>
   <nav class="topnav">
-    <a href="dashboard.html">Dashboard</a>
+    <a href="thennow.html">Then and Now</a>
+    <a href="dashboard.html">Polymarket</a>
     <a href="datasources.html" class="active">Data Sources</a>
     <a href="about.html">About</a>
   </nav>

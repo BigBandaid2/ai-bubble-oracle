@@ -1,155 +1,210 @@
-# Then & Now redesign — integration brief (handoff to the implementing agent)
+# AI Bubble Oracle — site-wide integration brief (v2)
 
-You are integrating a completed **design study** into the functional AI Bubble Oracle
-site. A prior design pass already made some **in-place edits**; a larger **mock** now
-exists in `design/thennow-modal-redesign.html`. This brief tells you what's done, what to
-build, the design rationale, and — importantly — where to use your own judgment.
+Handoff to the implementing (code) agent. **You edit the functional site; the design agent
+only edits `/design`.** This v2 supersedes v1: the Then & Now redesign is already integrated
+into the live `thennow.html`, and the job now is to bring **every page onto that one system**
+plus a set of specific refinements.
 
 ## 0. Prime directive: form follows function
 
-Follow the mock's **aesthetics and hierarchy**, but you own the **implementation**. Where a
-proposed element is impractical given the stack, conflicts with how the data/engine actually
-works, or it's unclear how the visual maps to real functionality: **lean toward omitting it
-and raising the issue for review** rather than forcing it. Do not invent data to satisfy a
-visual. An honest omission + a flagged question beats a fabricated element.
+Follow the mocks' **aesthetics, hierarchy, and interaction conventions**, but you own the
+**implementation**. Where an element is impractical for the hand-rolled stack, conflicts with how
+the engine actually works, or it's unclear how a visual maps to real functionality: **omit it and
+raise the issue** rather than forcing it or inventing data. End with `REVIEW-NOTES.md`:
+implemented / omitted (why) / open questions.
 
-At the end, produce a short `REVIEW-NOTES.md` listing: (a) what you implemented, (b) what you
-omitted and why, (c) open questions for the human.
+## 1. Current state (read first)
 
-## 1. The two reference points — read both fully first
+- **`thennow.html` is the reference design** — already integrated (dark data-terminal system:
+  hero with the projected-peak date as the punchline, date-led metric cards with canvas
+  sparklines, roll-up **tree sidebar**, per-metric **modal** with canvas chart + four
+  dual-timeline markers + month-year axis + evidence tiles + derivation summary + weights, and a
+  global **Options & assumptions drawer**; topbar `⚙ Options` + `Last update` convention). Reuse
+  its CSS tokens and components verbatim — do not re-derive them.
+- **The metric set has grown** (see `PIPELINE-PLAN.md`). The live payload tree is now, verbatim:
+  ```
+  AI bubble bursts (root, peak 2027-11-28, 45%)
+    Valuation (roll-up 2027-09-09)
+      Price appreciation (roll-up 2027-11-09)
+        Nasdaq (leaf 2027-05-05) · S&P 500 (leaf 2028-01-24)
+      Valuation multiple (leaf 2026-12-04) · Market cap to GDP (NO PROJECTION)
+    Market concentration (roll-up 2026-10-23)  →  Tech leadership (leaf)
+    Infrastructure / capex (roll-up 2027-07-11)
+      IT investment share (NO PROJECTION) · Tech equipment orders (leaf) · Semiconductor production (NO PROJECTION)
+    Speculative activity (roll-up 2029-11-26)  →  Margin debt (leaf) · IPO froth (leaf)
+    Monetary & sentiment (NO PROJECTION)  →  Yield curve (NO PROJECTION) · Consumer sentiment (NO PROJECTION)
+  ```
+  **5 major branches** under root; **6 no-projection nodes** (Market cap to GDP, IT investment
+  share, Semiconductor production, and the whole Monetary & sentiment branch) — these are the
+  "counter-arguments" that argue beside the headline, not in it. Detected in code as
+  `n.valid === false`. This is the reality the refinements below target.
+- **`bottomProgress` is now in the payload** — the projected bottom is real data; the earlier
+  "no source" gap is closed.
+- **Mocks in `/design`:** `about-redesign.html` (done), `thennow-modal-redesign.html` (the modal
+  detail study — SVG chart, four dual-timeline markers, evidence tiles, derivation summary),
+  **`thennow-page-redesign.html` (NEW — the base landing page: hero + sortable card grid +
+  roll-up tree, and a WORKING demo of all seven §4 refinements against the real tree above)**,
+  `polymarket-redesign.html`, and `datasources-redesign.html` — **these last two are now faithful
+  reskin bases copied verbatim from the live functional `dashboard.html` / `datasources.html`
+  (full DOM, tree, drawer, controls, copy preserved)**, plus nav rewired to the mock set. Treat
+  mocks as **visual specs**, not code to copy; the engines stay canvas/Python.
 
-- **The mock (the target aesthetic):** `design/thennow-modal-redesign.html` — a standalone,
-  self-contained page. It renders the graph in **SVG** and **ports a JS copy of the engine**
-  (`blend`/`match`/`evaluate`) only because it must stand alone. Treat it as a **visual spec**,
-  not code to copy verbatim.
-- **The live code (the thing you're editing):**
-  - `thennow.html` (generated) and `oracle/thennow_template.html` (source). **They are byte-identical except line ~211 `const DATA = __DATA__;`.**
-  - `oracle/thennow.py` — the real engine (Python). `oracle/thennow_page.py` — generation.
-  - `oracle/dashboard_template.html` — the source of the topbar/drawer conventions to reuse.
+## 2. Site-wide changes (all pages)
 
-## 2. CRITICAL build mechanics
+**Navigation + landing (production-visible):**
+- **`thennow.html` becomes the landing page / home** of aibubbleoracle.com, publicly visible
+  (drop the `noindex`/WIP-only posture — coordinate the WIP badge's fate with the human).
+- **Nav order + labels, identical on every page:**
+  `Then and Now` (→ thennow.html, home) · `Polymarket` (→ dashboard.html) · `Data Sources`
+  (→ datasources.html) · `About` (→ about.html). The brand mark/word links to `thennow.html`.
+- Mark the current page `.active`. Keep the shared `⚙ Options` + `Last update` topbar convention
+  where a page has options (thennow, Polymarket, Data Sources); About has no Options button.
 
-- **Pages are generated.** `thennow.html` is produced by `python main.py html`, which injects
-  the JSON payload into `oracle/thennow_template.html` (`__DATA__` → data). **Always edit the
-  template.** If you can run `python main.py html`, edit the template and regenerate. If you
-  cannot (no DB/deps), edit BOTH the template and the generated `thennow.html` with identical
-  changes so they don't drift. Same rule for `dashboard.html`/`datasources.html` and their
-  templates. Verify parity: `diff <(grep -v 'const DATA' oracle/thennow_template.html) <(grep -v 'const DATA' thennow.html)` should be empty.
-- **The engine is Python, not JS.** The live page receives already-computed values in `DATA`
-  (projected dates, intensities, phases, per-node arrays). **Do not port the mock's JS engine.**
-  If the payload lacks a value you need (see the bottom-date note below), extend
-  `oracle/thennow.py` to emit it, or compute it client-side from values already in `DATA` — and
-  say which you did.
-- **The charts are hand-rolled `<canvas>` 2D** (`drawNode(canvas, node, detail)` in the
-  template). The mock uses SVG. **Do not swap the stack to SVG unless you have a strong reason
-  and flag it.** Everything the mock shows is achievable on canvas: dashed lines
-  (`setLineDash`), one area fill (`createLinearGradient`), text, and markers. HTML chrome
-  (stat strip, legend, marker labels) should be **HTML elements positioned over the canvas**,
-  exactly as the live modal already does for its legend/stat strip.
+**One coherent system, every page:** same `:root` tokens, topbar, type scale, panel/border
+treatment, `#opts-btn`/`#topsub`, scrollbars, and drawer pattern as `thennow.html`. No page should
+look like it predates the redesign.
 
-## 3. What has ALREADY been done in place — do not redo
+## 3. Per-page rework
 
-- **Unified dark palette** across `thennow`, `dashboard`, `datasources`, `about` (+ templates).
-  Tokens are in §6. Semantic colors updated (`--ath`→dot-com grey, `--trigger`→peak red).
-- **Modal was restyled** in the live `thennow`: HTML stat strip (`.modal-statstrip`/`.mstat`),
-  HTML legend (`.modal-legend`), framed plot (`.modal-chartwrap`), corner-ish actions, scaled
-  detail-mode canvas type, brighter data lines (`--accent-hi`), convergence marker, tooltip.
-- **Gradients removed** except one area fill. **Stat tiles** fixed to vertical stacks.
+### A. Then and Now (`thennow.html`) — landing. Apply the seven refinements in §4.
 
-So the live modal is partway there. The work below is the **delta from the live state to the mock.**
+### B. Polymarket (`dashboard.html`) — the "AI bubble burst in 2026?" condition tracker
+Mock: `polymarket-redesign.html` — **a faithful reskin base copied from the live functional
+`dashboard.html`** (it already carries the unified dark tokens, topbar/nav, `#opts-btn`, the global
+`#drawer`, the `<main id="charts">` card grid, AND the `<aside><div id="tree">` roll-up tree).
+**The rework here is primarily aesthetic with modest DOM impact — do NOT restructure the page.**
+- **Keep every element, control, and copy string** from the functional page: all condition/metric
+  charts, the roll-up **tree sidebar** (core functionality, same as thennow — never drop it), the
+  Options/Ambiguities **drawer**, the verdict line, thresholds, and **every number shown on a card**.
+- **No drill-in modal.** Polymarket cards are **not** intended to open a detail modal — all the
+  information on a card today must stay on the card. Do not add a thennow-style modal here.
+- **Aesthetic only:** align spacing/type/card treatment to thennow's system where it is a pure skin
+  change; you may apply the §4.3 root/roll-up/leaf + branch level cues to the tree/cards. Nav becomes
+  the shared 4-link set (Then and Now · Polymarket · Data Sources · About); "Dashboard" → "Polymarket".
+- Any DOM change beyond a skin needs a **strong justification**; otherwise leave the structure alone.
 
-## 4. What to build (delta), in priority order
+### C. Data Sources (`datasources.html`) — feeds + pipeline + ambiguities
+Mock: `datasources-redesign.html` — **also a faithful reskin base copied from the live functional
+`datasources.html`.** Keep **all** current elements, copy, controls, feeds, the ETL asset graph,
+the sidebar, and the ambiguities. **Reserve edits to surface aesthetics; do not change the DOM
+without a very strong justification.** Apply the shared tokens/topbar/nav (4-link set) and the
+shared drawer treatment. This page stays the **"full method" target** the thennow derivation
+summary links to — keep the per-source anchors (e.g. `#src:yahoo`) intact.
 
-Each item: follow the mock's look; apply the judgment rule in §0.
+### D. About (`about.html`) — DONE as a mock (`about-redesign.html`)
+Copy rewritten to center **Then & Now** (the dot-com-clock thesis) while keeping the Polymarket
+origin story and the author's casual, self-deprecating voice; broken up with a thesis callout, a
+then→now analogy strip, stat tiles, and stack chips. Port that copy + layout into `about.html`.
 
-**A. Topbar convention (easy, do first).** Right-align a `⚙ Options` button + a muted
-`Last update: …` line, reusing the dashboard's exact `#opts-btn` and `#topsub` pattern
-(`oracle/dashboard_template.html`). The live page already computes the timestamp
-(`document.getElementById("topsub").textContent = "Last update: " + DATA.updated…`) — wire the
-real value, don't hardcode.
+## 4. Then & Now refinements (the human's specific comments)
 
-**B. Page hero — the peak date is the punchline.** Add a hero band above the content that
-leads with the **headline (root) projected peak date**, huge, with a one-line plain-English
-lead and the range/as-of chips. The single most important principle of this whole redesign:
-**the projected peak date is the thesis and must be the loudest element on every surface**
-(hero, each card, and the modal). Everything else is supporting evidence.
+**Live-code hook map** (line numbers from the current `thennow.html`; the same code lives in
+`oracle/thennow_template.html`). `thennow-page-redesign.html` shows the finished behavior for all
+of these:
+- **Card "suppressed" text** — `makeCard()`, the `.date` line renders `"suppressed"` when
+  `n.valid === false`. Change that string to **"No Projection"** (and it already dims via the
+  inline `--muted2` style). The foot already reads "does not fit the analog" — keep it.
+- **Tree marker** — `treeNode()` builds `<span class="sdot ${n.wip ? "wip" : "live"}">`, i.e. only
+  two states. Add a **third `nop` state** (grey) for `n.valid === false`:
+  `n.wip ? "wip" : n.valid === false ? "nop" : "live"`, and add `.sdot.nop` CSS. The tree `sdate`
+  already prints `"no fit"` for suppressed — restyle it muted to match.
+- **Level cue** — `tierOf(n)` already returns the tier text used in the card `.tier` and is the
+  hook for the root/roll-up/leaf pip styling in §4.3.
+- **Collapse state** — `const collapsed = new Set()` and the caret handler already exist
+  (`treeNode`, the `.caret` click toggles `.schildren.collapsed`). §4.4 reuses this exact set; the
+  new work is making `renderCards()` read it (see below), enlarging the caret, and adding the
+  header toggle.
+- **Cards render** — `renderCards()` / `orderedChildren()` walk the tree in order and currently
+  sort only WIP-last. This is where the §4.2 sort and the §4.4 collapse-filter hook in.
 
-**C. Metric cards — date-led.** Restyle each metric card so its **projected date** dominates,
-with a mini sparkline and the intensity/phase as a small footer. WIP branches stay as
-"not wired yet" (no chart), matching the engine. Cards open the full detail view on click.
+### 4.1 Suppressed metrics (the counter-arguments)
+- **Tree marker:** metrics with **no projection** (suppressed counter-arguments) get a **grey**
+  dot — distinct from the accent-blue "has a projection" dot and the hollow "not wired / WIP" dot.
+  Three tree states: `has projection` (accent), `no projection / suppressed` (grey filled),
+  `not wired / WIP` (hollow). Update the sidebar legend to match.
+- **Card text:** change the card's **"suppressed"** label to **"No Projection."** Keep the metric
+  readable (it still has a chart and a counter-argument observation) — it just doesn't assert a date.
 
-**D. Sidebar roll-up tree — PRESERVE.** The existing sidebar tree (hierarchy of how metrics
-roll up to the headline) is **load-bearing and must not be dropped.** Keep it; restyle to match.
-Tree rows and cards are both entry points to a metric's full view.
+### 4.2 Sort control (main body)
+Add a sort control above the card grid (segmented control in the thennow style): **Tree order**
+(default) · **Projected date** · **A–Z**. Suppressed/no-projection cards sort last under "Projected
+date." Persist the choice (localStorage) like the rest of the page state.
 
-**E. Modal detail view — the graph is the centerpiece.** Bring the live modal up to the mock:
-  - **Peak date leads** the modal header (label + big date + one-line sub). Metric-specific.
-  - **Graph upgrades** (on canvas): four vertical **markers — start / today / peak / bottom** —
-    each labelled with **both timelines** (AI date over dot-com date); the start marker names the
-    kickoff events (ChatGPT launch / Netscape IPO). A **month-year x-axis on the AI era**
-    (actual solid, projected dashed). **Dot-com line = grey DASHED, drawn only up to the
-    convergence point**; past convergence, only the **blue dashed projection** continues, on to
-    the **bottom**. One restrained area fill under the actual AI line (Bloomberg-style) — no
-    other gradients.
-  - **Supporting-evidence** stat tiles below the chart (subordinate to the date).
-  - **"How this date is derived" = a SUMMARY** (a few steps) + a link to the **Data Sources**
-    page for the full method. Keep the metric-specific "vs dot-com" note in the modal.
-  - **Download CSV + the × close in the top-right corner** of the modal.
+### 4.3 Root / roll-up / leaf + major-branch distinction (thennow AND Polymarket)
+A **light** visual system, no palette bloat:
+- **Level:** distinguish **root** (the headline blend) vs **roll-up** (a parent that blends
+  children) vs **leaf** (an end metric). Use the existing tier text plus a subtle level cue — e.g.
+  a small hierarchy glyph before the name and three restrained tier-pill styles (root: accent
+  outline; roll-up: neutral; leaf: plain). Do **not** use a coloured left-border card accent.
+- **Major branch:** group/mark cards by their top-level branch (Valuation, Monetary & sentiment,
+  WIP…) — e.g. a subtle branch section header over the grid, or a small branch tag shared between
+  the card and its tree row so you can trace a card to its branch. Keep it neutral/tonal, not a
+  rainbow.
 
-**F. Global "Options & assumptions" drawer.** These are **global**, not per-metric. Replace the
-live modal's per-metric options block (`#modal-opts`/`optionsHtml`) with a single page-level
-right-side **drawer** opened by the topbar `⚙ Options` button (mirror the dashboard drawer:
-`#drawer`, `renderOptions()`). The modal side panel then holds only the derivation summary.
+### 4.4 Tree collapse / expand
+- **Collapsing a branch hides that branch's cards from the main body** (re-render the grid to
+  exclude collapsed subtrees; respect the active sort).
+- **Bigger caret hit target:** the collapse/expand control is tiny today — give it a comfortable
+  ~24px tappable area (padding/min-size), keep the glyph small.
+- **Tree-level toggle:** one control in the tree header that reads **"Collapse all"** when
+  everything is expanded (collapses to the top-level roots) and **"Expand all"** when any branch is
+  collapsed. Wire it to the same collapse state the carets use.
 
-## 5. Known gaps / things to flag, not guess
+### 4.5 Landing hero + tree polish (latest comments — reflected in `thennow-page-redesign.html`)
+- **Top kicker line:** `AI BUBBLE BURSTS · CONSIDERING <accent>VALUATION + CONCENTRATION + CAPEX +
+  MONETARY</accent>` (the four branch families, accent-blue; mono uppercase as today).
+- **Drop the analog stat row** under the peak-date hero (the "At peak / Dot-com peak / Blended
+  intensity" trio read as filler) — the big date stands alone.
+- **Shorten the hero verdict** to one line: *"Every graph below compares the journey of the Dot-com
+  bubble against our current AI era. How far are we? Each metric has an opinion."*
+- **Declutter the roll-up tree:** it was too busy. **Remove the status dots on root and branch rows**
+  (keep a dot only on **leaf** rows — grey = No Projection, accent = has projection). **Remove the
+  per-row PEAK dates** from the tree entirely. Let the metric **label take the freed width** (more of
+  the string visible). In the live `treeNode()` this means dropping the `sdate` span and gating the
+  `sdot` to leaves.
+- **LEAF chip → green** (root stays amber, roll-up stays blue) so the three tiers read at a glance.
+- **Cards and tree rows open the metric's full view** (in the mock they navigate to
+  `thennow-modal-redesign.html`; on the live page they call `openNode()` → the existing modal). Wire
+  the **shared 4-link nav** across every page.
 
-- **Bottom date has no data source yet.** `oracle/thennow.py` projects the *peak* only. The
-  mock computes the *bottom* client-side by extending the arc at the node's pace to the dot-com
-  crash low (~progress 159, Oct 2002). Decide: add it to the Python payload, or compute in JS
-  from existing `DATA` — and flag it. If neither is clean, **omit the bottom marker and raise it.**
-- **"Full method" target.** The derivation summary links to Data Sources for the detail. If that
-  section doesn't exist there yet, either add a concise method section to `datasources.html` or
-  link to the closest existing anchor — and note it. Don't leave a dead link.
-- **Marker-label crowding.** Today and peak markers can sit close on narrow widths. The mock
-  staggers them into two rows. If labels collide at real widths, simplify (fewer dual labels, or
-  abbreviate) rather than overlap.
-- **Weights UI.** The live cards have adjustable child weights (`weightsBlock`). The mock didn't
-  re-mock that control. Preserve the existing weights functionality; fit it into the new card/modal
-  styling. If it doesn't fit cleanly, keep it working and flag the styling gap.
+## 5. Build mechanics (unchanged, still critical)
 
-## 6. Design tokens (already in the live `:root` — use these, add none casually)
+- Pages are generated from `oracle/*_template.html` via `python main.py html` (`__DATA__`
+  injection). **Edit the template**; if you can run the build, regenerate; if not, edit BOTH
+  template and generated file identically and verify parity
+  (`diff <(grep -v 'const DATA' tmpl) <(grep -v 'const DATA' generated)` empty).
+- **The engine is Python** (`oracle/thennow.py`, dashboard/datasources generators); the browser
+  gets precomputed `DATA`. Don't port the mock's standalone JS engine. If a refinement needs a
+  value not in the payload, add it in Python or derive it client-side from existing `DATA` — say
+  which.
+- **Charts are hand-rolled `<canvas>`.** Keep them; reskin. HTML chrome (stat strip, legend,
+  marker labels, sort control, tree) sits over/around the canvas as HTML, as thennow already does.
+- Coordinate with `PIPELINE-PLAN.md` — the metric set/validator there is authoritative for which
+  metrics are suppressed counter-arguments vs projecting leaves.
+
+## 6. Design tokens (already in the live `:root` — use these)
 
 ```
---bg #0a0d13   --panel #12161f   --panel2 #1b212c   --border #242c39   --border2 #313a49
---text #eef1f6 --muted #9aa4b3   --muted2 #6a7484
---accent #1677ff (brand; UI/chrome/CTAs)   --accent-hi #57a6ff (brighter; plotted data + small accent text on dark)
---then #8b93a3 (dot-com "past" line, grey)  --peak #ff5a44 (2000 peak / peak marker)  --bottom #3fb27f (crash-bottom marker)
-font: Inter (display+body) + Geist Mono (numerics/IDs/axis)
+--bg #0a0d13  --panel #12161f  --panel2 #1b212c  --panel3 #222a37  --border #242c39  --border2 #313a49
+--text #eef1f6  --muted #9aa4b3  --muted2 #6a7484
+--accent #1677ff (chrome/CTAs)  --accent-hi #57a6ff (plotted data + small accent text)
+--then #8b93a3 (dot-com "past" line)  --peak #ff5a44 (peak marker)  --bottom #3fb27f (bottom marker)
+font: Inter + Geist Mono (numerics/axis). Type sizes were raised for an older audience — keep
+secondary text ≥ ~12px. Gradients minimized to one area fill under the actual line.
 ```
 
-Rules: dark cool-slate only (no beige/gradient washes). One accent, two weights. Red = peak,
-green = bottom — the only two semantic event colors. **Type sizes were bumped up** for an older,
-higher-net-worth audience — keep secondary text ≥ ~12px; nobody should need to zoom.
+Line convention: dot-com = **grey dashed**, drawn only to the convergence point; past today only
+the **blue dashed** projection continues, on to the bottom.
 
-## 7. The human's stated preferences (honor these)
+## 7. Definition of done
 
-- Edit **in place**; **dark "data-terminal"** feel.
-- **Preserve core page structure** — the roll-up **tree sidebar cannot be dropped**.
-- **Every metric needs a full-size view** (modal is fine).
-- **Minimize gradients** (one area fill under the line is OK — "Bloomberg occasionally does it").
-- **Keep in mind the hand-rolled stack** — don't design anything excessively hard to do without
-  changing it.
-- **Bigger fonts** where there's space and little text.
-- **Follow the dashboard's conventions** (the `Options` + `Last update` topbar pattern).
-- **Peak date is the punchline** across the whole page, not just the modal. Its post-crash
-  **bottom date** should be marked/labelled on the graph like the peak. The graph needs a real
-  **month-year** x-axis (AI era). Each marker expresses the **dual parallel timelines**.
+- All four pages share one system (tokens, topbar/nav with the new labels, drawer, type).
+- `thennow.html` landing: suppressed metrics greyed in the tree + "No Projection" on cards; sort
+  control; root/roll-up/leaf + branch distinction; collapse hides body cards; bigger carets +
+  collapse/expand-all toggle.
+- Polymarket: verdict-led hero, reskinned condition cards + modal, shared drawer, level distinction.
+- Data Sources: shared system, tree-styled source nav, shared drawer, per-metric method anchor.
+- About: new Then & Now copy ported from `about-redesign.html`.
+- Templates + generated pages in parity; site builds; `REVIEW-NOTES.md` written.
 
-## 8. Definition of done
-
-- Template + generated page in parity; site still builds (`python main.py html` if runnable).
-- Peak date is unmistakably the first thing the eye lands on, on the page and in the modal.
-- Tree sidebar intact and functional; every wired metric opens a full view; WIP handled honestly.
-- Options drawer global; derivation is a per-metric summary linking to Data Sources.
-- Palette/type match the tokens above; gradients minimized.
-- `REVIEW-NOTES.md` written: implemented / omitted (with why) / open questions.
+_Mocks are visual references in `/design`. Canonical mock source is `C:\workspace\ai-bubble-oracle\design\`._

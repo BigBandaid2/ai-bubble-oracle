@@ -5,19 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>About · AI Bubble Oracle</title>
 <meta name="description" content="Why AI Bubble Oracle exists: line the AI boom up against the dot-com clock, metric by metric, and see how close we are.">
-<meta property="og:type" content="website">
-<meta property="og:site_name" content="AI Bubble Oracle">
-<meta property="og:title" content="About · AI Bubble Oracle">
-<meta property="og:description" content="Why AI Bubble Oracle exists: line the AI boom up against the dot-com clock, metric by metric, and see how close we are.">
-<meta property="og:url" content="https://aibubbleoracle.com/about.html">
-<link rel="canonical" href="https://aibubbleoracle.com/about.html">
-<meta property="og:image" content="https://aibubbleoracle.com/og-image.jpg">
-<meta property="og:image:width" content="1200">
-<meta property="og:image:height" content="630">
-<meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="About · AI Bubble Oracle">
-<meta name="twitter:description" content="Why AI Bubble Oracle exists: line the AI boom up against the dot-com clock, metric by metric, and see how close we are.">
-<meta name="twitter:image" content="https://aibubbleoracle.com/og-image.jpg">
+<!-- DESIGN MOCK (not wired). Reworked About in the Then & Now system. Copy kept in the author's voice. -->
 <style>
   :root {
     --bg: #0a0d13; --panel: #12161f; --panel2: #1b212c; --panel3: #222a37; --border: #242c39; --border2: #313a49;
@@ -35,13 +23,12 @@
   b { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 
   #topbar { display: flex; align-items: center; gap: 12px; padding: 0 24px; height: 56px; background: var(--bg); border-bottom: 1px solid var(--border); }
-  #topbar .home { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; color: inherit; }
   #topbar .mark { width: 26px; height: 26px; border-radius: 6px; background: var(--text); color: var(--bg); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 15px; }
   #topbar .brand { font-size: 16px; font-weight: 700; letter-spacing: -.2px; }
   .topnav { display: flex; gap: 4px; margin-left: 16px; }
   .topnav a { color: var(--muted); font-size: 13px; font-weight: 500; padding: 6px 12px; border-radius: 7px; }
   .topnav a:hover { color: var(--text); background: var(--panel2); text-decoration: none; }
-  .topnav a.active { color: var(--text); background: var(--panel3); }
+  .topnav a.active { color: var(--text); background: var(--panel); }
 
   main { height: calc(100vh - 56px); overflow-y: auto; }
   .wrap { max-width: 780px; margin: 0 auto; padding: 0 28px 90px; }
@@ -78,16 +65,16 @@
   .foot { color: var(--muted2); font-size: 12px; margin-top: 44px; border-top: 1px solid var(--border); padding-top: 16px; }
   @media (max-width: 520px) { #topbar { padding: 0 12px; } #topbar .brand { display: none; } .wrap { padding: 0 18px 60px; } }
 </style>
-<script defer src="/_vercel/insights/script.js"></script>
 </head>
 <body>
 <div id="topbar">
-  <a class="home" href="thennow.html"><span class="mark">AI</span><span class="brand">Bubble Oracle</span></a>
+  <div class="mark">AI</div>
+  <div class="brand">Bubble Oracle</div>
   <nav class="topnav">
-    <a href="thennow.html">Then and Now</a>
-    <a href="dashboard.html">Polymarket</a>
-    <a href="datasources.html">Data Sources</a>
-    <a href="about.html" class="active">About</a>
+    <a href="thennow-page-redesign.html">Then and Now</a>
+    <a href="polymarket-redesign.html">Polymarket</a>
+    <a href="datasources-redesign.html">Data Sources</a>
+    <a href="about-redesign.html" class="active">About</a>
   </nav>
 </div>
 <main>
@@ -114,28 +101,28 @@
     <p class="pull">The best analog we have is the dot-com bust. So the Oracle lines the two cycles up on the same clock and
       asks, metric by metric: where does today sit on the 1995→2000 timeline?</p>
 
-    <p>That's the <a href="thennow.html">Then &amp; Now</a> page — the front door. Each metric — price appreciation, valuation
-      multiples, market concentration, capex, and monetary/sentiment signals — becomes a 0–1 intensity, matched against where
-      the dot-com path was at that same level. Roll them up and you get a single projected top, and the crash that historically
-      follows it. It's a bold hook over a transparent method, <b>not</b> a forecast: change the weights, the smoothing, or the
-      anchors and the date moves. That's the point. You can see exactly why it says what it says.</p>
+    <p>That's the <a href="thennow-page-redesign.html">Then &amp; Now</a> page — the front door. Each metric (price appreciation,
+      valuation multiples, and more as they're wired) becomes a 0–1 intensity, matched against where the dot-com path was at
+      that same level. Roll them up and you get a single projected top — and the crash that historically follows it. It's a
+      bold hook over a transparent method, <b>not</b> a forecast: change the weights or the anchors and the date moves. That's
+      the point. You can see exactly why it says what it says.</p>
 
     <div class="grid2">
-      <div class="stat"><div class="n blue">12</div><div class="l">metrics now wired across valuation, concentration, capex and monetary — seven project a date, five argue against the analog and say so</div></div>
-      <div class="stat"><div class="n red">3 of 6</div><div class="l">conditions the <a href="dashboard.html">Polymarket</a> market needs within 90 days — tracked live on its own page</div></div>
+      <div class="stat"><div class="n blue">2</div><div class="l">metrics wired today — price appreciation &amp; valuation multiple — with concentration, capex and speculation on deck</div></div>
+      <div class="stat"><div class="n red">3 of 6</div><div class="l">conditions the <a href="polymarket-redesign.html">Polymarket</a> market needs within 90 days — tracked live on its own page</div></div>
     </div>
 
     <h2>The Polymarket piece</h2>
-    <p>The market's rulebook is still tracked in full on the <a href="dashboard.html">Polymarket</a> page: NVIDIA and
+    <p>The market's rulebook is still tracked in full on the <a href="polymarket-redesign.html">Polymarket</a> page: NVIDIA and
       semiconductor drawdowns, a major supplier collapse, an OpenAI/Anthropic bankruptcy or acquisition, H100 rental prices
       cratering — each a live chart, with the "3 of 6 within 90 days" rule evaluated in front of you. Then &amp; Now grew out of
       wanting a longer-range read than one market's resolution window.</p>
 
     <h2>Where it's going</h2>
-    <p>The first pass wired one metric per pillar; the honest ones disagree with each other, which is the interesting part. The
-      goal is a living read on the indicators that actually help anticipate a turn.</p>
+    <p>Tracking one market's conditions is the start, not the destination. The goal is a living read on the indicators that
+      actually help anticipate a turn.</p>
     <ul>
-      <li>Deepen each branch — more leaves per pillar (breadth and cap-weight for concentration, a dollar-semis and turnover read for capex) beside the ones already wired.</li>
+      <li>Wire the metrics still greyed out on Then &amp; Now: market concentration, infrastructure/capex, speculative activity.</li>
       <li>Add leading indicators — compute prices, datacenter buildout, funding rounds, model economics — that may turn before the headline conditions do.</li>
       <li>Keep every number inspectable and every assumption a toggle, so you can see how it reaches each answer.</li>
     </ul>
@@ -153,9 +140,8 @@
       <span class="chip"><b>Vercel</b> static hosting</span>
     </div>
     <p>Data comes from free public feeds — Yahoo Finance, Polymarket's CLOB API, CourtListener/RECAP, GDELT, Vast.ai (an H100
-      rental proxy), Shiller CAPE via multpl.com, FRED macro series, and Jay Ritter's IPO data. Claude Haiku classifies which
-      news actually concerns a company's distress, keeping the buzz markers honest, and writes a plain-language read on each
-      Then &amp; Now metric. The full pipeline is documented on <a href="datasources.html">Data Sources</a>.</p>
+      rental proxy), and Shiller CAPE via multpl.com. Claude Haiku classifies which news actually concerns a company's
+      distress, keeping the buzz markers honest. The full pipeline is documented on <a href="datasources-redesign.html">Data Sources</a>.</p>
 
     <h2>Open source</h2>
     <p>The whole thing — collectors, the evaluation engine, the site generators — is public. Fork it, check the methodology,

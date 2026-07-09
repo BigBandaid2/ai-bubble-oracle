@@ -57,8 +57,7 @@
     padding: 6px 12px; border-radius: 7px;
   }
   .topnav a:hover { color: var(--text); background: var(--panel2); }
-  .topnav a.active { color: var(--text); background: var(--panel3); }
-  #topbar .home { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; color: inherit; }
+  .topnav a.active { color: var(--text); background: var(--panel); }
   #topbar .sub { color: var(--muted); font-size: 12.5px; text-align: right; }
   #opts-btn { margin-left: auto; background: var(--panel); border: 1px solid var(--border); color: var(--text);
     font: inherit; font-size: 13px; padding: 6px 12px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 6px; }
@@ -270,12 +269,13 @@
 </head>
 <body>
 <div id="topbar">
-  <a class="home" href="thennow.html"><span class="mark">AI</span><span class="brand">Bubble Oracle</span></a>
+  <div class="mark">AI</div>
+  <div class="brand">Bubble Oracle</div>
   <nav class="topnav">
-    <a href="thennow.html">Then and Now</a>
-    <a href="dashboard.html" class="active">Polymarket</a>
-    <a href="datasources.html">Data Sources</a>
-    <a href="about.html">About</a>
+    <a href="thennow-page-redesign.html">Then and Now</a>
+    <a href="polymarket-redesign.html" class="active">Polymarket</a>
+    <a href="datasources-redesign.html">Data Sources</a>
+    <a href="about-redesign.html">About</a>
   </nav>
   <button id="opts-btn" aria-label="Options">&#9881; Options</button>
   <div class="sub" id="topsub" style="margin-left:16px"></div>
@@ -1265,7 +1265,7 @@ function renderAmbiguities() {
           <div class="ambiq">Which SiliconData H100 index? Neocloud (~$2/hr) vs. hyperscaler (~$7.5/hr). The $1.00 trigger is only realistically reachable against the neocloud tier.</div>
           ${ambiSeg("h100index", [{ val: "neocloud", t: "Neocloud" }, { val: "hyperscaler", t: "Hyperscaler" }])}
         </div>
-        <div class="ambifoot">Neither is specified in the rules. Full breakdown on the <a href="datasources.html#src:yahoo">Data Sources</a> page.</div>
+        <div class="ambifoot">Neither is specified in the rules. Full breakdown on the <a href="datasources-redesign.html#src:yahoo">Data Sources</a> page.</div>
       </div>
     </div>`;
   $("#ambitoggle").onclick = () => { ambiOpen = !ambiOpen; renderAmbiguities(); };

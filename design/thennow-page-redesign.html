@@ -1,0 +1,386 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Then &amp; Now — base page refinements (design study)</title>
+<style>
+  :root {
+    --bg: #0a0d13; --panel: #12161f; --panel2: #1b212c; --panel3: #222a37;
+    --border: #242c39; --border2: #313a49;
+    --text: #eef1f6; --muted: #9aa4b3; --muted2: #6a7484;
+    --accent: #1677ff; --accent-hi: #57a6ff; --accent-dim: rgba(87,166,255,.14);
+    --then: #8b93a3; --peak: #ff5a44; --bottom: #3fb27f;
+    /* branch wayfinding hues — low-chroma, functional, not decorative */
+    --br-val: #57a6ff; --br-conc: #4fc4c0; --br-infra: #d7a54a; --br-spec: #a98be0; --br-mon: #7f8a9c;
+    --font: Inter, "Open Sauce One", "Segoe UI", system-ui, -apple-system, sans-serif;
+    --mono: "Geist Mono", "SF Mono", Consolas, ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { height: 100%; }
+  body { background: var(--bg); color: var(--text); font: 14px/1.5 var(--font); -webkit-font-smoothing: antialiased; overflow: hidden; }
+  * { scrollbar-width: thin; scrollbar-color: #2c3646 transparent; }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-thumb { background: #2c3646; border-radius: 6px; border: 2px solid transparent; background-clip: padding-box; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  b { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+  /* ---------- TOPBAR (matches live convention) ---------- */
+  #topbar { display: flex; align-items: center; gap: 12px; padding: 0 24px; height: 56px;
+    background: var(--bg); border-bottom: 1px solid var(--border); z-index: 20; }
+  #topbar .mark { width: 26px; height: 26px; border-radius: 6px; background: var(--text); color: var(--bg);
+    display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 15px; }
+  #topbar .brand { font-size: 16px; font-weight: 700; letter-spacing: -.2px; }
+  .topnav { display: flex; gap: 4px; margin-left: 16px; }
+  .topnav a { color: var(--muted); text-decoration: none; font-size: 13px; font-weight: 500; padding: 6px 12px; border-radius: 7px; }
+  .topnav a:hover { color: var(--text); background: var(--panel2); }
+  .topnav a.active { color: var(--text); background: var(--panel3); }
+  #opts-btn { margin-left: auto; background: var(--panel); border: 1px solid var(--border); color: var(--text);
+    font: inherit; font-size: 13px; padding: 6px 12px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+  #opts-btn:hover { background: var(--panel2); border-color: var(--border2); }
+  #topbar .sub { color: var(--muted); font-size: 12.5px; text-align: right; margin-left: 16px; font-variant-numeric: tabular-nums; }
+
+  #app { display: flex; height: calc(100vh - 56px); }
+  main.content { flex: 1; overflow-y: auto; padding: 0 28px 60px; min-width: 0; }
+  .wrap { max-width: 1120px; margin: 0 auto; }
+
+  /* ---------- HERO — the projected peak date is the punchline ---------- */
+  .hero { padding: 40px 0 30px; border-bottom: 1px solid var(--border); margin-bottom: 26px; }
+  .hero .kicker { font: 600 12px/1 var(--mono); letter-spacing: 2.5px; text-transform: uppercase; color: var(--muted2); margin-bottom: 18px; }
+  .hero .kicker b { color: var(--accent-hi); }
+  .hero .peak-date { font-size: clamp(52px, 8vw, 92px); font-weight: 800; letter-spacing: -2px; line-height: .95; color: var(--text); }
+  .hero .peak-lbl { font: 600 13px/1 var(--mono); letter-spacing: 1.5px; text-transform: uppercase; color: var(--peak); margin-bottom: 12px; display: flex; align-items: center; gap: 9px; }
+  .hero .peak-lbl .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--peak); box-shadow: 0 0 0 4px rgba(255,90,68,.16); }
+  .hero .analog { margin-top: 20px; display: flex; gap: 30px; flex-wrap: wrap; align-items: flex-end; }
+  .hero .analog .ai .n { font: 700 21px/1 var(--mono); color: var(--text); }
+  .hero .analog .dc .n { font: 700 21px/1 var(--mono); color: var(--then); }
+  .hero .analog .l { font: 500 11px/1.4 var(--mono); letter-spacing: .5px; text-transform: uppercase; color: var(--muted2); margin-bottom: 5px; }
+  .hero .verdict { margin-top: 22px; max-width: 720px; font-size: 15.5px; line-height: 1.6; color: var(--muted); }
+  .hero .verdict b { color: var(--text); font-family: var(--font); font-weight: 700; }
+
+  /* ---------- CARD TOOLBAR (sort control) ---------- */
+  .cardbar { display: flex; align-items: baseline; gap: 14px; margin-bottom: 16px; }
+  .cardbar h2 { font-size: 17px; font-weight: 700; letter-spacing: -.2px; }
+  .cardbar .count { font: 500 12.5px/1 var(--mono); color: var(--muted2); }
+  .cardbar .sort { margin-left: auto; display: flex; align-items: center; gap: 9px; }
+  .cardbar .sort .lbl { font: 500 11px/1 var(--mono); letter-spacing: .5px; text-transform: uppercase; color: var(--muted2); }
+  .seg { display: inline-flex; background: var(--panel); border: 1px solid var(--border); border-radius: 9px; padding: 3px; }
+  .seg button { font: 500 12.5px/1 var(--font); color: var(--muted); background: none; border: 0; padding: 6px 12px; border-radius: 6px; cursor: pointer; }
+  .seg button:hover { color: var(--text); }
+  .seg button.on { color: var(--text); background: var(--panel3); }
+
+  /* ---------- CARD GRID ---------- */
+  .cardgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(268px, 1fr)); gap: 14px; }
+  .mcard { position: relative; background: var(--panel); border: 1px solid var(--border); border-radius: 14px;
+    padding: 16px 18px 15px; cursor: pointer; overflow: hidden; transition: border-color .12s, transform .12s; }
+  .mcard::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--brc, var(--border2)); opacity: .9; }
+  .mcard:hover { border-color: var(--border2); transform: translateY(-1px); }
+  .mcard .top { display: flex; align-items: center; gap: 8px; margin-bottom: 13px; }
+  .mcard .name { font-size: 15.5px; font-weight: 700; letter-spacing: -.1px; }
+  /* level pip — root / roll-up / leaf distinction */
+  .pip { font: 700 9.5px/1 var(--mono); letter-spacing: .6px; text-transform: uppercase; padding: 3px 7px; border-radius: 5px; white-space: nowrap; }
+  .pip.root { color: #ffd27a; background: rgba(255,210,122,.12); border: 1px solid rgba(255,210,122,.3); }
+  .pip.rollup { color: var(--accent-hi); background: var(--accent-dim); border: 1px solid rgba(87,166,255,.3); }
+  .pip.leaf { color: #6fd39e; background: rgba(63,178,127,.13); border: 1px solid rgba(63,178,127,.34); }
+  .mcard .open { margin-left: auto; font: 500 11.5px/1 var(--mono); color: var(--muted2); opacity: 0; transition: opacity .12s; }
+  .mcard:hover .open { opacity: 1; }
+  .mcard .lbl { font: 500 11px/1 var(--mono); letter-spacing: .8px; text-transform: uppercase; color: var(--muted2); margin-bottom: 6px; }
+  .mcard .date { font: 800 30px/1 var(--font); letter-spacing: -1px; color: var(--text); }
+  .mcard .mini { height: 44px; margin: 13px 0 11px; }
+  .mcard .mini svg { width: 100%; height: 100%; display: block; }
+  .mcard .foot { display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: var(--muted2); }
+  .mcard .foot .phase { font-weight: 500; }
+  .mcard .foot .int { font-family: var(--mono); }
+  .mcard .foot .int b { color: var(--muted); }
+  /* NO PROJECTION (was "suppressed") */
+  .mcard.nop { }
+  .mcard.nop .date { color: var(--muted2); font-size: 22px; font-weight: 700; letter-spacing: -.3px; }
+  .mcard.nop .lbl { color: var(--muted2); }
+  .mcard.nop::before { background: repeating-linear-gradient(180deg, var(--muted2) 0 4px, transparent 4px 8px); opacity: .5; }
+  /* WIP */
+  .mcard.wip { cursor: default; }
+  .mcard.wip .soon { font-size: 12.5px; line-height: 1.5; color: var(--muted2); margin: 4px 0 12px; }
+
+  /* ---------- SIDEBAR (roll-up tree) ---------- */
+  aside { width: 340px; flex-shrink: 0; border-left: 1px solid var(--border); background: var(--bg);
+    overflow-y: auto; padding: 22px 18px 60px; }
+  .tree-head { display: flex; align-items: center; margin-bottom: 6px; padding: 0 6px; }
+  .tree-head .t { font: 600 11px/1 var(--mono); letter-spacing: 1.4px; text-transform: uppercase; color: var(--muted2); }
+  .tree-head .toggle { margin-left: auto; font: 500 12px/1 var(--font); color: var(--muted); background: var(--panel); border: 1px solid var(--border);
+    border-radius: 7px; padding: 5px 10px; cursor: pointer; }
+  .tree-head .toggle:hover { color: var(--text); border-color: var(--border2); background: var(--panel2); }
+  .tree-note { font: 500 11px/1.5 var(--mono); color: var(--muted2); padding: 0 6px 12px; }
+
+  .snode { }
+  .srow { position: relative; display: flex; align-items: center; gap: 7px; padding: 7px 8px 7px 6px; border-radius: 8px; cursor: pointer; }
+  .srow:hover { background: var(--panel2); }
+  /* branch accent stripe */
+  .srow.branch { border-left: 2px solid var(--brc, transparent); padding-left: 8px; }
+  /* bigger, easier-to-click caret */
+  .caret { flex-shrink: 0; width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center;
+    font-size: 11px; color: var(--muted); border-radius: 6px; cursor: pointer; user-select: none; }
+  .caret:hover { background: var(--panel3); color: var(--text); }
+  .caret.leaf { visibility: hidden; }
+  /* status dot: live / wip / no-projection(grey) */
+  .sdot { flex-shrink: 0; width: 8px; height: 8px; border-radius: 50%; }
+  .sdot.live { background: var(--accent-hi); box-shadow: 0 0 0 3px var(--accent-dim); }
+  .sdot.wip { background: #e0bf3e; box-shadow: 0 0 0 3px rgba(224,191,62,.12); }
+  .sdot.nop { background: var(--muted2); box-shadow: 0 0 0 3px rgba(106,116,132,.14); }
+  /* level pip in tree */
+  .lvl { flex-shrink: 0; width: 15px; text-align: center; font: 700 9px/1 var(--mono); color: var(--muted2); }
+  .slabel { flex: 1; font-size: 13.5px; font-weight: 500; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .srow.dim .slabel { color: var(--muted); }
+  .sdate { flex-shrink: 0; text-align: right; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+  .sdate .l { display: block; font-size: 9px; letter-spacing: .5px; text-transform: uppercase; color: var(--muted2); }
+  .sdate.nop { color: var(--muted2); }
+  .schildren { margin-left: 15px; padding-left: 9px; border-left: 1px solid var(--border); overflow: hidden; }
+  .schildren.collapsed { display: none; }
+
+  @media (max-width: 1000px) {
+    #topbar .sub { display: none; }
+    aside { width: 288px; }
+  }
+  @media (max-width: 820px) {
+    #app { flex-direction: column; height: auto; overflow: visible; }
+    body { overflow: auto; }
+    aside { width: auto; border-left: 0; border-top: 1px solid var(--border); }
+  }
+</style>
+</head>
+<body>
+  <div id="topbar">
+    <div class="mark">A</div>
+    <div class="brand">AI Bubble Oracle</div>
+    <nav class="topnav">
+      <a href="thennow-page-redesign.html" class="active">Then and Now</a>
+      <a href="polymarket-redesign.html">Polymarket</a>
+      <a href="datasources-redesign.html">Data Sources</a>
+      <a href="about-redesign.html">About</a>
+    </nav>
+    <button id="opts-btn">⚙ Options</button>
+    <div class="sub">Last update: Jul 9, 2026, 9:14 AM EDT</div>
+  </div>
+
+  <div id="app">
+    <main class="content">
+      <div class="wrap">
+        <!-- HERO: peak date is the punchline -->
+        <section class="hero">
+          <div class="kicker">AI bubble bursts · considering <b>valuation + concentration + capex + monetary</b></div>
+          <div class="peak-lbl"><span class="dot"></span>Projected AI-era peak</div>
+          <div class="peak-date">November 28, 2027</div>
+          <p class="verdict">Every graph below compares the journey of the Dot-com bubble against our current AI era. How far are we? Each metric has an opinion.</p>
+        </section>
+
+        <!-- CARD TOOLBAR with sort -->
+        <div class="cardbar">
+          <h2>Metrics</h2>
+          <span class="count" id="count"></span>
+          <div class="sort">
+            <span class="lbl">Sort</span>
+            <div class="seg" id="sortseg">
+              <button data-sort="tree" class="on">Tree order</button>
+              <button data-sort="date">Projected date</button>
+              <button data-sort="alpha">A–Z</button>
+            </div>
+          </div>
+        </div>
+        <div class="cardgrid" id="cardgrid"></div>
+      </div>
+    </main>
+
+    <aside>
+      <div class="tree-head">
+        <span class="t">Roll-up tree</span>
+        <button class="toggle" id="treetoggle">Collapse all</button>
+      </div>
+      <div class="tree-note">How each metric rolls up to the headline. Collapsing a branch hides its cards.</div>
+      <div id="tree"></div>
+    </aside>
+  </div>
+
+<script>
+/* =========================================================================
+   Design study — Then & Now base page, demonstrating the 7 refinements.
+   Data (labels, tiers, projected dates, intensity) is REAL, extracted from
+   the live thennow.html payload. Sparkline geometry is illustrative; the
+   live page binds each node's true series. Not wired to main.py.
+   ========================================================================= */
+
+// tier: root | rollup | leaf   ·  valid:false => "No Projection" (suppressed)
+const TREE = {
+  key:"root", label:"AI bubble bursts", tier:"root", valid:true, peak:"2027-11-28", int:45,
+  children:[
+    { key:"val", label:"Valuation", tier:"rollup", branch:"val", valid:true, peak:"2027-09-09", int:72, children:[
+      { key:"price", label:"Price appreciation", tier:"rollup", branch:"val", valid:true, peak:"2027-11-09", int:52, children:[
+        { key:"nasdaq", label:"Nasdaq", tier:"leaf", branch:"val", valid:true, peak:"2027-05-05", int:44 },
+        { key:"sp500", label:"S&P 500", tier:"leaf", branch:"val", valid:true, peak:"2028-01-24", int:60 },
+      ]},
+      { key:"capey", label:"Valuation multiple", tier:"leaf", branch:"val", valid:true, peak:"2026-12-04", int:91 },
+      { key:"mcgdp", label:"Market cap to GDP", tier:"leaf", branch:"val", valid:false, int:172 },
+    ]},
+    { key:"conc", label:"Market concentration", tier:"rollup", branch:"conc", valid:true, peak:"2026-10-23", int:38, children:[
+      { key:"lead", label:"Tech leadership", tier:"leaf", branch:"conc", valid:true, peak:"2026-10-23", int:38 },
+    ]},
+    { key:"infra", label:"Infrastructure / capex", tier:"rollup", branch:"infra", valid:true, peak:"2027-07-11", int:66, children:[
+      { key:"itshare", label:"IT investment share", tier:"leaf", branch:"infra", valid:false, int:154 },
+      { key:"orders", label:"Tech equipment orders", tier:"leaf", branch:"infra", valid:true, peak:"2027-07-11", int:66 },
+      { key:"semi", label:"Semiconductor production", tier:"leaf", branch:"infra", valid:false, int:8 },
+    ]},
+    { key:"spec", label:"Speculative activity", tier:"rollup", branch:"spec", valid:true, peak:"2029-11-26", int:3, children:[
+      { key:"margin", label:"Margin debt", tier:"leaf", branch:"spec", valid:true, peak:"2031-02-14", int:27 },
+      { key:"ipo", label:"IPO froth", tier:"leaf", branch:"spec", valid:true, peak:"2031-02-08", int:-22 },
+    ]},
+    { key:"mon", label:"Monetary & sentiment", tier:"rollup", branch:"mon", valid:false, int:-119, children:[
+      { key:"yc", label:"Yield curve", tier:"leaf", branch:"mon", valid:false, int:46 },
+      { key:"sent", label:"Consumer sentiment", tier:"leaf", branch:"mon", valid:false, int:-284 },
+    ]},
+  ]
+};
+const BRANCH_VAR = { val:"var(--br-val)", conc:"var(--br-conc)", infra:"var(--br-infra)", spec:"var(--br-spec)", mon:"var(--br-mon)" };
+const PIP = { root:"ROOT", rollup:"ROLL-UP", leaf:"LEAF" };
+const LVL = { root:"◆", rollup:"◈", leaf:"·" };
+
+// flatten with parent branch + depth
+const NODES = [];
+(function flat(n, parent){ n._parent = parent; NODES.push(n); (n.children||[]).forEach(c=>flat(c,n)); })(TREE, null);
+const byKey = k => NODES.find(n=>n.key===k);
+
+const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+function fmtNice(iso){ if(!iso) return "—"; const [y,m,d]=iso.split("-").map(Number); return `${MONTHS[m-1]} ${d}, ${y}`; }
+
+/* ---------- SPARKLINE (illustrative geometry; real series bound live) ---------- */
+function spark(node){
+  const w=232, h=44, n=24, top=node.int/100;
+  // a monotone-ish rise toward the current intensity, with the "now" dot
+  const pts=[]; for(let i=0;i<n;i++){ const t=i/(n-1); const v=Math.max(0, top*(t*t*0.85+0.1)+ (Math.sin(i*1.3)*0.015)); pts.push(v); }
+  const maxV=Math.max(0.4, top*1.15);
+  const X=i=>6+(i/(n-1))*(w-12), Y=v=>h-4-(v/maxV)*(h-8);
+  let d=""; pts.forEach((v,i)=>{ d+=(i?"L":"M")+X(i).toFixed(1)+" "+Y(v).toFixed(1); });
+  const nowX=X(n-1), nowY=Y(pts[n-1]);
+  const col = node.valid===false ? "var(--muted2)" : "var(--accent-hi)";
+  const area = node.valid===false ? "" :
+    `<path d="${d}L${nowX} ${h} L6 ${h} Z" fill="url(#g-${node.key})"/>`;
+  return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
+    <defs><linearGradient id="g-${node.key}" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="var(--accent-hi)" stop-opacity=".22"/>
+      <stop offset="1" stop-color="var(--accent-hi)" stop-opacity="0"/></linearGradient></defs>
+    ${area}
+    <path d="${d}" fill="none" stroke="${col}" stroke-width="${node.valid===false?1.3:1.8}" ${node.valid===false?'stroke-dasharray="4 3"':''} stroke-linecap="round" stroke-linejoin="round"/>
+    ${node.valid===false?"":`<circle cx="${nowX.toFixed(1)}" cy="${nowY.toFixed(1)}" r="2.6" fill="var(--accent-hi)"/>`}
+  </svg>`;
+}
+
+/* ---------- CARDS ---------- */
+let SORT = "tree";
+const collapsed = new Set(); // branch keys whose descendants are hidden from body + tree
+
+function treeOrder(){ const out=[]; (function walk(n){ out.push(n); (n.children||[]).forEach(walk); })(TREE); return out; }
+function visibleCards(){
+  // hide any node that has a collapsed ancestor
+  const hidden = new Set();
+  NODES.forEach(n=>{ let p=n._parent; while(p){ if(collapsed.has(p.key)){ hidden.add(n.key); break; } p=p._parent; } });
+  let list = treeOrder().filter(n=>!hidden.has(n.key));
+  if(SORT==="alpha") list = list.slice().sort((a,b)=>a.label.localeCompare(b.label));
+  else if(SORT==="date") list = list.slice().sort((a,b)=>{
+    const av=a.valid===false, bv=b.valid===false;
+    if(av!==bv) return av?1:-1;            // no-projection nodes sink to the end
+    return (a.peak||"9999").localeCompare(b.peak||"9999");
+  });
+  return list;
+}
+function makeCard(n){
+  const nop = n.valid===false;
+  const c=document.createElement("div");
+  c.className="mcard"+(nop?" nop":"");
+  c.style.setProperty("--brc", BRANCH_VAR[n.branch]||"var(--border2)");
+  const pip = `<span class="pip ${n.tier}">${PIP[n.tier]}</span>`;
+  const dateBlk = nop
+    ? `<div class="lbl">Projection</div><div class="date">No Projection</div>`
+    : `<div class="lbl">Projected peak</div><div class="date">${fmtNice(n.peak)}</div>`;
+  const foot = nop
+    ? `<span class="phase">Does not fit the analog</span><span class="int">Intensity <b>${n.int}%</b></span>`
+    : `<span class="phase">${n.tier==="root"?"Headline roll-up":n.tier==="rollup"?"Branch roll-up":"Leaf metric"}</span><span class="int">Intensity <b>${n.int}%</b></span>`;
+  c.innerHTML =
+    `<div class="top">${pip}<span class="name">${n.label}</span><span class="open">expand ↗</span></div>`+
+    dateBlk+
+    `<div class="mini">${spark(n)}</div>`+
+    `<div class="foot">${foot}</div>`;
+  c.addEventListener("click", ()=>{ location.href = "thennow-modal-redesign.html"; });
+  return c;
+}
+function renderCards(){
+  const grid=document.getElementById("cardgrid"); grid.innerHTML="";
+  const list=visibleCards();
+  list.forEach(n=>grid.appendChild(makeCard(n)));
+  const nop=list.filter(n=>n.valid===false).length;
+  document.getElementById("count").textContent = `${list.length} shown · ${nop} no projection`;
+}
+
+/* ---------- TREE ---------- */
+function treeNodeEl(n){
+  const wrap=document.createElement("div"); wrap.className="snode";
+  const row=document.createElement("div");
+  const isBranch = n._parent && n._parent.key==="root"; // major branch row gets accent stripe
+  row.className="srow"+(isBranch?" branch":"")+(n.valid===false?" dim":"");
+  if(isBranch) row.style.setProperty("--brc", BRANCH_VAR[n.branch]||"transparent");
+  const kids=n.children||[]; const hasKids=kids.length>0;
+  const isColl=collapsed.has(n.key);
+  const isLeaf = !hasKids;
+  const dot = isLeaf ? `<span class="sdot ${n.valid===false?"nop":"live"}"></span>` : "";
+  row.innerHTML =
+    `<span class="caret${hasKids?"":" leaf"}">${isColl?"▸":"▾"}</span>`+
+    dot+
+    `<span class="slabel">${n.label}</span>`;
+  wrap.appendChild(row);
+  row.addEventListener("click", e=>{ if(!e.target.classList.contains("caret")) location.href="thennow-modal-redesign.html"; });
+  if(hasKids){
+    const box=document.createElement("div"); box.className="schildren"+(isColl?" collapsed":"");
+    kids.forEach(c=>box.appendChild(treeNodeEl(c)));
+    wrap.appendChild(box);
+    row.querySelector(".caret").addEventListener("click", e=>{
+      e.stopPropagation();
+      if(collapsed.has(n.key)) collapsed.delete(n.key); else collapsed.add(n.key);
+      renderAll();
+    });
+  }
+  return wrap;
+}
+function renderTree(){
+  const t=document.getElementById("tree"); t.innerHTML="";
+  t.appendChild(treeNodeEl(TREE));
+  // toggle label reflects state: "Expand all" if anything collapsed, else "Collapse all"
+  document.getElementById("treetoggle").textContent = collapsed.size ? "Expand all" : "Collapse all";
+}
+function allBranchKeys(){ return NODES.filter(n=>(n.children||[]).length).map(n=>n.key); }
+
+function renderAll(){ renderCards(); renderTree(); }
+
+/* ---------- WIRING ---------- */
+document.getElementById("sortseg").addEventListener("click", e=>{
+  const b=e.target.closest("button"); if(!b) return;
+  SORT=b.dataset.sort;
+  [...e.currentTarget.children].forEach(x=>x.classList.toggle("on", x===b));
+  renderCards();
+});
+document.getElementById("treetoggle").addEventListener("click", ()=>{
+  if(collapsed.size){ collapsed.clear(); }        // expand all
+  else { allBranchKeys().forEach(k=>{ if(k!=="root") collapsed.add(k); }); } // collapse to roots
+  renderAll();
+});
+let flashT;
+function flash(msg){ /* stand-in for openNode() modal in the live page */
+  clearTimeout(flashT);
+  let el=document.getElementById("flash");
+  if(!el){ el=document.createElement("div"); el.id="flash";
+    el.style.cssText="position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:var(--panel3);border:1px solid var(--border2);color:var(--text);font:500 13px/1 var(--font);padding:10px 16px;border-radius:9px;z-index:50;box-shadow:0 8px 30px rgba(0,0,0,.5)";
+    document.body.appendChild(el); }
+  el.textContent=`Opens full modal for “${msg}” on the live page`;
+  el.style.opacity="1"; flashT=setTimeout(()=>el.style.opacity="0",1600);
+}
+document.getElementById("opts-btn").addEventListener("click", ()=>flash("Options & assumptions drawer"));
+
+renderAll();
+</script>
+</body>
+</html>

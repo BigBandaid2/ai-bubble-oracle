@@ -3,9 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Then and Now (WIP) · AI Bubble Oracle</title>
-<!-- Semi-private WIP page: reachable by direct URL, not linked in nav, not indexed. -->
-<meta name="robots" content="noindex, nofollow">
+<title>AI Bubble Oracle — Then and Now: the dot-com clock for the AI boom</title>
+<meta name="description" content="A transparent, reproducible comparison of the AI boom to the dot-com bubble, across valuation, concentration, capex, and monetary signals — projecting when the analog peaks.">
 <style>
   :root {
     --bg: #0a0d13; --panel: #12161f; --panel2: #1b212c; --panel3: #222a37;
@@ -13,6 +12,8 @@
     --text: #eef1f6; --muted: #9aa4b3; --muted2: #6a7484;
     --accent: #1677ff; --accent-hi: #57a6ff; --accent-dim: rgba(87,166,255,.14);
     --then: #8b93a3; --peak: #ff5a44; --bottom: #3fb27f;
+    /* branch wayfinding hues — low-chroma, functional, not decorative */
+    --br-val: #57a6ff; --br-conc: #4fc4c0; --br-infra: #d7a54a; --br-spec: #a98be0; --br-mon: #7f8a9c;
     /* legacy aliases still referenced in a couple of places */
     --ath: #8b93a3; --trigger: #ff5a44;
     --font: Inter, "Open Sauce One", "Segoe UI", system-ui, -apple-system, sans-serif;
@@ -35,8 +36,10 @@
   .topnav { display: flex; gap: 4px; margin-left: 16px; }
   .topnav a { color: var(--muted); text-decoration: none; font-size: 13px; font-weight: 500; padding: 6px 12px; border-radius: 7px; }
   .topnav a:hover { color: var(--text); background: var(--panel2); }
-  #topbar .wiptag { margin-left: 14px; font-size: 11px; font-weight: 700; letter-spacing: .5px; color: #e0bf3e;
-    background: rgba(224,191,62,.1); border: 1px solid rgba(224,191,62,.35); border-radius: 100px; padding: 3px 11px; }
+  .topnav a.active { color: var(--text); background: var(--panel3); }
+  #topbar .home { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; color: inherit; }
+  #topbar .exptag { margin-left: 14px; font-size: 11px; font-weight: 600; letter-spacing: .4px; color: var(--muted2);
+    background: var(--panel2); border: 1px solid var(--border); border-radius: 100px; padding: 3px 10px; }
   #opts-btn { margin-left: auto; background: var(--panel); border: 1px solid var(--border); color: var(--text);
     font: inherit; font-size: 13px; padding: 6px 12px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 6px; }
   #opts-btn:hover { background: var(--panel2); border-color: var(--border2); }
@@ -47,35 +50,43 @@
   .wrap { max-width: 1080px; margin: 0 auto; }
 
   /* HERO — the projected peak date is the punchline */
-  .hero { padding: 40px 0 28px; border-bottom: 1px solid var(--border); }
-  .hero .eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: 2px; text-transform: uppercase;
-    color: var(--accent-hi); margin-bottom: 13px; display: flex; align-items: center; gap: 10px; }
-  .hero .eyebrow::before { content: ""; width: 26px; height: 1px; background: var(--accent-hi); }
-  .hero .lead { font-size: clamp(16px, 2vw, 21px); font-weight: 500; color: var(--muted); max-width: 600px; }
-  .hero .bigdate { font-size: clamp(44px, 8vw, 88px); font-weight: 800; letter-spacing: -2.5px; line-height: 1;
-    color: var(--text); margin: 6px 0 2px; }
-  .hero .arc { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 18px; font-size: 14px; color: var(--muted); }
-  .hero .arc .seg { display: inline-flex; align-items: center; gap: 7px; }
-  .hero .arc .adot { width: 8px; height: 8px; border-radius: 50%; }
-  .hero .arc b { color: var(--text); } .hero .arc .to { color: var(--muted2); }
-  .hero .chips { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 20px; }
-  .hero .chip { font-size: 13px; color: var(--muted); background: var(--panel2); border: 1px solid var(--border); border-radius: 8px; padding: 7px 13px; }
-  .hero .chip b { color: var(--text); }
-  .sectitle { font-family: var(--mono); font-size: 11px; letter-spacing: 1.3px; text-transform: uppercase;
-    color: var(--muted2); margin: 28px 0 14px; }
+  .hero { padding: 40px 0 30px; border-bottom: 1px solid var(--border); }
+  .hero .kicker { font: 600 12px/1 var(--mono); letter-spacing: 2.5px; text-transform: uppercase; color: var(--muted2); margin-bottom: 18px; }
+  .hero .kicker b { color: var(--accent-hi); font-weight: 600; }
+  .hero .peak-lbl { font: 600 13px/1 var(--mono); letter-spacing: 1.5px; text-transform: uppercase; color: var(--peak);
+    margin-bottom: 12px; display: flex; align-items: center; gap: 9px; }
+  .hero .peak-lbl .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--peak); box-shadow: 0 0 0 4px rgba(255,90,68,.16); }
+  .hero .peak-date { font-size: clamp(46px, 8vw, 90px); font-weight: 800; letter-spacing: -2px; line-height: .96; color: var(--text); }
+  .hero .verdict { margin-top: 22px; max-width: 720px; font-size: 15.5px; line-height: 1.6; color: var(--muted); }
+  .hero .verdict b { color: var(--text); font-family: var(--font); font-weight: 700; }
 
-  /* METRIC CARDS — date-led */
-  .cardgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  /* CARD TOOLBAR (title + count + sort control) */
+  .cardbar { display: flex; align-items: baseline; gap: 14px; margin: 26px 0 16px; }
+  .cardbar h2 { font-size: 17px; font-weight: 700; letter-spacing: -.2px; }
+  .cardbar .count { font: 500 12.5px/1 var(--mono); color: var(--muted2); }
+  .cardbar .sort { margin-left: auto; display: flex; align-items: center; gap: 9px; }
+  .cardbar .sort .lbl { font: 500 11px/1 var(--mono); letter-spacing: .5px; text-transform: uppercase; color: var(--muted2); }
+  .seg { display: inline-flex; background: var(--panel); border: 1px solid var(--border); border-radius: 9px; padding: 3px; }
+  .seg button { font: 500 12.5px/1 var(--font); color: var(--muted); background: none; border: 0; padding: 6px 12px; border-radius: 6px; cursor: pointer; }
+  .seg button:hover { color: var(--text); }
+  .seg button.on { color: var(--text); background: var(--panel3); }
+
+  /* METRIC CARDS — date-led, branch-striped, level-pipped */
+  .cardgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 15px; align-items: start; }
   @media (max-width: 720px) { .cardgrid { grid-template-columns: 1fr; } }
-  .mcard { background: var(--panel); border: 1px solid var(--border); border-radius: 13px; padding: 16px 18px 14px;
-    cursor: pointer; transition: border-color .14s, transform .14s; display: flex; flex-direction: column; }
-  .mcard:hover { border-color: var(--accent); transform: translateY(-1px); }
+  .mcard { position: relative; background: var(--panel); border: 1px solid var(--border); border-radius: 13px; padding: 16px 18px 14px;
+    cursor: pointer; overflow: hidden; transition: border-color .14s, transform .14s; display: flex; flex-direction: column; }
+  .mcard::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--brc, var(--border2)); opacity: .9; }
+  .mcard:hover { border-color: var(--border2); transform: translateY(-1px); }
   .mcard .top { display: flex; align-items: center; gap: 8px; }
-  .mcard .name { font-size: 16.5px; font-weight: 600; letter-spacing: -.2px; }
-  .mcard .tier { font-family: var(--mono); font-size: 9.5px; letter-spacing: .5px; text-transform: uppercase;
-    color: var(--muted2); border: 1px solid var(--border2); border-radius: 5px; padding: 1px 6px; }
-  .mcard .open { margin-left: auto; font-size: 12px; color: var(--muted2); }
-  .mcard:hover .open { color: var(--accent-hi); }
+  .mcard .name { font-size: 16px; font-weight: 700; letter-spacing: -.2px; }
+  /* level pip — root / roll-up / leaf */
+  .pip { font: 700 9.5px/1 var(--mono); letter-spacing: .6px; text-transform: uppercase; padding: 3px 7px; border-radius: 5px; white-space: nowrap; flex-shrink: 0; }
+  .pip.root { color: #ffd27a; background: rgba(255,210,122,.12); border: 1px solid rgba(255,210,122,.3); }
+  .pip.rollup { color: var(--accent-hi); background: var(--accent-dim); border: 1px solid rgba(87,166,255,.3); }
+  .pip.leaf { color: #6fd39e; background: rgba(63,178,127,.13); border: 1px solid rgba(63,178,127,.34); }
+  .mcard .open { margin-left: auto; font-size: 12px; color: var(--muted2); opacity: 0; transition: opacity .12s; }
+  .mcard:hover .open { opacity: 1; color: var(--accent-hi); }
   .mcard .lbl { font-family: var(--mono); font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: var(--peak); margin: 13px 0 3px; }
   .mcard .date { font-size: 31px; font-weight: 800; letter-spacing: -1px; line-height: 1; }
   .mcard .mini { height: 78px; margin: 12px 0 4px; }
@@ -84,27 +95,39 @@
     padding-top: 10px; border-top: 1px solid var(--border); font-size: 12.5px; color: var(--muted); }
   .mcard .foot .phase { color: var(--accent-hi); font-weight: 600; }
   .mcard .foot .int b { color: var(--text); }
+  /* NO PROJECTION (counter-argument) */
+  .mcard.nop .date { color: var(--muted2); font-size: 22px; font-weight: 700; letter-spacing: -.3px; }
+  .mcard.nop .lbl { color: var(--muted2); }
+  .mcard.nop::before { background: repeating-linear-gradient(180deg, var(--muted2) 0 4px, transparent 4px 8px); opacity: .5; }
+  .mcard.nop .foot .phase { color: var(--muted2); }
   .mcard.wip { cursor: default; opacity: .72; }
   .mcard.wip:hover { border-color: var(--border); transform: none; }
   .mcard.wip .soon { color: var(--muted2); font-size: 12.5px; padding: 20px 0 8px; }
 
   /* SIDEBAR TREE (roll-up hierarchy) — load-bearing, preserved */
-  aside.tree { width: 316px; flex-shrink: 0; border-left: 1px solid var(--border); overflow-y: auto; padding: 18px 14px; background: var(--bg); }
-  .tree h3 { font-size: 11.5px; text-transform: uppercase; letter-spacing: 1.2px; color: var(--muted); font-weight: 600; margin: 4px 8px 4px; }
-  .tree .hint { font-size: 12px; color: var(--muted2); margin: 0 8px 12px; line-height: 1.5; }
+  aside.tree { width: 340px; flex-shrink: 0; border-left: 1px solid var(--border); overflow-y: auto; padding: 22px 16px 60px; background: var(--bg); }
+  .tree-head { display: flex; align-items: center; margin-bottom: 6px; padding: 0 6px; }
+  .tree-head .t { font: 600 11px/1 var(--mono); letter-spacing: 1.4px; text-transform: uppercase; color: var(--muted2); }
+  .tree-head .toggle { margin-left: auto; font: 500 12px/1 var(--font); color: var(--muted); background: var(--panel); border: 1px solid var(--border);
+    border-radius: 7px; padding: 5px 10px; cursor: pointer; }
+  .tree-head .toggle:hover { color: var(--text); border-color: var(--border2); background: var(--panel2); }
+  .tree .hint { font: 500 11.5px/1.5 var(--mono); color: var(--muted2); padding: 0 6px 12px; }
   .snode { margin: 1px 0; }
-  .srow { display: flex; align-items: center; gap: 8px; padding: 7px 8px; border-radius: 8px; cursor: pointer; }
+  .srow { position: relative; display: flex; align-items: center; gap: 7px; padding: 7px 8px 7px 6px; border-radius: 8px; cursor: pointer; }
   .srow:hover { background: var(--panel2); }
+  .srow.branch { border-left: 2px solid var(--brc, transparent); padding-left: 8px; }
   .srow.wip { cursor: default; } .srow.wip:hover { background: transparent; }
-  .caret { width: 14px; text-align: center; color: var(--muted2); font-size: 9px; user-select: none; cursor: pointer; }
+  .srow.dim .slabel { color: var(--muted); }
+  .caret { flex-shrink: 0; width: 22px; height: 22px; display: inline-flex; align-items: center; justify-content: center;
+    font-size: 11px; color: var(--muted); border-radius: 6px; cursor: pointer; user-select: none; }
+  .caret:hover { background: var(--panel3); color: var(--text); }
   .caret.leaf { visibility: hidden; }
-  .sdot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; box-sizing: border-box; }
-  .sdot.live { background: var(--accent-hi); box-shadow: 0 0 7px rgba(87,166,255,.45); }
+  .sdot { flex-shrink: 0; width: 8px; height: 8px; border-radius: 50%; box-sizing: border-box; }
+  .sdot.live { background: var(--accent-hi); box-shadow: 0 0 0 3px var(--accent-dim); }
+  .sdot.nop { background: var(--muted2); box-shadow: 0 0 0 3px rgba(106,116,132,.14); }
   .sdot.wip { background: transparent; border: 2px solid var(--muted2); }
   .slabel { flex: 1; min-width: 0; font-size: 13.5px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .sdate { color: var(--muted); font-size: 11.5px; text-align: right; line-height: 1.2; font-family: var(--mono); font-variant-numeric: tabular-nums; }
-  .sdate .l { display: block; font-size: 9px; text-transform: uppercase; letter-spacing: .5px; font-family: var(--font); color: var(--muted2); }
-  .schildren { margin-left: 15px; border-left: 1px solid var(--border); padding-left: 5px; }
+  .schildren { margin-left: 15px; border-left: 1px solid var(--border); padding-left: 9px; }
   .schildren.collapsed { display: none; }
   .tree .legend2 { margin: 16px 8px 0; padding-top: 14px; border-top: 1px solid var(--border); font-size: 12.5px; color: var(--muted); }
   .tree .legend2 .r { display: flex; align-items: center; gap: 9px; padding: 3px 0; }
@@ -218,7 +241,7 @@
   .seg2 button:not(.on):hover { background: var(--panel3); color: var(--text); }
 
   @media (max-width: 1000px) {
-    #topbar .sub { display: none; } #topbar .wiptag { display: none; }
+    #topbar .sub { display: none; } #topbar .exptag { display: none; }
     #app { flex-direction: column; height: auto; } body { overflow: auto; }
     main.content { overflow: visible; }
     aside.tree { width: auto; border-left: none; border-top: 1px solid var(--border); }
@@ -238,14 +261,14 @@
 </head>
 <body>
 <div id="topbar">
-  <div class="mark">AI</div>
-  <div class="brand">Bubble Oracle</div>
+  <a class="home" href="thennow.html"><span class="mark">AI</span><span class="brand">Bubble Oracle</span></a>
   <nav class="topnav">
-    <a href="dashboard.html">Dashboard</a>
+    <a href="thennow.html" class="active">Then and Now</a>
+    <a href="dashboard.html">Polymarket</a>
     <a href="datasources.html">Data Sources</a>
     <a href="about.html">About</a>
   </nav>
-  <span class="wiptag">THEN &amp; NOW · WIP</span>
+  <span class="exptag" title="An experimental, transparent method — the metric set is still growing">Experimental</span>
   <button id="opts-btn" aria-label="Options">&#9881; Options</button>
   <div class="sub" id="topsub"></div>
 </div>
@@ -254,17 +277,28 @@
   <main class="content">
     <div class="wrap">
       <section class="hero" id="hero"></section>
-      <div class="sectitle">Metrics — each rolls up to the headline · click any card for the full view</div>
+      <div class="cardbar">
+        <h2>Metrics</h2>
+        <span class="count" id="count"></span>
+        <div class="sort">
+          <span class="lbl">Sort</span>
+          <div class="seg" id="sortseg">
+            <button data-sort="tree" class="on">Tree order</button>
+            <button data-sort="date">Projected date</button>
+            <button data-sort="alpha">A&ndash;Z</button>
+          </div>
+        </div>
+      </div>
       <section class="cardgrid" id="cardgrid"></section>
     </div>
   </main>
   <aside class="tree">
-    <h3>Roll-up hierarchy</h3>
-    <div class="hint">How each metric feeds the headline date. Click a wired node for its full detail.</div>
+    <div class="tree-head"><span class="t">Roll-up tree</span><button class="toggle" id="treetoggle">Collapse all</button></div>
+    <div class="hint">How each metric rolls up to the headline. Collapsing a branch hides its cards.</div>
     <div id="tree"></div>
     <div class="legend2">
-      <div class="r"><span class="sdot live"></span> Wired metric (has a graph)</div>
-      <div class="r"><span class="sdot wip"></span> Not wired yet (WIP branch)</div>
+      <div class="r"><span class="sdot live"></span> Leaf with a projection</div>
+      <div class="r"><span class="sdot nop"></span> Leaf with no projection (counter-argument)</div>
     </div>
   </aside>
 </div>
@@ -419,23 +453,23 @@ function leafVals(n) {
                : interp(PROG_DOT, n.smoothedDot, p)) };
 }
 
-/* ---------- HERO ---------- */
+/* ---------- HERO — the projected peak date is the punchline ---------- */
 function renderHero() {
-  const root = DATA.tree, leaves = liveLeaves(root).filter(l => l.valid !== false).map(l => l.projectedPeakDate).sort();
+  const root = DATA.tree;
   el("hero").innerHTML =
-    `<div class="eyebrow">Projected · AI era peak</div>` +
-    `<div class="lead">Blended across the wired metrics, the AI bubble tops out on</div>` +
-    `<div class="bigdate">${fmtNice(root.projectedPeakDate)}</div>` +
-    `<div class="arc">` +
-      `<span class="seg"><span class="adot" style="background:var(--then)"></span>Started <b>${fmtMY(DATA.aiStart)}</b></span><span class="to">→</span>` +
-      `<span class="seg"><span class="adot" style="background:var(--accent-hi)"></span>Today <b>${(root.intensityNow * 100).toFixed(0)}%</b> of the way</span><span class="to">→</span>` +
-      `<span class="seg"><span class="adot" style="background:var(--peak)"></span>Peak <b>${fmtMY(root.projectedPeakDate)}</b></span><span class="to">→</span>` +
-      `<span class="seg"><span class="adot" style="background:var(--bottom)"></span>Bottom <b>${fmtMY(root.projectedBottomDate)}</b></span>` +
-    `</div>` +
-    `<div class="chips"><span class="chip">Range <b>${fmtNice(leaves[0])} – ${fmtNice(leaves[leaves.length - 1])}</b></span>` +
-      `<span class="chip">Metrics live <b>${liveLeaves(root).filter(l => l.valid !== false).length}</b></span><span class="chip">As of <b>${DATA.asOf}</b></span></div>`;
+    `<div class="kicker">AI bubble bursts · considering <b>valuation + concentration + capex + monetary</b></div>` +
+    `<div class="peak-lbl"><span class="dot"></span>Projected AI-era peak</div>` +
+    `<div class="peak-date">${fmtNice(root.projectedPeakDate)}</div>` +
+    `<p class="verdict">Every graph below compares the journey of the Dot-com bubble against our current AI era. How far are we? Each metric has an opinion.</p>`;
 }
 function liveLeaves(root) { const out = []; (function w(n) { if (n.wip) return; if (n.leaf) out.push(n); (n.children || []).forEach(w); })(root); return out; }
+/* ---------- branch + level wayfinding ---------- */
+const ROOT_KEY = DATA.tree.key;
+const BRANCH_VAR = { valuation: "--br-val", market_concentration: "--br-conc", capex: "--br-infra", speculation: "--br-spec", monetary: "--br-mon" };
+const PIP = { root: "ROOT", rollup: "ROLL-UP", leaf: "LEAF" };
+function branchKeyOf(n) { if (!n || n.key === ROOT_KEY) return null; let c = n; while (PARENT[c.key] && PARENT[c.key].key !== ROOT_KEY) c = PARENT[c.key]; return c.key; }
+function branchVar(n) { const b = branchKeyOf(n); return b && BRANCH_VAR[b] ? `var(${BRANCH_VAR[b]})` : "var(--border2)"; }
+function levelOf(n) { return n.key === ROOT_KEY ? "root" : n.leaf ? "leaf" : "rollup"; }
 
 /* ---------- canvas helpers ---------- */
 let _css = null; const getCss = v => (_css = _css || getComputedStyle(document.documentElement)).getPropertyValue(v);
@@ -448,6 +482,7 @@ const fmtNum = v => v == null ? "-" : v >= 1000 ? Math.round(v).toLocaleString()
 /* ---------- mini card sparkline (canvas) ---------- */
 function drawMini(canvas, n) {
   const { ctx, w, h } = setup(canvas);
+  const nop = n.valid === false;   // counter-argument: mute the line, drop the projection + dot
   const all = n.intensityDot.concat(n.intensityAi).filter(v => v != null);
   const yMax = Math.max(1.05, Math.max(...all)), yMin = Math.min(0, Math.min(...all));
   const P = { l: 2, r: 2, t: 8, b: 8 }, X = p => P.l + (w - P.l - P.r) * p / XMAX, Y = v => P.t + (h - P.t - P.b) * (1 - (v - yMin) / (yMax - yMin || 1));
@@ -457,58 +492,96 @@ function drawMini(canvas, n) {
   const dc = []; for (let i = 0; i < PROG_DOT.length; i++) if (PROG_DOT[i] <= eq && n.intensityDot[i] != null) dc.push([PROG_DOT[i], n.intensityDot[i]]);
   dc.push([eq, interp(PROG_DOT, n.intensityDot, eq)]);
   poly(ctx, dc, X, Y, getCss("--then"), 1.2, [4, 3]);
-  const proj = [[eq, n.intensityNow]]; for (let i = 0; i < PROG_DOT.length; i++) if (PROG_DOT[i] > eq && n.intensityDot[i] != null) proj.push([PROG_DOT[i], n.intensityDot[i]]);
-  poly(ctx, proj, X, Y, getCss("--accent-hi"), 1.3, [4, 3]);
-  poly(ctx, aiP.map((p, i) => [p, n.intensityAi[i]]), X, Y, getCss("--accent-hi"), 2, []);
-  ctx.fillStyle = getCss("--accent-hi"); ctx.beginPath(); ctx.arc(X(eq), Y(n.intensityNow), 3, 0, 6.2832); ctx.fill();
-  ctx.strokeStyle = getCss("--bg"); ctx.lineWidth = 1; ctx.stroke();
+  if (!nop) {
+    const proj = [[eq, n.intensityNow]]; for (let i = 0; i < PROG_DOT.length; i++) if (PROG_DOT[i] > eq && n.intensityDot[i] != null) proj.push([PROG_DOT[i], n.intensityDot[i]]);
+    poly(ctx, proj, X, Y, getCss("--accent-hi"), 1.3, [4, 3]);
+  }
+  const aiCol = nop ? getCss("--muted2") : getCss("--accent-hi");
+  poly(ctx, aiP.map((p, i) => [p, n.intensityAi[i]]), X, Y, aiCol, 2, nop ? [4, 3] : []);
+  if (!nop) {
+    ctx.fillStyle = getCss("--accent-hi"); ctx.beginPath(); ctx.arc(X(eq), Y(n.intensityNow), 3, 0, 6.2832); ctx.fill();
+    ctx.strokeStyle = getCss("--bg"); ctx.lineWidth = 1; ctx.stroke();
+  }
 }
 
 /* ---------- CARDS ---------- */
 const MINIS = [];
+let SORT = (function () { try { return localStorage.getItem("tn_sort") || "tree"; } catch (e) { return "tree"; } })();
+function orderedChildren(node) { return (node.children || []).slice().sort((a, b) => (a.wip ? 1 : 0) - (b.wip ? 1 : 0)); }
+function treeOrderNodes() { const out = []; (function walk(n) { out.push(n); orderedChildren(n).forEach(walk); })(DATA.tree); return out; }
+function isHidden(n) { let p = PARENT[n.key]; while (p) { if (collapsed.has(p.key)) return true; p = PARENT[p.key]; } return false; }
+function visibleCards() {
+  let list = treeOrderNodes().filter(n => !isHidden(n));   // collapsing a branch hides its cards
+  if (SORT === "alpha") list = list.slice().sort((a, b) => a.label.localeCompare(b.label));
+  else if (SORT === "date") list = list.slice().sort((a, b) => {
+    const av = a.valid === false, bv = b.valid === false;
+    if (av !== bv) return av ? 1 : -1;                     // no-projection cards sink to the end
+    return (a.projectedPeakDate || "9999").localeCompare(b.projectedPeakDate || "9999");
+  });
+  return list;
+}
 function renderCards() {
   const grid = el("cardgrid"); grid.innerHTML = ""; MINIS.length = 0;
-  grid.appendChild(makeCard(DATA.tree));
-  (function walk(n) { orderedChildren(n).forEach(c => { grid.appendChild(makeCard(c)); walk(c); }); })(DATA.tree);
+  const list = visibleCards();
+  list.forEach(n => grid.appendChild(makeCard(n)));
+  const nop = list.filter(n => !n.wip && n.valid === false).length;
+  el("count").textContent = `${list.length} shown · ${nop} no projection`;
   MINIS.forEach(([canvas, n]) => requestAnimationFrame(() => drawMini(canvas, n)));
 }
-function orderedChildren(node) { return (node.children || []).slice().sort((a, b) => (a.wip ? 1 : 0) - (b.wip ? 1 : 0)); }
 function makeCard(n) {
-  const c = document.createElement("div"); c.className = "mcard" + (n.wip ? " wip" : ""); c.id = "card-" + n.key;
+  const c = document.createElement("div");
+  const nop = !n.wip && n.valid === false;
+  c.className = "mcard" + (n.wip ? " wip" : nop ? " nop" : ""); c.id = "card-" + n.key;
+  c.style.setProperty("--brc", branchVar(n));
   if (n.wip) {
-    c.innerHTML = `<div class="top"><span class="name">${n.label}</span><span class="tier">WIP</span></div>` +
+    c.innerHTML = `<div class="top"><span class="pip rollup">WIP</span><span class="name">${n.label}</span></div>` +
       `<div class="soon">Ingestion and dot-com alignment for this branch arrive later. It does not affect the projection yet.</div>` +
       `<div class="foot"><span>not wired</span><span class="int">—</span></div>`;
     return c;
   }
-  const ok = n.valid !== false;
-  c.innerHTML = `<div class="top"><span class="name">${n.label}</span><span class="tier">${tierOf(n)}</span><span class="open">expand ↗</span></div>` +
-    `<div class="lbl">${ok ? "Projected peak" : "Projection"}</div>` +
-    `<div class="date"${ok ? "" : ' style="color:var(--muted2);font-size:26px"'}>${ok ? fmtNice(n.projectedPeakDate) : "suppressed"}</div>` +
+  const lvl = levelOf(n);
+  const dateBlk = nop
+    ? `<div class="lbl">Projection</div><div class="date">No Projection</div>`
+    : `<div class="lbl">Projected peak</div><div class="date">${fmtNice(n.projectedPeakDate)}</div>`;
+  c.innerHTML =
+    `<div class="top"><span class="pip ${lvl}">${PIP[lvl]}</span><span class="name">${n.label}</span><span class="open">expand ↗</span></div>` +
+    dateBlk +
     `<div class="mini"><canvas></canvas></div>` +
-    `<div class="foot"><span class="phase">${ok ? n.phase : "does not fit the analog"}</span><span class="int">Intensity <b>${(n.intensityNow * 100).toFixed(0)}%</b></span></div>`;
+    `<div class="foot"><span class="phase">${nop ? "does not fit the analog" : n.phase}</span><span class="int">Intensity <b>${(n.intensityNow * 100).toFixed(0)}%</b></span></div>`;
   c.addEventListener("click", () => openNode(n.key));
   MINIS.push([c.querySelector("canvas"), n]);
   return c;
 }
 
-/* ---------- SIDEBAR TREE ---------- */
+/* ---------- SIDEBAR TREE (leaf-only dots, no per-row dates, branch stripes) ---------- */
 const collapsed = new Set();
-function renderTree() { el("tree").innerHTML = ""; el("tree").appendChild(treeNode(DATA.tree)); }
+function renderAll() { renderCards(); renderTree(); }
+function renderTree() {
+  el("tree").innerHTML = ""; el("tree").appendChild(treeNode(DATA.tree));
+  el("treetoggle").textContent = collapsed.size ? "Expand all" : "Collapse all";
+}
 function treeNode(n) {
   const wrap = document.createElement("div"); wrap.className = "snode";
-  const row = document.createElement("div"); row.className = "srow" + (n.wip ? " wip" : "");
+  const row = document.createElement("div");
+  const isBranch = PARENT[n.key] && PARENT[n.key].key === ROOT_KEY;   // top-level branch row → accent stripe
+  const nop = !n.wip && n.valid === false;
+  row.className = "srow" + (n.wip ? " wip" : "") + (isBranch ? " branch" : "") + (nop ? " dim" : "");
+  if (isBranch) row.style.setProperty("--brc", branchVar(n));
   const kids = orderedChildren(n), hasKids = kids.length > 0;
-  row.innerHTML = `<span class="caret${hasKids ? "" : " leaf"}">${collapsed.has(n.key) ? "▸" : "▾"}</span><span class="sdot ${n.wip ? "wip" : "live"}"></span>` +
-    `<span class="slabel">${n.label}</span>` +
-    `<span class="sdate"><span class="l">${n.wip ? "status" : n.valid === false ? "analog" : "peak"}</span>${n.wip ? "WIP" : n.valid === false ? "no fit" : fmtNice(n.projectedPeakDate)}</span>`;
-  if (!n.wip) row.addEventListener("click", e => { if (!e.target.classList.contains("caret")) openNode(n.key); });
+  const dot = hasKids ? "" : `<span class="sdot ${n.wip ? "wip" : nop ? "nop" : "live"}"></span>`;   // leaf-only
+  row.innerHTML =
+    `<span class="caret${hasKids ? "" : " leaf"}">${collapsed.has(n.key) ? "▸" : "▾"}</span>` + dot +
+    `<span class="slabel">${n.label}</span>`;
+  if (!n.wip) row.addEventListener("click", e => { if (!e.target.closest(".caret")) openNode(n.key); });
   wrap.appendChild(row);
   if (hasKids) {
     const box = document.createElement("div"); box.className = "schildren" + (collapsed.has(n.key) ? " collapsed" : "");
     kids.forEach(c => box.appendChild(treeNode(c))); wrap.appendChild(box);
-    row.querySelector(".caret").addEventListener("click", e => { e.stopPropagation();
-      const now = box.classList.toggle("collapsed"); e.target.textContent = now ? "▸" : "▾"; if (now) collapsed.add(n.key); else collapsed.delete(n.key); });
+    row.querySelector(".caret").addEventListener("click", e => {
+      e.stopPropagation();
+      if (collapsed.has(n.key)) collapsed.delete(n.key); else collapsed.add(n.key);
+      renderAll();   // collapsing a branch hides its cards from the body
+    });
   }
   return wrap;
 }
@@ -841,6 +914,19 @@ el("topsub").textContent = "Last update: " + (DATA.updated
   ? new Date(DATA.updated).toLocaleString("en-US", { timeZone: "America/New_York", month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short" })
   : DATA.asOf);
 renderHero(); renderCards(); renderTree(); renderDrawer();
+// sort control (persisted) + collapse/expand-all toggle
+[...el("sortseg").children].forEach(x => x.classList.toggle("on", x.dataset.sort === SORT));
+el("sortseg").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  SORT = b.dataset.sort; try { localStorage.setItem("tn_sort", SORT); } catch (err) {}
+  [...el("sortseg").children].forEach(x => x.classList.toggle("on", x === b));
+  renderCards();
+});
+el("treetoggle").addEventListener("click", () => {
+  if (collapsed.size) collapsed.clear();
+  else Object.values(NODES).forEach(n => { if ((n.children || []).length && n.key !== ROOT_KEY) collapsed.add(n.key); });
+  renderAll();
+});
 el("m-close").addEventListener("click", closeModal);
 el("scrim").addEventListener("click", closeModal);
 el("m-dl").addEventListener("click", () => downloadCSV(CUR));
