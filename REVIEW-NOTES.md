@@ -165,3 +165,22 @@ in the preview (no console errors on any page).
    the public landing.
 3. **Sparkline stays canvas** (per the brief). The mock's SVG sparkline geometry was
    illustrative; the live cards bind each node's real weekly series.
+
+## (d) Follow-up refinement — no-projection charts + "analogy"
+
+- **No-projection cards + modal now draw the whole story.** A counter-argument
+  metric previously clipped both curves at the (meaningless) convergence point.
+  Now the **entire dot-com era is drawn to its 2002 conclusion** (grey dashed) and
+  the **AI line is blue, stopping at today with no forward projection**. For these
+  metrics the AI line is placed by ELAPSED TIME (`PROG_AI`) rather than by an
+  intensity match, so it always spans its real ~79% extent instead of collapsing
+  (e.g. sentiment, whose level sits below the dot-com start, previously degenerated
+  to a vertical line). Implemented as `n.valid === false` branches in `aiPlot` /
+  `aiOrdAt` / `aiProgFromDays` + a `todayProg(n)` helper; the modal today-marker
+  then reads the time-equivalent dot-com date (Jul 2026 ≈ Mar 1999), the projected
+  axis leg + Peak/Bottom markers + those legend items are suppressed, and the hover
+  shows no AI value past today.
+- **Wording:** the card foot reads **"does not fit dot-com analogy"**, and "analog"
+  was replaced with **"analogy"** everywhere (templates, engine copy, the LLM prompt
+  + fallback, the committed observation cache, About). Cached Haiku observations were
+  edited in place; the shape-hash is state-based, so this doesn't trigger regen.

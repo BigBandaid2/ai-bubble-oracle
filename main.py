@@ -143,7 +143,7 @@ def cmd_update(conn):
           + (f" — {streak} consecutive throttled run(s)" if streak else ""))
 
     # Then-and-Now LLM observations: hash-gated, so this only calls Haiku for a
-    # node whose analog state actually shifted since the last run (usually none).
+    # node whose analogy state actually shifted since the last run (usually none).
     obs_changed = refresh_observations(conn)
     print(f"thennow observations: {obs_changed} regenerated"
           if obs_changed else "thennow observations: unchanged")

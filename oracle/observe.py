@@ -35,8 +35,8 @@ def _prompt(node):
     checks = "; ".join(
         f"{c['name']} {'ok' if c['pass'] else 'FAILS'} ({c['detail']})"
         for c in (node.get("validation") or {}).get("checks", []))
-    verdict = ("fits the dot-com rise-peak-fall analog" if node.get("valid")
-               else "does NOT fit the analog, so its projection is suppressed")
+    verdict = ("fits the dot-com rise-peak-fall analogy" if node.get("valid")
+               else "does NOT fit the analogy, so its projection is suppressed")
     beyond = (" Its AI reading has already passed the dot-com peak level."
               if node.get("beyondDotcomPeak") else "")
     return (
@@ -44,7 +44,7 @@ def _prompt(node):
         "dot-com bubble (which peaked 2000-03-10). Write one or two sentences of "
         "plain, candid commentary on what THIS metric says about the comparison, "
         "plus one caveat a skeptical reader should keep in mind. Do not restate the "
-        "projected date as a prediction; it is an analog, not a forecast. Style: no "
+        "projected date as a prediction; it is an analogy, not a forecast. Style: no "
         "em-dashes (use commas or periods), no bold, straight quotes only, no filler "
         "like 'notably' or 'it is worth noting'. Under 45 words.\n\n"
         f"Metric: {node.get('label')}\n"
@@ -55,7 +55,7 @@ def _prompt(node):
         f"Equivalent dot-com date: {node.get('equivalentDotcomDate')} ({node.get('phase')}), "
         f"{node.get('daysFromPeak')} days from the 2000 peak; compression ratio "
         f"{node.get('compression')}.\n"
-        f"Analog-projected top: {node.get('projectedPeakDate')}.{beyond}"
+        f"Analogy-projected top: {node.get('projectedPeakDate')}.{beyond}"
     )
 
 

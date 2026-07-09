@@ -1,4 +1,4 @@
-"""Then and Now analog engine.
+"""Then and Now analogy engine.
 
 Phase 1 foundation of the universal pipeline (see design/PIPELINE-PLAN.md):
 
@@ -13,7 +13,7 @@ Phase 1 foundation of the universal pipeline (see design/PIPELINE-PLAN.md):
     projected peak) plus a WEEKLY-downsampled series for the plot, carrying the
     metric's NATIVE value all the way down for look-through on hover/CSV.
 
-The projected date is a transparent analog, not a forecast.
+The projected date is a transparent analogy, not a forecast.
 """
 
 import hashlib
@@ -351,7 +351,7 @@ def _match(target, int_dot, mode="dominant"):
 
 
 def _evaluate(int_dot, int_ai, today):
-    """Analog + projection on a node's daily curves (scalars, exact daily)."""
+    """Analogy + projection on a node's daily curves (scalars, exact daily)."""
     ai_now = next((v for v in reversed(int_ai) if v is not None), 0.0)
     eq = _match(ai_now, int_dot)
     equiv_date = date.fromordinal(_d(CLOCK["start"]).toordinal() + round(eq / 100 * RAMP))
@@ -474,7 +474,7 @@ def obs_fallback(node):
                 f"({node.get('phase', '')}); it projects a top around {node.get('projectedPeakDate', '')}.")
     fail = next((c for c in v.get("checks", []) if not c["pass"]), None)
     tail = f" ({fail['detail']})" if fail else ""
-    return (f"{node['label']} does not fit the rise-peak-fall analog{tail}; "
+    return (f"{node['label']} does not fit the rise-peak-fall analogy{tail}; "
             "it is shown for context and its projection is suppressed.")
 
 
@@ -583,7 +583,7 @@ def _build(conn, node, dot_dates, ai_dates, today):
     valid = len(valid_live) > 0
     validation = {"valid": valid, "crossings": 0, "checks": [
         {"name": "conforming inputs", "pass": valid,
-         "detail": f"{len(valid_live)} of {len(live)} inputs fit the analog"}]}
+         "detail": f"{len(valid_live)} of {len(live)} inputs fit the analogy"}]}
     return {"key": node["key"], "label": node["label"], "display": "blended",
             "valid": valid, "validation": validation,
             "children": live + placeholders, "_intDot": int_dot, "_intAi": int_ai, **result}

@@ -1813,7 +1813,7 @@ ASSETS.push(
     inputs: ["int_curve_intensity", "int_sent_intensity"],
     blendWhy: "The monetary and sentiment branch roll-up, currently the counter-argument branch.",
     blendDesc: "Weighted mean of the conforming inputs; today NEITHER conforms (the curve already un-inverted, sentiment is at lows), so the branch renders as context with its projection suppressed and is excluded from the root blend.",
-    graphWhy: "The Monetary & sentiment pillar: two tells that argue AGAINST the analog right now, shown, labeled, and kept out of the headline math.",
+    graphWhy: "The Monetary & sentiment pillar: two tells that argue AGAINST the analogy right now, shown, labeled, and kept out of the headline math.",
   }),
 );
 
@@ -2484,7 +2484,7 @@ const SOURCE_INFO = {
     caveats: [
       { t: "WIP prototype", d: "Method and copy will change. Direct URL only." },
       { t: "Parsed from multpl.com", d: "The public 'Shiller PE by month' table (Robert Shiller's data), parsed with the stdlib, kept as a committed CSV fallback. Broad-market CAPE, not Nasdaq-specific." },
-      { t: "Validated and annotated", d: "The same two-pass validator + cached Haiku observation as every metric, run independently on CAPE. The verdict and numbers are computed; the prose is layered on top and regenerates only when the analog state shifts." },
+      { t: "Validated and annotated", d: "The same two-pass validator + cached Haiku observation as every metric, run independently on CAPE. The verdict and numbers are computed; the prose is layered on top and regenerates only when the analogy state shifts." },
     ],
     cardinality: [
       { asset: "raw.multpl_cape", count: "1 doc", meaning: "The monthly CAPE table, back to the 1870s." },
@@ -2654,7 +2654,7 @@ Object.assign(SOURCE_INFO, {
       { t: "10Y-3M vs 10Y-2Y", d: "T10Y3M is the recession-literature standard and reaches 1982; T10Y2Y exists back to 1976 if a second read is ever wanted." },
     ],
     ambiguities: [
-      { t: "Which inversion counts", d: "The 2022-24 inversion was the deepest since 1981 and un-inverted without (so far) a crash, which is exactly why this leaf argues against the analog rather than for it." },
+      { t: "Which inversion counts", d: "The 2022-24 inversion was the deepest since 1981 and un-inverted without (so far) a crash, which is exactly why this leaf argues against the analogy rather than for it." },
     ],
     caveats: [
       { t: "Daily, business days", d: "Holidays carry '.' in the raw CSV and are dropped, then forward-filled on the grid." },

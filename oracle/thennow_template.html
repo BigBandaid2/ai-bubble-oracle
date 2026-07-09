@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>AI Bubble Oracle — Then and Now: the dot-com clock for the AI boom</title>
-<meta name="description" content="A transparent, reproducible comparison of the AI boom to the dot-com bubble, across valuation, concentration, capex, and monetary signals — projecting when the analog peaks.">
+<meta name="description" content="A transparent, reproducible comparison of the AI boom to the dot-com bubble, across valuation, concentration, capex, and monetary signals — projecting when the analogy peaks.">
 <style>
   :root {
     --bg: #0a0d13; --panel: #12161f; --panel2: #1b212c; --panel3: #222a37;
@@ -363,7 +363,7 @@ const fmtNice = iso => { const d = new Date(iso + "T00:00:00Z"); return MON[d.ge
 const fmtMY = iso => { const d = new Date(iso + "T00:00:00Z"); return MON[d.getUTCMonth()] + " " + d.getUTCFullYear(); };
 const fmtMYs = dt => MON[dt.getUTCMonth()] + " '" + String(dt.getUTCFullYear()).slice(2);
 
-/* ---------- analog engine (mirrors oracle/thennow.py; needed for live weights) ---------- */
+/* ---------- analogy engine (mirrors oracle/thennow.py; needed for live weights) ---------- */
 function phaseOf(p) { let l = PHASES[0]; BOUNDS.forEach((e, i) => { if (p >= e) l = PHASES[i]; }); return l; }
 // Where `target` sits on the (non-monotone) dot-com ramp, as a progress %.
 // mode "dominant" = the last upward crossing (the final approach to the peak, the
@@ -430,13 +430,20 @@ const interp = (xs, ys, x) => { if (x <= xs[0]) return ys[0];
   return ys[ys.length - 1]; };
 
 /* ---------- per-node plotting model ---------- */
+// A conforming metric's AI line is compressed so today lands on the convergence
+// point (equiv.progress), with a projection continuing past it. A NON-conforming
+// metric has no analogy match, so its AI line is placed by ELAPSED TIME (PROG_AI is
+// the time-progress on the shared clock) and simply stops at today — no projection.
 function aiK(n) { return n.equiv.progress / (PROG_AI[PROG_AI.length - 1] || 1); }
-function aiPlot(n) { const k = aiK(n); return PROG_AI.map(p => p * k); }
+function todayProg(n) { return n.valid === false ? PROG_AI[PROG_AI.length - 1] : n.equiv.progress; }
+function aiPlot(n) { if (n.valid === false) return PROG_AI.slice(); const k = aiK(n); return PROG_AI.map(p => p * k); }
 // AI date at a plot-progress p: real scale up to today, then extend at the node's pace.
-function aiOrdAt(n, p) { const k = aiK(n), TD = TODAY - AI_START;
+function aiOrdAt(n, p) { if (n.valid === false) return AI_START + Math.round(p / 100 * RAMP);
+  const k = aiK(n), TD = TODAY - AI_START;
   const days = p <= n.equiv.progress ? p / k * RAMP / 100 : TD + n.compression * (p - n.equiv.progress) / 100 * RAMP;
   return AI_START + Math.round(days); }
-function aiProgFromDays(n, d) { const k = aiK(n), TD = TODAY - AI_START;
+function aiProgFromDays(n, d) { if (n.valid === false) return d / RAMP * 100;
+  const k = aiK(n), TD = TODAY - AI_START;
   return d <= TD ? d * k * 100 / RAMP : n.equiv.progress + (d - TD) / (n.compression * RAMP) * 100; }
 function leafVals(n) {
   if (!n.leaf) return null;
@@ -444,13 +451,14 @@ function leafVals(n) {
   const ratio = n.type === "ratio_from_start";
   return { dotStart, aiStart, peakMult, ratio,
     dotValAt: p => interp(PROG_DOT, n.smoothedDot, p),
-    // Past today, AI is assumed to trace the dot-com shape. For a ratio metric
-    // that means AI keeps its own start and follows the appreciation curve; for
-    // an absolute-level metric (CAPE) it simply follows the dot-com level itself,
-    // so the native value stays continuous at the convergence point.
-    aiValAt: p => p <= n.equiv.progress ? interp(aiPlot(n), n.smoothedAi, p)
-      : (ratio ? aiStart * (1 + interp(PROG_DOT, n.intensityDot, p) * (peakMult - 1))
-               : interp(PROG_DOT, n.smoothedDot, p)) };
+    // Up to today, the AI native value. Past today: for a conforming metric AI
+    // traces the dot-com shape (ratio keeps its own start; absolute follows the
+    // dot-com level); a non-conforming metric has no projection, so null.
+    aiValAt: p => { const tp = todayProg(n);
+      if (p <= tp) return interp(aiPlot(n), n.smoothedAi, p);
+      if (n.valid === false) return null;
+      return ratio ? aiStart * (1 + interp(PROG_DOT, n.intensityDot, p) * (peakMult - 1))
+                   : interp(PROG_DOT, n.smoothedDot, p); } };
 }
 
 /* ---------- HERO — the projected peak date is the punchline ---------- */
@@ -482,24 +490,26 @@ const fmtNum = v => v == null ? "-" : v >= 1000 ? Math.round(v).toLocaleString()
 /* ---------- mini card sparkline (canvas) ---------- */
 function drawMini(canvas, n) {
   const { ctx, w, h } = setup(canvas);
-  const nop = n.valid === false;   // counter-argument: mute the line, drop the projection + dot
+  const nop = n.valid === false;   // counter-argument: full dot-com, AI to today, no projection
   const all = n.intensityDot.concat(n.intensityAi).filter(v => v != null);
   const yMax = Math.max(1.05, Math.max(...all)), yMin = Math.min(0, Math.min(...all));
   const P = { l: 2, r: 2, t: 8, b: 8 }, X = p => P.l + (w - P.l - P.r) * p / XMAX, Y = v => P.t + (h - P.t - P.b) * (1 - (v - yMin) / (yMax - yMin || 1));
-  const eq = n.equiv.progress, aiP = aiPlot(n);
+  const tp = todayProg(n), aiP = aiPlot(n);
   ctx.clearRect(0, 0, w, h);
   if (yMin < 0) { const y0 = Y(0); ctx.strokeStyle = getCss("--border"); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(P.l, y0); ctx.lineTo(w - P.r, y0); ctx.stroke(); }
-  const dc = []; for (let i = 0; i < PROG_DOT.length; i++) if (PROG_DOT[i] <= eq && n.intensityDot[i] != null) dc.push([PROG_DOT[i], n.intensityDot[i]]);
-  dc.push([eq, interp(PROG_DOT, n.intensityDot, eq)]);
+  // dot-com dashed grey: only to convergence when a projection continues it, the whole
+  // era (through its 2002 conclusion) when there is none.
+  const dc = []; for (let i = 0; i < PROG_DOT.length; i++) if ((nop || PROG_DOT[i] <= tp) && n.intensityDot[i] != null) dc.push([PROG_DOT[i], n.intensityDot[i]]);
+  if (!nop) dc.push([tp, interp(PROG_DOT, n.intensityDot, tp)]);
   poly(ctx, dc, X, Y, getCss("--then"), 1.2, [4, 3]);
   if (!nop) {
-    const proj = [[eq, n.intensityNow]]; for (let i = 0; i < PROG_DOT.length; i++) if (PROG_DOT[i] > eq && n.intensityDot[i] != null) proj.push([PROG_DOT[i], n.intensityDot[i]]);
+    const proj = [[tp, n.intensityNow]]; for (let i = 0; i < PROG_DOT.length; i++) if (PROG_DOT[i] > tp && n.intensityDot[i] != null) proj.push([PROG_DOT[i], n.intensityDot[i]]);
     poly(ctx, proj, X, Y, getCss("--accent-hi"), 1.3, [4, 3]);
   }
-  const aiCol = nop ? getCss("--muted2") : getCss("--accent-hi");
-  poly(ctx, aiP.map((p, i) => [p, n.intensityAi[i]]), X, Y, aiCol, 2, nop ? [4, 3] : []);
-  if (!nop) {
-    ctx.fillStyle = getCss("--accent-hi"); ctx.beginPath(); ctx.arc(X(eq), Y(n.intensityNow), 3, 0, 6.2832); ctx.fill();
+  // AI actual, blue, stopping at today (conforming and not)
+  poly(ctx, aiP.map((p, i) => [p, n.intensityAi[i]]), X, Y, getCss("--accent-hi"), 2, []);
+  {
+    ctx.fillStyle = getCss("--accent-hi"); ctx.beginPath(); ctx.arc(X(tp), Y(n.intensityNow), 3, 0, 6.2832); ctx.fill();
     ctx.strokeStyle = getCss("--bg"); ctx.lineWidth = 1; ctx.stroke();
   }
 }
@@ -547,7 +557,7 @@ function makeCard(n) {
     `<div class="top"><span class="pip ${lvl}">${PIP[lvl]}</span><span class="name">${n.label}</span><span class="open">expand ↗</span></div>` +
     dateBlk +
     `<div class="mini"><canvas></canvas></div>` +
-    `<div class="foot"><span class="phase">${nop ? "does not fit the analog" : n.phase}</span><span class="int">Intensity <b>${(n.intensityNow * 100).toFixed(0)}%</b></span></div>`;
+    `<div class="foot"><span class="phase">${nop ? "does not fit dot-com analogy" : n.phase}</span><span class="int">Intensity <b>${(n.intensityNow * 100).toFixed(0)}%</b></span></div>`;
   c.addEventListener("click", () => openNode(n.key));
   MINIS.push([c.querySelector("canvas"), n]);
   return c;
@@ -588,18 +598,21 @@ function treeNode(n) {
 
 /* ---------- MODAL ---------- */
 let CUR = null;
-const LEG =
+const LEG_BASE =
   `<span class="lg" style="color:var(--then)"><i class="dash"></i>Dot-com (past)</span>` +
   `<span class="lg" style="color:var(--accent-hi)"><i style="background:var(--accent-hi)"></i>AI path (actual)</span>` +
+  `<span class="lg" style="color:var(--text)"><i class="vline"></i>Today</span>`;
+const LEG_PROJ =
   `<span class="lg" style="color:var(--accent-hi)"><i class="dash"></i>AI projection</span>` +
-  `<span class="lg" style="color:var(--text)"><i class="vline"></i>Today</span>` +
   `<span class="lg" style="color:var(--peak)"><i class="mk" style="background:var(--peak)"></i>Peak</span>` +
   `<span class="lg" style="color:var(--bottom)"><i class="mk" style="background:var(--bottom)"></i>Bottom</span>`;
+// a non-conforming metric draws no projection/peak/bottom, so its legend omits them
+function legendFor(n) { return n.valid === false ? LEG_BASE : LEG_BASE + LEG_PROJ; }
 function openNode(key) {
   const n = NODES[key]; if (!n || n.wip) return; CUR = n;
   el("m-crumb").innerHTML = crumbOf(n).map((c, i, a) => `${i ? '<span class="sep">›</span>' : ''}<span class="${i === a.length - 1 ? 'here' : ''}">${c.label}</span>`).join("");
   setHead(n);
-  el("m-legend").innerHTML = LEG;
+  el("m-legend").innerHTML = legendFor(n);
   el("m-tiles").innerHTML = tilesHtml(n);
   el("m-deriv").innerHTML = derivHtml(n);
   el("m-weights").innerHTML = ""; const kids = liveKids(n);
@@ -655,7 +668,7 @@ function derivHtml(n) {
   const src = SRC_GROUP[n.leaf] || SRC_GROUP[n.key] || "";
   const ok = n.valid !== false;
   const steps = ok ? `<ol class="steps">${rows.map((r, i) => `<li data-n="${i + 1}">${r}</li>`).join("")}</ol>`
-    : `<div class="dcnote">This metric does not fit the rise-peak-fall analog, so no date is projected from it. The curves below are shown for context only.</div>`;
+    : `<div class="dcnote">This metric does not fit the rise-peak-fall analogy, so no date is projected from it. The curves below are shown for context only.</div>`;
   return `<h4>How this date is derived <span class="more"><a href="${src ? "datasources.html#src:" + src : "datasources.html"}" target="_blank" rel="noopener">full method &amp; sources ↗</a></span></h4>` +
     steps +
     (ok && n.leaf && n.different ? `<div class="dcnote"><span class="k">vs dot-com</span>${n.different}</div>` : "") +
@@ -665,7 +678,7 @@ function derivHtml(n) {
 // observation. The numbers are authoritative; the observation is prose on top.
 function validationHtml(n) {
   const v = n.validation || {}, checks = v.checks || [], ok = n.valid !== false;
-  const chip = `<span class="vchip ${ok ? "ok" : "no"}">${ok ? "✓ fits the analog" : "⚠ does not fit"}</span>`;
+  const chip = `<span class="vchip ${ok ? "ok" : "no"}">${ok ? "✓ fits the analogy" : "⚠ does not fit"}</span>`;
   const list = checks.map(c => `<li class="${c.pass ? "p" : "f"}">${c.name}<span>${c.detail}</span></li>`).join("");
   const obs = n.observations ? `<div class="obs"><span class="k">Observation</span>${n.observations}</div>` : "";
   return `<div class="valid"><h4 style="text-transform:none;letter-spacing:0">Validation ${chip}</h4>` +
@@ -701,7 +714,7 @@ function setHead(n) {
   el("m-date").textContent = ok ? fmtNice(n.projectedPeakDate) : "—";
   el("m-sub").innerHTML = ok
     ? `Today it's <b>${(n.intensityNow * 100).toFixed(0)}%</b> of the way to the 2000 peak (${n.phase}); if the arc holds, a projected bottom around <b>${fmtMY(n.projectedBottomDate)}</b>.`
-    : `This metric does not fit the rise-peak-fall analog, so no peak date is projected from it. Today it sits at <b>${(n.intensityNow * 100).toFixed(0)}%</b> of the 2000 peak level (${n.phase}); the curve is shown for context.`;
+    : `This metric does not fit the rise-peak-fall analogy, so no peak date is projected from it. Today it sits at <b>${(n.intensityNow * 100).toFixed(0)}%</b> of the 2000 peak level (${n.phase}); the curve is shown for context.`;
 }
 function buildRibbon(n) {
   const r = el("m-ribbon"); r.innerHTML = "";
@@ -718,8 +731,8 @@ function drawBig(n) {
   const PAD = { l: 54, r: 30, t: 74, b: 56 }, plotW = w - PAD.l - PAD.r, plotH = h - PAD.t - PAD.b;
   const all = n.intensityDot.concat(n.intensityAi), yMax = Math.max(1.12, Math.max(...all) * 1.06), yMin = Math.min(0, Math.min(...all));
   const X = p => PAD.l + plotW * p / XMAX, Y = v => PAD.t + plotH * (1 - (v - yMin) / (yMax - yMin || 1));
-  const aiP = aiPlot(n), yb = h - PAD.b, eqx = X(n.equiv.progress), eqy = Y(n.intensityNow);
   const ok = n.valid !== false;   // non-conforming metric: no projection drawn
+  const aiP = aiPlot(n), yb = h - PAD.b, tp = todayProg(n), eqx = X(tp), eqy = Y(n.intensityNow);
   RC = { X, Y, PAD, w, h, n, px2prog: x => (x - PAD.l) / (plotW || 1) * XMAX };
   ctx.clearRect(0, 0, w, h);
 
@@ -730,15 +743,16 @@ function drawBig(n) {
     ctx.font = "12px 'Geist Mono', monospace"; ctx.fillText((v * 100).toFixed(0) + "%", PAD.l - 8, y); });
   if (yMin < 0) { const y0 = Y(0); ctx.strokeStyle = getCss("--border2"); ctx.beginPath(); ctx.moveTo(PAD.l, y0); ctx.lineTo(w - PAD.r, y0); ctx.stroke(); }
 
-  // AI month-year axis (actual solid → projected dashed)
+  // AI month-year axis (actual solid → projected dashed; no projected leg when suppressed)
   ctx.strokeStyle = getCss("--muted2"); ctx.lineWidth = 1.2; ctx.setLineDash([]);
   ctx.beginPath(); ctx.moveTo(PAD.l, yb); ctx.lineTo(eqx, yb); ctx.stroke();
-  ctx.globalAlpha = .7; ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.moveTo(eqx, yb); ctx.lineTo(w - PAD.r, yb); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1;
+  if (ok) { ctx.globalAlpha = .7; ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.moveTo(eqx, yb); ctx.lineTo(w - PAD.r, yb); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1; }
   ctx.fillStyle = getCss("--muted"); ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.font = "12px 'Geist Mono', monospace";
-  for (let yr = 2022; yr <= 2032; yr++) { const d = Date.UTC(yr, 10, 1) / DAYMS - AI_START, p = aiProgFromDays(n, d); if (p < 0 || p > XMAX) continue; const x = X(p);
+  const pMax = ok ? XMAX : tp;
+  for (let yr = 2022; yr <= 2032; yr++) { const d = Date.UTC(yr, 10, 1) / DAYMS - AI_START, p = aiProgFromDays(n, d); if (p < 0 || p > pMax) continue; const x = X(p);
     ctx.strokeStyle = getCss("--muted2"); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x, yb); ctx.lineTo(x, yb + 5); ctx.stroke();
     ctx.fillText(fmtMYs(new Date(Date.UTC(yr, 10, 1))), x, yb + 9); }
-  ctx.fillStyle = getCss("--accent-hi"); ctx.textAlign = "left"; ctx.font = "11px 'Geist Mono', monospace"; ctx.fillText("AI ERA · ACTUAL → PROJECTED", PAD.l, yb + 30);
+  ctx.fillStyle = getCss("--accent-hi"); ctx.textAlign = "left"; ctx.font = "11px 'Geist Mono', monospace"; ctx.fillText(ok ? "AI ERA · ACTUAL → PROJECTED" : "AI ERA · ACTUAL (NO ANALOGY MATCH)", PAD.l, yb + 30);
 
   // area fill under the actual AI line
   const grad = ctx.createLinearGradient(0, PAD.t, 0, yb);
@@ -747,12 +761,14 @@ function drawBig(n) {
   for (let i = 0; i < aiP.length; i++) ctx.lineTo(X(aiP[i]), Y(n.intensityAi[i]));
   ctx.lineTo(X(aiP[aiP.length - 1]), Y(0)); ctx.closePath(); ctx.fill();
 
-  // dot-com grey dashed, only to convergence
-  const dc = []; for (let i = 0; i < PROG_DOT.length; i++) if (PROG_DOT[i] <= n.equiv.progress && n.intensityDot[i] != null) dc.push([PROG_DOT[i], n.intensityDot[i]]);
-  dc.push([n.equiv.progress, interp(PROG_DOT, n.intensityDot, n.equiv.progress)]);
+  // dot-com grey dashed: to convergence when a projection continues it, else the whole
+  // era through its 2002 conclusion (a non-conforming metric has no projection).
+  const dcLim = ok ? n.equiv.progress : Infinity;
+  const dc = []; for (let i = 0; i < PROG_DOT.length; i++) if (PROG_DOT[i] <= dcLim && n.intensityDot[i] != null) dc.push([PROG_DOT[i], n.intensityDot[i]]);
+  if (ok) dc.push([n.equiv.progress, interp(PROG_DOT, n.intensityDot, n.equiv.progress)]);
   poly(ctx, dc, X, Y, getCss("--then"), 1.8, [5, 4]);
   // blue dashed projection: convergence → peak → bottom (traces the remaining dot-com
-  // shape). Suppressed when the metric does not conform to the analog.
+  // shape). Suppressed when the metric does not conform to the analogy.
   if (ok) {
     const proj = [[n.equiv.progress, n.intensityNow]]; for (let i = 0; i < PROG_DOT.length; i++) if (PROG_DOT[i] > n.equiv.progress && n.intensityDot[i] != null) proj.push([PROG_DOT[i], n.intensityDot[i]]);
     poly(ctx, proj, X, Y, getCss("--accent-hi"), 2.4, [7, 5]);
@@ -762,7 +778,7 @@ function drawBig(n) {
 
   // marker vertical lines (peak/bottom only when a projection exists)
   const MK = [{ id: "begin", p: 0, col: "var(--then)", dash: [], a: .55 },
-    { id: "today", p: n.equiv.progress, col: "var(--text)", dash: [3, 4], a: .9 },
+    { id: "today", p: tp, col: "var(--text)", dash: [3, 4], a: .9 },
     { id: "peak", p: 100, col: "var(--peak)", dash: [3, 3], a: .9 },
     { id: "bottom", p: BOTTOM_PROG, col: "var(--bottom)", dash: [3, 3], a: .9 }];
   MK.filter(m => ok || m.id === "begin" || m.id === "today").forEach(m => { const x = X(m.p); ctx.globalAlpha = m.a; ctx.strokeStyle = getCss(m.col.slice(4, -1)); ctx.lineWidth = m.id === "today" ? 1.6 : 1.4; ctx.setLineDash(m.dash);
@@ -780,10 +796,13 @@ function drawBig(n) {
 // dual-timeline marker chips as HTML over the canvas (AI date over dot-com date)
 function placeMarkers(n, X, wrap) {
   const layer = el("mklayer"); layer.innerHTML = "";
-  const dcMonth = iso => fmtMY(iso), ok = n.valid !== false;
+  const dcMonth = iso => fmtMY(iso), ok = n.valid !== false, tp = todayProg(n);
+  // conforming: today sits at the intensity-matched dot-com date. Non-conforming:
+  // today sits at the same ELAPSED-time point on the dot-com clock.
+  const todayDc = ok ? n.equivalentDotcomDate : isoFromOrd(DOT_START + Math.round(tp / 100 * RAMP));
   const MK = [
     { p: 0, eb: "START", ebc: "var(--then)", col: "var(--then)", ai: fmtMY(DATA.aiStart) + " · " + DATA.aiStartEvent, dc: dcMonth(DATA.dotcomStart) + " · " + DATA.dotcomStartEvent, row: 0, align: "L" },
-    { p: n.equiv.progress, eb: "TODAY", ebc: "var(--text)", col: "var(--text)", ai: fmtMY(DATA.asOf), dc: dcMonth(n.equivalentDotcomDate), row: 1, align: "C" },
+    { p: tp, eb: "TODAY", ebc: "var(--text)", col: "var(--text)", ai: fmtMY(DATA.asOf), dc: dcMonth(todayDc), row: 1, align: "C" },
     { p: 100, eb: "PROJECTED PEAK", ebc: "var(--peak)", col: "var(--peak)", ai: fmtMY(n.projectedPeakDate), dc: dcMonth(DATA.dotcomPeak), row: 0, align: "C" },
     { p: BOTTOM_PROG, eb: "PROJECTED BOTTOM", ebc: "var(--bottom)", col: "var(--bottom)", ai: fmtMY(n.projectedBottomDate), dc: dcMonth(DOT_END_ISO), row: 1, align: "R" }];
   (ok ? MK : MK.slice(0, 2)).forEach(m => { const c = document.createElement("div"); c.className = "mkchip"; c.style.left = X(m.p) + "px"; c.style.top = (m.row === 0 ? 4 : 40) + "px";
@@ -796,15 +815,17 @@ function onMove(e) {
   let x = Math.max(RC.PAD.l, Math.min(RC.w - RC.PAD.r, e.clientX - r.left)); const p = RC.px2prog(x);
   drawBig(n); const ctx = el("modal-canvas").getContext("2d");
   ctx.strokeStyle = "rgba(238,241,246,.45)"; ctx.lineWidth = 1; ctx.setLineDash([]); ctx.beginPath(); ctx.moveTo(x, RC.PAD.t); ctx.lineTo(x, RC.h - RC.PAD.b); ctx.stroke();
-  const lv = leafVals(n), dotV = interp(PROG_DOT, n.intensityDot, p), proj = p > n.equiv.progress;
+  const ok = n.valid !== false, tp = todayProg(n);
+  const lv = leafVals(n), dotV = interp(PROG_DOT, n.intensityDot, p), proj = p > tp;
   chip.style.display = "block";
   let html = `<div class="hr">${fmtMY(isoFromOrd(aiOrdAt(n, p)))} · ${p.toFixed(0)}%</div>`;
-  if (lv) { const unit = n.unitLabel || "level";
+  if (lv) { const unit = n.unitLabel || "level", av = lv.aiValAt(p);
     html += `<div class="row"><span class="sw" style="background:var(--then)"></span>Dot-com ${unit}<b>${fmtNum(lv.dotValAt(p))}</b></div>` +
-      `<div class="row"><span class="sw" style="background:var(--accent-hi)"></span>AI ${unit}${proj ? " (proj)" : ""}<b>${fmtNum(lv.aiValAt(p))}</b></div>`;
+      `<div class="row"><span class="sw" style="background:var(--accent-hi)"></span>AI ${unit}${proj && ok ? " (proj)" : ""}<b>${av == null ? "—" : fmtNum(av)}</b></div>`;
   } else {
+    const aiInt = proj ? (ok ? dotV : null) : interp(aiPlot(n), n.intensityAi, p);
     html += `<div class="row"><span class="sw" style="background:var(--then)"></span>Dot-com<b>${(dotV * 100).toFixed(0)}%</b></div>` +
-      `<div class="row"><span class="sw" style="background:var(--accent-hi)"></span>AI${proj ? " (proj)" : ""}<b>${((proj ? dotV : interp(aiPlot(n), n.intensityAi, p)) * 100).toFixed(0)}%</b></div>`;
+      `<div class="row"><span class="sw" style="background:var(--accent-hi)"></span>AI${proj && ok ? " (proj)" : ""}<b>${aiInt == null ? "—" : (aiInt * 100).toFixed(0) + "%"}</b></div>`;
   }
   chip.innerHTML = html; const cw = chip.offsetWidth; let cx = x + 14; if (cx + cw > RC.w - 8) cx = x - cw - 14;
   chip.style.left = cx + "px"; chip.style.top = (RC.PAD.t + 8) + "px";
