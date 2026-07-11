@@ -4,7 +4,7 @@
     "Anthropic": 3
   },
   "news_query_version": 3,
-  "news_k": 0.0297,
+  "news_k": 0.0304,
   "events_version": 3,
-  "gdelt_throttle_streak": 0
+  "gdelt_throttle_streak": 1
 }
