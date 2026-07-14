@@ -179,7 +179,7 @@ def _node_examples(t, pk):
     out = {}
 
     def walk(n):
-        if n.get("wip"):
+        if n.get("wip") or n.get("stub"):
             return
         checks = (n.get("validation") or {}).get("checks", [])
         e = {

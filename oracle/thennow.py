@@ -58,143 +58,13 @@ BOTTOM_PROG = _days(CLOCK["start"], CLOCK["bottom"]) / RAMP * 100.0
 
 
 # ---------------------------------------------------------------- metric registry
-# formula: maps a raw row (single `source`) or an alias dict (multi-`series`
-# composite) to the metric's input value. `type` then governs normalization.
-# Optional `minRange` relaxes the validator's dynamic-range gate (default 0.2,
-# tuned for prices; bounded indexes like sentiment move less and say as much).
-PRICE = {
-    "kind": "price", "source": ("prices", "^IXIC"), "columns": ["close"],
-    "formula": lambda r: r["close"], "cadence": "daily",
-    "type": "ratio_from_start", "direction": "up", "unit": "nasdaq_close",
-    "unitLabel": "Nasdaq",
-}
-SP500 = {
-    "kind": "sp500", "source": ("prices", "^GSPC"), "columns": ["close"],
-    "formula": lambda r: r["close"], "cadence": "daily",
-    "type": "ratio_from_start", "direction": "up", "unit": "sp500_close",
-    "unitLabel": "S&P 500",
-}
-CAPE = {
-    "kind": "cape", "source": ("cape", None), "columns": ["cape"],
-    "formula": lambda r: r["cape"], "cadence": "monthly",
-    "type": "absolute_level", "direction": "up", "unit": "shiller_cape",
-    "unitLabel": "CAPE",
-}
-# Total US market value against GDP (the Buffett indicator): nonfinancial
-# corporate equities (Z.1, $mn) over nominal GDP ($bn). Indexed to each era's own
-# start (ratio_from_start), so it measures how much the market-cap-to-GDP ratio
-# has RUN UP since ChatGPT versus its dot-com run-up, rather than comparing
-# absolute levels across eras (which structural shifts make less comparable).
-BUFFETT = {
-    "kind": "buffett",
-    "series": {"eq": ("fred", "NCBEILQ027S"), "gdp": ("fred", "GDP")},
-    "formula": lambda r: (r["eq"] / 1000.0) / r["gdp"], "cadence": "quarterly",
-    "type": "ratio_from_start", "direction": "up", "unit": "mktcap_gdp",
-    "unitLabel": "x GDP",
-}
-# How far the tech-heavy index outruns the broad market: the concentration /
-# narrow-leadership proxy that is computable daily back to the 1970s.
-TECH_LEAD = {
-    "kind": "tech_leadership",
-    "series": {"ixic": ("prices", "^IXIC"), "gspc": ("prices", "^GSPC")},
-    "formula": lambda r: r["ixic"] / r["gspc"], "cadence": "daily",
-    "type": "ratio_from_start", "direction": "up", "unit": "ixic_gspc_ratio",
-    "unitLabel": "Nasdaq/S&P ratio",
-}
-# The economy-wide capex commitment to the boom's tooling: private fixed
-# investment in information processing equipment + software as a share of GDP.
-# Indexed to each era's own start (ratio_from_start): how much the IT-investment
-# share has grown since ChatGPT versus its dot-com run-up, not the absolute level.
-IT_INVEST = {
-    "kind": "it_invest",
-    "series": {"it": ("fred", "A679RC1Q027SBEA"), "gdp": ("fred", "GDP")},
-    "formula": lambda r: r["it"] / r["gdp"] * 100.0, "cadence": "quarterly",
-    "type": "ratio_from_start", "direction": "up", "unit": "pct_gdp",
-    "unitLabel": "% of GDP",
-}
-# The picks-and-shovels output index: chips carried both booms (fabs then,
-# GPUs now). Volume index, so each era is measured by its own growth. NOTE:
-# quality-adjusted chip VOLUME grew straight through the 2001 bust (the crash
-# was in dollars), so this leaf is expected to render as an honest counter.
-SEMIS = {
-    "kind": "semis", "source": ("fred", "IPG3344S"), "columns": ["value"],
-    "formula": lambda r: r["value"], "cadence": "monthly",
-    "type": "ratio_from_start", "direction": "up", "unit": "ip_index",
-    "unitLabel": "Semis production",
-}
-# The dollar capex cycle that DID rise, peak, and crash: manufacturers' new
-# orders for computers and electronic products (excludes semiconductor orders,
-# a Census reporting gap; the semis volume leaf above covers chips).
-TECH_ORDERS = {
-    "kind": "tech_orders", "source": ("fred", "A34SNO"), "columns": ["value"],
-    "formula": lambda r: r["value"] / 1000.0, "cadence": "monthly",
-    "type": "ratio_from_start", "direction": "up", "unit": "usd_bn",
-    "unitLabel": "Tech orders $bn",
-}
-# Leverage behind the trade: broker-dealer margin loans (Z.1). Nominal dollars,
-# so each era is indexed to its own start (ratio) rather than compared raw.
-MARGIN = {
-    "kind": "margin", "source": ("fred", "BOGZ1FL663067003Q"), "columns": ["value"],
-    "formula": lambda r: r["value"] / 1000.0, "cadence": "quarterly",
-    "type": "ratio_from_start", "direction": "up", "unit": "usd_bn",
-    "unitLabel": "Margin loans $bn",
-}
-# IPO froth: the average first-day pop, Ritter's classic speculation gauge
-# (1999 months ran 60-120%). Zero-IPO months carry no reading (forward-filled).
-IPO_FROTH = {
-    "kind": "ipo", "source": ("ipo", None), "columns": ["avg_first_day_return"],
-    "formula": lambda r: r["avg_first_day_return"], "cadence": "monthly",
-    "type": "absolute_level", "direction": "up", "unit": "pct",
-    "unitLabel": "IPO first-day %",
-}
-# The late-cycle monetary tell: the 10Y-3M spread inverts near tops. Direction
-# DOWN (falling spread = later cycle). The AI era already inverted deeper than
-# 2000 and has re-steepened, so this is expected to render as a counter.
-CURVE = {
-    "kind": "curve", "source": ("fred", "T10Y3M"), "columns": ["value"],
-    "formula": lambda r: r["value"], "cadence": "daily",
-    "type": "absolute_level", "direction": "down", "unit": "pct_spread",
-    "unitLabel": "10Y-3M spread",
-}
-# Main Street euphoria check: Michigan sentiment hit all-time highs into the
-# 2000 peak; today it sits near record lows. Expected counter-argument.
-SENTIMENT = {
-    "kind": "sentiment", "source": ("fred", "UMCSENT"), "columns": ["value"],
-    "formula": lambda r: r["value"], "cadence": "monthly",
-    "type": "absolute_level", "direction": "up", "unit": "umich_index",
-    "unitLabel": "UMich sentiment", "minRange": 0.08,
-}
-
-THENNOW_TREE = {
-    "key": "ai_peak", "label": "AI bubble bursts", "children": [
-        {"key": "valuation", "label": "Valuation", "children": [
-            # Price appreciation is a sub-blend of two indices (Phase 3), so no
-            # single index carries the whole "price" argument on its own.
-            {"key": "price_appreciation", "label": "Price appreciation", "children": [
-                {"key": "nasdaq", "label": "Nasdaq", "metric": PRICE},
-                {"key": "sp500", "label": "S&P 500", "metric": SP500},
-            ]},
-            {"key": "valuation_multiple", "label": "Valuation multiple", "metric": CAPE},
-            {"key": "buffett", "label": "Market cap to GDP", "metric": BUFFETT},
-        ]},
-        {"key": "market_concentration", "label": "Market concentration", "children": [
-            {"key": "tech_leadership", "label": "Tech leadership", "metric": TECH_LEAD},
-        ]},
-        {"key": "capex", "label": "Infrastructure / capex", "children": [
-            {"key": "it_invest", "label": "IT investment share", "metric": IT_INVEST},
-            {"key": "tech_orders", "label": "Tech equipment orders", "metric": TECH_ORDERS},
-            {"key": "semis", "label": "Semiconductor production", "metric": SEMIS},
-        ]},
-        {"key": "speculation", "label": "Speculative activity", "children": [
-            {"key": "margin_debt", "label": "Margin debt", "metric": MARGIN},
-            {"key": "ipo_froth", "label": "IPO froth", "metric": IPO_FROTH},
-        ]},
-        {"key": "monetary", "label": "Monetary & sentiment", "children": [
-            {"key": "yield_curve", "label": "Yield curve", "metric": CURVE},
-            {"key": "sentiment", "label": "Consumer sentiment", "metric": SENTIMENT},
-        ]},
-    ],
-}
+# Metric declarations live as one module each under oracle/metrics/ (see
+# oracle/registry.py for the spec and docs/ADDING-A-METRIC.md for the
+# walkthrough). Each declares: key/label/parent/order (tree placement), a
+# formula over a single `source` or a multi-`series` composite, cadence,
+# type (ratio_from_start | absolute_level), direction, unit/unitLabel, and an
+# optional minRange for the validator's dynamic-range gate. The tree below is
+# assembled at build time; inactive (credential-gated) metrics appear as stubs.
 
 
 # ------------------------------------------------------------------ grid + fills
@@ -481,7 +351,7 @@ def obs_fallback(node):
 
 
 def _attach_observations(node, cache):
-    if not node.get("wip"):
+    if not (node.get("wip") or node.get("stub")):
         h = obs_hash(node)
         node["obsHash"] = h
         entry = cache.get(node["key"])
@@ -567,11 +437,16 @@ def _build_leaf(conn, node, dot_dates, ai_dates, today):
 def _build(conn, node, dot_dates, ai_dates, today):
     if node.get("wip"):
         return {"key": node["key"], "label": node["label"], "wip": True}
+    if node.get("stub"):
+        # A discovered-but-inactive metric (credential-gated or disabled): shown
+        # in the sidebar tree as available, never computed, never blended.
+        return {"key": node["key"], "label": node["label"], "stub": True,
+                "requires": node.get("requires", "credentials required")}
     if "metric" in node:
         return _build_leaf(conn, node, dot_dates, ai_dates, today)
     kids = [_build(conn, c, dot_dates, ai_dates, today) for c in node["children"]]
-    live = [k for k in kids if k and not k.get("wip")]
-    placeholders = [k for k in kids if k and k.get("wip")]
+    live = [k for k in kids if k and not (k.get("wip") or k.get("stub"))]
+    placeholders = [k for k in kids if k and (k.get("wip") or k.get("stub"))]
     if not live:
         return None
     # A parent blends only its CONFORMING inputs, so a non-conforming child is shown
@@ -607,6 +482,9 @@ def _emit(node, dw, aw):
     """Recursively build the weekly payload node (arrays downsampled to weekly)."""
     if node.get("wip"):
         return {"key": node["key"], "label": node["label"], "wip": True}
+    if node.get("stub"):
+        return {"key": node["key"], "label": node["label"], "stub": True,
+                "requires": node["requires"]}
     out = {"key": node["key"], "label": node["label"], "display": node["display"],
            "valid": node.get("valid", True), "validation": node.get("validation"),
            "intensityDot": _pick(node["_intDot"], dw), "intensityAi": _pick(node["_intAi"], aw)}
@@ -643,7 +521,8 @@ def compute_thennow(conn):
     today = _today()
     dot_dates = _grid(CLOCK["start"], CLOCK["bottom"])
     ai_dates = _grid(CLOCK["aiStart"], today.isoformat())
-    root = _build(conn, THENNOW_TREE, dot_dates, ai_dates, today)
+    from . import registry
+    root = _build(conn, registry.build_tree(), dot_dates, ai_dates, today)
     if not root:
         return None
 

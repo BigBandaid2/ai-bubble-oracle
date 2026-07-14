@@ -129,6 +129,9 @@
   .slabel { flex: 1; min-width: 0; font-size: 13.5px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .schildren { margin-left: 15px; border-left: 1px solid var(--border); padding-left: 9px; }
   .schildren.collapsed { display: none; }
+  /* committed-but-inactive metric (credential-gated): tree-only stub */
+  .stubtag { flex-shrink: 0; font: 600 9px/1 var(--mono); letter-spacing: .4px; text-transform: uppercase;
+    color: var(--muted2); border: 1px solid var(--border); border-radius: 5px; padding: 3px 6px; white-space: nowrap; }
   .tree .legend2 { margin: 16px 8px 0; padding-top: 14px; border-top: 1px solid var(--border); font-size: 12.5px; color: var(--muted); }
   .tree .legend2 .r { display: flex; align-items: center; gap: 9px; padding: 3px 0; }
 
@@ -299,6 +302,7 @@
     <div class="legend2">
       <div class="r"><span class="sdot live"></span> Leaf with a projection</div>
       <div class="r"><span class="sdot nop"></span> Leaf with no projection (counter-argument)</div>
+      <div class="r" id="legend-stub" style="display:none"><span class="sdot wip"></span> In the repo, needs credentials (run locally)</div>
     </div>
   </aside>
 </div>
@@ -517,11 +521,13 @@ function drawMini(canvas, n) {
 /* ---------- CARDS ---------- */
 const MINIS = [];
 let SORT = (function () { try { return localStorage.getItem("tn_sort") || "tree"; } catch (e) { return "tree"; } })();
-function orderedChildren(node) { return (node.children || []).slice().sort((a, b) => (a.wip ? 1 : 0) - (b.wip ? 1 : 0)); }
+function orderedChildren(node) { return (node.children || []).slice().sort((a, b) => ((a.wip || a.stub) ? 1 : 0) - ((b.wip || b.stub) ? 1 : 0)); }
 function treeOrderNodes() { const out = []; (function walk(n) { out.push(n); orderedChildren(n).forEach(walk); })(DATA.tree); return out; }
 function isHidden(n) { let p = PARENT[n.key]; while (p) { if (collapsed.has(p.key)) return true; p = PARENT[p.key]; } return false; }
 function visibleCards() {
-  let list = treeOrderNodes().filter(n => !isHidden(n));   // collapsing a branch hides its cards
+  // collapsing a branch hides its cards; stubs (inactive credential-gated
+  // metrics) render in the tree only, never as cards
+  let list = treeOrderNodes().filter(n => !isHidden(n) && !n.stub);
   if (SORT === "alpha") list = list.slice().sort((a, b) => a.label.localeCompare(b.label));
   else if (SORT === "date") list = list.slice().sort((a, b) => {
     const av = a.valid === false, bv = b.valid === false;
@@ -569,20 +575,24 @@ function renderAll() { renderCards(); renderTree(); }
 function renderTree() {
   el("tree").innerHTML = ""; el("tree").appendChild(treeNode(DATA.tree));
   el("treetoggle").textContent = collapsed.size ? "Expand all" : "Collapse all";
+  const hasStubs = Object.values(NODES).some(n => n.stub);
+  el("legend-stub").style.display = hasStubs ? "" : "none";
 }
 function treeNode(n) {
   const wrap = document.createElement("div"); wrap.className = "snode";
   const row = document.createElement("div");
   const isBranch = PARENT[n.key] && PARENT[n.key].key === ROOT_KEY;   // top-level branch row → accent stripe
-  const nop = !n.wip && n.valid === false;
-  row.className = "srow" + (n.wip ? " wip" : "") + (isBranch ? " branch" : "") + (nop ? " dim" : "");
+  const inert = n.wip || n.stub;   // stub = committed metric awaiting credentials
+  const nop = !inert && n.valid === false;
+  row.className = "srow" + (inert ? " wip" : "") + (isBranch ? " branch" : "") + ((nop || n.stub) ? " dim" : "");
   if (isBranch) row.style.setProperty("--brc", branchVar(n));
   const kids = orderedChildren(n), hasKids = kids.length > 0;
-  const dot = hasKids ? "" : `<span class="sdot ${n.wip ? "wip" : nop ? "nop" : "live"}"></span>`;   // leaf-only
+  const dot = hasKids ? "" : `<span class="sdot ${inert ? "wip" : nop ? "nop" : "live"}"></span>`;   // leaf-only
   row.innerHTML =
     `<span class="caret${hasKids ? "" : " leaf"}">${collapsed.has(n.key) ? "▸" : "▾"}</span>` + dot +
-    `<span class="slabel">${n.label}</span>`;
-  if (!n.wip) row.addEventListener("click", e => { if (!e.target.closest(".caret")) openNode(n.key); });
+    `<span class="slabel">${n.label}</span>` +
+    (n.stub ? `<span class="stubtag" title="Committed in the repo; run locally with your own credentials">${n.requires}</span>` : "");
+  if (!inert) row.addEventListener("click", e => { if (!e.target.closest(".caret")) openNode(n.key); });
   wrap.appendChild(row);
   if (hasKids) {
     const box = document.createElement("div"); box.className = "schildren" + (collapsed.has(n.key) ? " collapsed" : "");
@@ -609,7 +619,7 @@ const LEG_PROJ =
 // a non-conforming metric draws no projection/peak/bottom, so its legend omits them
 function legendFor(n) { return n.valid === false ? LEG_BASE : LEG_BASE + LEG_PROJ; }
 function openNode(key) {
-  const n = NODES[key]; if (!n || n.wip) return; CUR = n;
+  const n = NODES[key]; if (!n || n.wip || n.stub) return; CUR = n;
   el("m-crumb").innerHTML = crumbOf(n).map((c, i, a) => `${i ? '<span class="sep">›</span>' : ''}<span class="${i === a.length - 1 ? 'here' : ''}">${c.label}</span>`).join("");
   setHead(n);
   el("m-legend").innerHTML = legendFor(n);
@@ -877,7 +887,7 @@ function wireSmoothToggle() { wireToggle("smooth-toggle", () => SMOOTH, applySmo
 function recomputeTree() {
   (function walk(n) {
     (n.children || []).forEach(walk);
-    if (n.wip) return;
+    if (n.wip || n.stub) return;
     if (n.leaf) Object.assign(n, evaluate(n.intensityDot, n.intensityAi));
     else recompute(n);
   })(DATA.tree);

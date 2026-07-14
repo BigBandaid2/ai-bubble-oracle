@@ -16,7 +16,7 @@ import time
 from datetime import datetime, timezone
 
 from oracle import db, registry
-from oracle.config import SP500_TICKER, THENNOW_TICKERS, TICKERS
+from oracle.config import SP500_TICKER, TICKERS
 from oracle.dashboard import write_dashboard
 from oracle.datasources import write_datasources
 from oracle.observe import refresh_observations
@@ -28,9 +28,10 @@ from oracle.yahoo import fetch_history, YahooError
 
 
 def cmd_update(conn):
-    # Condition tickers, the S&P 500 context series, and the long-history
-    # Then-and-Now series (^IXIC etc). dict.fromkeys dedupes if any overlap.
-    for ticker in dict.fromkeys(TICKERS + [SP500_TICKER] + THENNOW_TICKERS):
+    registry.report()
+    # Condition tickers, the S&P 500 context series, and every ticker the
+    # ACTIVE metric registry reads (kind "prices"). dict.fromkeys dedupes.
+    for ticker in dict.fromkeys(TICKERS + [SP500_TICKER] + registry.required_tickers()):
         days = 90 if db.has_prices(conn, ticker) else None
         try:
             bars = fetch_history(ticker, days)
@@ -166,6 +167,7 @@ def main():
         elif args.command == "events":
             cmd_events(conn)
         elif args.command == "html":
+            registry.report()
             print(f"dashboard written:   {write_dashboard(conn)}")
             print(f"datasources written: {write_datasources(conn)}")
             print(f"thennow written:     {write_thennow_page(conn)}")

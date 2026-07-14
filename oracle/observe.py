@@ -93,7 +93,7 @@ def refresh_observations(conn):
 
     def walk(node):
         nonlocal changed
-        if not node.get("wip"):
+        if not (node.get("wip") or node.get("stub")):
             h = node.get("obsHash") or obs_hash(node)
             entry = cache.get(node["key"])
             if not entry or entry.get("hash") != h:
