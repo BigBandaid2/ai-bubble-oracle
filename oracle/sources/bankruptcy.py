@@ -25,8 +25,8 @@ import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
 
-from .config import PROJECT_DIR
-from . import db
+from ..config import PROJECT_DIR
+from .. import db
 
 SEARCH_URL = "https://www.courtlistener.com/api/rest/v4/search/"
 USER_AGENT = "ai-bubble-oracle/1.0 (public data monitor; github.com/BigBandaid2/ai-bubble-oracle)"
@@ -98,3 +98,22 @@ def export_bankruptcy_csv(conn):
         for r in rows:
             w.writerow([r["date"], r["entity"], r["candidates"]])
     return len(rows)
+
+
+def update(conn):
+    # Bankruptcy conditions: daily CourtListener docket scan (candidates only
+    # count after human confirmation in config.CONFIRMED_BANKRUPTCIES).
+    import_bankruptcy_csv(conn)
+    scans = scan_all(conn)
+    for entity, r in scans.items():
+        print(f"Bankruptcy scan ({entity}): {r['candidates']} candidate Ch.7/11 filings")
+    bk_kept = export_bankruptcy_csv(conn)
+    print(f"Bankruptcy history: {bk_kept} scan rows in data/bankruptcy_history.csv")
+
+
+SOURCE = {
+    "kind": "bankruptcy", "label": "CourtListener/RECAP docket scan",
+    "requires": [], "redistributable": True, "csv": "data/bankruptcy_history.csv",
+    "ddl": None, "order": 70, "date_col": "date", "value_col": "candidates",
+    "update": update, "load": None,
+}

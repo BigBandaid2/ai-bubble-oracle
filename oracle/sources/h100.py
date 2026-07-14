@@ -19,8 +19,8 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from .config import PROJECT_DIR
-from . import db
+from ..config import PROJECT_DIR
+from .. import db
 
 # The only data that must persist between runs (Yahoo prices are re-fetchable,
 # but Vast.ai exposes only current offers). Kept as a small committed CSV so the
@@ -111,3 +111,30 @@ def export_h100_csv(conn):
                         "" if r["low"] is None else r["low"],
                         "" if r["n"] is None else r["n"]])
     return len(rows)
+
+
+def update(conn):
+    # H100 rental proxy (condition 5). Restore accumulated readings from the
+    # committed CSV, seed the published index points (both tiers), append
+    # today's live Vast.ai proxy reading, then persist back to the CSV.
+    from datetime import datetime, timezone
+    restored = import_h100_csv(conn)
+    for d, index_type, src, val in SEED_POINTS:
+        db.upsert_h100(conn, d, index_type, src, val)
+    proxy = fetch_h100_proxy()
+    if proxy:
+        today = datetime.now(timezone.utc).date().isoformat()
+        db.upsert_h100(conn, today, "neocloud", "vast_proxy", proxy["usd_hr"], proxy["low"], proxy["n"])
+        print(f"H100 neocloud proxy: median ${proxy['usd_hr']}/hr (low ${proxy['low']}, n={proxy['n']})")
+    else:
+        print("H100 proxy: fetch failed (kept prior readings)")
+    kept = export_h100_csv(conn)
+    print(f"H100 history: restored {restored}, now {kept} readings in data/h100_history.csv")
+
+
+SOURCE = {
+    "kind": "h100", "label": "H100 rental proxy (Vast.ai + published seeds)",
+    "requires": [], "redistributable": True, "csv": "data/h100_history.csv",
+    "ddl": None, "order": 50, "date_col": "date", "value_col": "usd_hr",
+    "update": update, "load": None,
+}

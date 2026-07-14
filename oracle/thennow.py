@@ -204,22 +204,20 @@ def _grid(start_iso, end_iso):
     return [(d0 + timedelta(days=i)).isoformat() for i in range((d1 - d0).days + 1)]
 
 
-# Per-source loader, plus the column each source contributes when it appears as
-# one leg of a composite (and the date column, where it isn't literally "date").
+# Per-source loading goes through the registry: every source module in
+# oracle/sources/ declares its loader plus the date/value columns the engine
+# reads through, so adding a source never touches this file.
+def _source(kind):
+    from . import registry
+    try:
+        return registry.sources()[kind]
+    except KeyError:
+        raise RuntimeError(f"metric references unknown source kind {kind!r}") from None
+
+
 def _load_rows(conn, src, arg):
-    if src == "prices":
-        return db.load_prices(conn, arg)
-    if src == "cape":
-        return db.load_cape(conn)
-    if src == "fred":
-        return db.load_fred(conn, arg)
-    if src == "ipo":
-        return db.load_ipo(conn)
-    return []
-
-
-_SCALAR_COL = {"prices": "close", "cape": "cape", "fred": "value", "ipo": "avg_first_day_return"}
-_DATE_COL = {"ipo": "month"}
+    loader = _source(src).get("load")
+    return loader(conn, arg) if loader else []
 
 
 def _load_metric(conn, metric):
@@ -233,7 +231,8 @@ def _load_metric(conn, metric):
     if "series" in metric:
         maps = {}
         for alias, (src, arg) in metric["series"].items():
-            dcol, scol = _DATE_COL.get(src, "date"), _SCALAR_COL[src]
+            spec = _source(src)
+            dcol, scol = spec["date_col"], spec["value_col"]
             maps[alias] = {r[dcol]: r[scol] for r in _load_rows(conn, src, arg)
                            if r[scol] is not None}
         if not maps or any(not m for m in maps.values()):
@@ -251,7 +250,7 @@ def _load_metric(conn, metric):
         return out
     src, arg = metric["source"]
     rows = _load_rows(conn, src, arg)
-    dcol = _DATE_COL.get(src, "date")
+    dcol = _source(src)["date_col"]
     out = []
     for r in rows:
         try:

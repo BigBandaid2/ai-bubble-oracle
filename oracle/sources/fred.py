@@ -19,8 +19,8 @@ import time
 import urllib.error
 import urllib.request
 
-from .config import PROJECT_DIR
-from . import db
+from ..config import PROJECT_DIR
+from .. import db
 
 FRED_CSV_URL = "https://fred.stlouisfed.org/graph/fredgraph.csv?id={series}"
 FRED_CSV = PROJECT_DIR / "data" / "fred_history.csv"
@@ -128,3 +128,24 @@ def export_fred_csv(conn):
         for r in rows:
             w.writerow([r["series_id"], r["date"], r["value"]])
     return len(rows)
+
+
+def update(conn):
+    # FRED macro series (Then-and-Now leaves: capex share, margin loans, semis,
+    # Buffett numerator, yield curve, sentiment). Keyless; committed CSV is the
+    # outage fallback, and one failed series never blanks the rest.
+    fred_restored = import_fred_csv(conn)
+    fred_counts = fetch_all_fred(conn)
+    ok = sum(1 for n in fred_counts.values() if n)
+    print(f"FRED: {ok}/{len(fred_counts)} series fetched "
+          f"({sum(fred_counts.values())} rows; {fred_restored} restored from CSV)")
+    fred_kept = export_fred_csv(conn)
+    print(f"FRED history: {fred_kept} rows in data/fred_history.csv")
+
+
+SOURCE = {
+    "kind": "fred", "label": "FRED macro series (keyless fredgraph.csv)",
+    "requires": [], "redistributable": True, "csv": "data/fred_history.csv",
+    "ddl": None, "order": 30, "date_col": "date", "value_col": "value",
+    "update": update, "load": lambda conn, arg: db.load_fred(conn, arg),
+}

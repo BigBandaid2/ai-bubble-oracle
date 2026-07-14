@@ -122,7 +122,7 @@ def _docket_json(conn, node, master, spikes=None):
     slow release), the candidate counts, and a met bitstring that is all-zero
     unless the entity has a human-confirmed filing in CONFIRMED_BANKRUPTCIES, neither buzz nor a scan hit ever flips it.
     """
-    from .buzz import compute_buzz, get_news_k
+    from .sources.buzz import compute_buzz, get_news_k
     rows = db.load_bankruptcy(conn, node["entity"])
     if not rows:
         return {"key": node["key"], "label": node["label"], "type": "manual",
@@ -220,7 +220,7 @@ def _sp500_json(conn, master):
 
 
 def build_payload(conn):
-    from .buzz import find_notable_spikes
+    from .sources.buzz import find_notable_spikes
     spikes, _ = find_notable_spikes(conn)
 
     leaves = drawdown_leaves()

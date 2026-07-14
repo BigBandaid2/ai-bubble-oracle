@@ -15,8 +15,8 @@ import urllib.error
 import urllib.request
 from datetime import datetime, timezone
 
-from .config import PROJECT_DIR
-from . import db
+from ..config import PROJECT_DIR
+from .. import db
 
 # YES (outcome index 0) CLOB token id for "AI bubble burst in 2026?"
 # (event ai-bubble-burst-by; market created 2025-11-20). The prices-history
@@ -66,3 +66,26 @@ def export_polymarket_csv(conn):
         for r in rows:
             w.writerow([r["date"], r["yes_prob"]])
     return len(rows)
+
+
+def update(conn):
+    # Polymarket's own implied YES-probability over time. Full history is
+    # re-fetchable; the CSV is a fallback so a stalled API doesn't blank the chart.
+    pm_restored = import_polymarket_csv(conn)
+    pm_hist = fetch_market_history()
+    if pm_hist:
+        db.upsert_polymarket(conn, pm_hist)
+        print(f"Polymarket: fetched {len(pm_hist)} daily points "
+              f"({pm_hist[0][0]}..{pm_hist[-1][0]}, latest {pm_hist[-1][1] * 100:.0f}% YES)")
+    else:
+        print(f"Polymarket: fetch failed (kept {pm_restored} cached points)")
+    pm_kept = export_polymarket_csv(conn)
+    print(f"Polymarket history: {pm_kept} points in data/polymarket_history.csv")
+
+
+SOURCE = {
+    "kind": "polymarket", "label": "Polymarket CLOB (market YES probability)",
+    "requires": [], "redistributable": True, "csv": "data/polymarket_history.csv",
+    "ddl": None, "order": 60, "date_col": "date", "value_col": "yes_prob",
+    "update": update, "load": None,
+}

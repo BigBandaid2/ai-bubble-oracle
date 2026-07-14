@@ -18,8 +18,8 @@ import urllib.error
 import urllib.request
 from datetime import datetime
 
-from .config import PROJECT_DIR
-from . import db
+from ..config import PROJECT_DIR
+from .. import db
 
 CAPE_URL = "https://www.multpl.com/shiller-pe/table/by-month"
 CAPE_CSV = PROJECT_DIR / "data" / "cape_history.csv"
@@ -98,3 +98,26 @@ def export_cape_csv(conn):
         for r in rows:
             w.writerow([r["date"], r["cape"]])
     return len(rows)
+
+
+def update(conn):
+    # Shiller CAPE valuation multiple (Then-and-Now valuation leaf). Re-fetchable;
+    # the committed CSV is a fallback so a stalled fetch doesn't blank the leaf.
+    cape_restored = import_cape_csv(conn)
+    cape_rows = fetch_cape()
+    if cape_rows:
+        db.upsert_cape(conn, cape_rows)
+        print(f"CAPE: fetched {len(cape_rows)} monthly points "
+              f"({cape_rows[0][0]}..{cape_rows[-1][0]}, latest {cape_rows[-1][1]})")
+    else:
+        print(f"CAPE: fetch failed (kept {cape_restored} cached points)")
+    cape_kept = export_cape_csv(conn)
+    print(f"CAPE history: {cape_kept} points in data/cape_history.csv")
+
+
+SOURCE = {
+    "kind": "cape", "label": "Shiller CAPE via multpl.com",
+    "requires": [], "redistributable": True, "csv": "data/cape_history.csv",
+    "ddl": None, "order": 20, "date_col": "date", "value_col": "cape",
+    "update": update, "load": lambda conn, arg: db.load_cape(conn),
+}

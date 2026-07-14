@@ -33,8 +33,8 @@ import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta, timezone
 
-from .config import PROJECT_DIR
-from . import db
+from ..config import PROJECT_DIR
+from .. import db
 from .bankruptcy import ENTITIES, USER_AGENT, SEARCH_URL
 
 GDELT_URL = "https://api.gdeltproject.org/api/v2/doc/doc"
@@ -571,3 +571,30 @@ def export_buzz_csv(conn):
                             "" if r["dockets_total"] is None else r["dockets_total"]])
                 n += 1
     return n
+
+
+def update(conn):
+    # Bankruptcy-buzz signals (GDELT news volume + litigation pulse). The
+    # coefficient itself is computed at page-generation time.
+    import_buzz_csv(conn)
+    did_backfill = update_signals(conn)
+    bz_kept = export_buzz_csv(conn)
+    print(f"Buzz history: {bz_kept} signal rows in data/buzz_history.csv")
+
+    # Notable buzz spikes: pick the news item behind each. Skip on backfill runs
+    # so the heavy GDELT timeline call and the article calls don't stack up.
+    import_buzz_events_csv(conn)
+    if did_backfill:
+        print("Buzz events: skipped this run (news backfill ran; GDELT cooldown)")
+    else:
+        update_buzz_events(conn)
+    ev_kept = export_buzz_events_csv(conn)
+    print(f"Buzz events: {ev_kept} cached articles in data/buzz_events.csv")
+
+
+SOURCE = {
+    "kind": "buzz", "label": "GDELT news-buzz signals + spike articles",
+    "requires": [], "redistributable": True, "csv": "data/buzz_history.csv",
+    "ddl": None, "order": 80, "date_col": "date", "value_col": "news_share",
+    "update": update, "load": None,
+}

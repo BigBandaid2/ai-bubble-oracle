@@ -14,8 +14,8 @@ live fetch; the import is idempotent. Months with no IPOs carry a NULL return
 
 import csv
 
-from .config import PROJECT_DIR
-from . import db
+from ..config import PROJECT_DIR
+from .. import db
 
 IPO_CSV = PROJECT_DIR / "data" / "ipo_issuance.csv"
 
@@ -42,3 +42,17 @@ def import_ipo_csv(conn):
     if rows:
         db.upsert_ipo(conn, rows)
     return len(rows)
+
+
+def update(conn):
+    # IPO froth seed (Ritter monthly stats; authored CSV, refreshed ~annually).
+    ipo_rows = import_ipo_csv(conn)
+    print(f"IPO seed: {ipo_rows} monthly rows from data/ipo_issuance.csv")
+
+
+SOURCE = {
+    "kind": "ipo", "label": "IPO stats seed (Ritter, Univ. of Florida)",
+    "requires": [], "redistributable": True, "csv": "data/ipo_issuance.csv",
+    "ddl": None, "order": 40, "date_col": "month", "value_col": "avg_first_day_return",
+    "update": update, "load": lambda conn, arg: db.load_ipo(conn),
+}

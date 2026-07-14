@@ -117,6 +117,18 @@ CREATE TABLE IF NOT EXISTS ipo_issuance (
     ipo_count_gross      INTEGER,
     ipo_count_net        INTEGER
 );
+
+-- Generic keyed-series store for CONTRIBUTED sources (see oracle/registry.py
+-- and oracle/sources/_generic.py): a source that stores plain dated values can
+-- use this table and never needs to edit this file. Bespoke schemas remain
+-- possible via a SOURCE spec's `ddl` field.
+CREATE TABLE IF NOT EXISTS ext_series (
+    source_kind TEXT NOT NULL,
+    series_id   TEXT NOT NULL,
+    date        TEXT NOT NULL,
+    value       REAL NOT NULL,
+    PRIMARY KEY (source_kind, series_id, date)
+);
 """
 
 
@@ -194,6 +206,29 @@ def load_fred(conn, series_id):
 def load_fred_all(conn):
     return conn.execute(
         "SELECT series_id, date, value FROM fred_series ORDER BY series_id, date"
+    ).fetchall()
+
+
+def upsert_ext(conn, kind, series_id, rows):
+    """rows: iterable of (date_iso, value_float). Generic contributed-source store."""
+    conn.executemany(
+        "INSERT OR REPLACE INTO ext_series (source_kind, series_id, date, value) VALUES (?, ?, ?, ?)",
+        [(kind, series_id, d, v) for d, v in rows],
+    )
+    conn.commit()
+
+
+def load_ext(conn, kind, series_id):
+    return conn.execute(
+        "SELECT date, value FROM ext_series WHERE source_kind = ? AND series_id = ? ORDER BY date",
+        (kind, series_id),
+    ).fetchall()
+
+
+def load_ext_all(conn, kind):
+    return conn.execute(
+        "SELECT series_id, date, value FROM ext_series WHERE source_kind = ? ORDER BY series_id, date",
+        (kind,),
     ).fetchall()
 
 
