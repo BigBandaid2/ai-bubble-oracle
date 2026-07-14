@@ -184,3 +184,29 @@ in the preview (no console errors on any page).
   was replaced with **"analogy"** everywhere (templates, engine copy, the LLM prompt
   + fallback, the committed observation cache, About). Cached Haiku observations were
   edited in place; the shape-hash is state-based, so this doesn't trigger regen.
+
+## (e) OSS refactor addendum (2026-07-14, phases P0-P6)
+
+- **The module system is live.** A metric is one file in `oracle/metrics/`
+  (engine declaration + `ir` documentation block); a source is one file in
+  `oracle/sources/`. `oracle/registry.py` discovers, lints, gates
+  (`requires` env vars + `enabled_by_default`/`ORACLE_ENABLE`/`ORACLE_DISABLE`),
+  assembles the tree, and orders the Data Sources IR. Payload proofs: P1 and P2
+  byte-equal to the pre-refactor baseline; P4 added exactly `DATA.ir` +
+  `DATA.srcGroups`. The datasources template lost ~101KB of hand-maintained
+  tn_ literals after an in-browser dual-build matched all 18 groups.
+- **Two deliberate micro-diffs, documented here.** (1) IR asset order is now
+  the tree's post-order walk, so `int_valuation_blend` is emitted after the
+  Buffett chain instead of before it; the only visible effect is the ordering
+  of downstream pills on a couple of shared asset pages (e.g.
+  `int_bf_intensity`). (2) Stale post-P1 paths inside the Data Sources prose
+  (`oracle/fred.py` etc.) were corrected to `oracle/sources/*`.
+- **Root redirect fixed to the landing page.** `vercel.json` still sent `/`
+  to `dashboard.html` from before the design-integration phase made Then & Now
+  the landing; it now redirects to `/thennow.html` (Polymarket stays in the nav).
+- **Docs shipped:** README rewrite (Then & Now-first, module system,
+  adopt-for-your-own-analysis, data-licensing table), CONTRIBUTING.md,
+  docs/ADDING-A-METRIC.md, issue/PR templates, `.env.example`,
+  `oracle/metrics/_template.py` (the credential-gated skeleton, also the CI
+  lint fixture). PR CI (`pr-check.yml`) = compileall + `main.py check` +
+  `verify-pages`, deterministic and credential-free.
