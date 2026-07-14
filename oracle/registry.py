@@ -195,3 +195,146 @@ def report():
         details = "; ".join(f"{m['key']}: {r}" for m, r in stubs)
         line += f" · {len(stubs)} stub ({details})"
     print(line)
+
+
+# -------------------------------------------------------------------- spec lint
+_CADENCES = {"daily", "weekly", "monthly", "quarterly", "annual"}
+_TYPES = {"ratio_from_start", "absolute_level"}
+_DIRECTIONS = {"up", "down"}
+
+
+def _lint_metric(spec, srcs, branch_keys, errs, where):
+    def bad(msg):
+        errs.append(f"{where}: {msg}")
+
+    for field in ("key", "label", "parent", "kind", "formula", "cadence",
+                  "type", "direction", "unit", "unitLabel"):
+        if field not in spec:
+            bad(f"missing required field {field!r}")
+    if ("source" in spec) == ("series" in spec):
+        bad("must declare exactly one of 'source' or 'series'")
+    if spec.get("cadence") not in _CADENCES:
+        bad(f"cadence must be one of {sorted(_CADENCES)}")
+    if spec.get("type") not in _TYPES:
+        bad(f"type must be one of {sorted(_TYPES)}")
+    if spec.get("direction") not in _DIRECTIONS:
+        bad("direction must be 'up' or 'down'")
+    if spec.get("parent") not in branch_keys:
+        bad(f"parent {spec.get('parent')!r} is not a known branch key")
+    if not isinstance(spec.get("order", 0), int):
+        bad("order must be an int")
+    if not isinstance(spec.get("requires", []), list) or \
+            not all(isinstance(v, str) for v in spec.get("requires", [])):
+        bad("requires must be a list of env-var name strings")
+    # every referenced source kind must be registered
+    probe_row = {}
+    try:
+        for kind in _source_kinds(spec):
+            src = srcs.get(kind)
+            if src is None:
+                bad(f"references unregistered source kind {kind!r}")
+            elif "series" not in spec:
+                probe_row[src["value_col"]] = 1.0
+        if "series" in spec:
+            probe_row = {alias: 1.0 for alias in spec["series"]}
+    except (KeyError, TypeError):
+        bad("malformed source/series declaration")
+    # formula probe: synthetic row; only the engine-tolerated exceptions allowed
+    f = spec.get("formula")
+    if not callable(f):
+        bad("formula must be callable")
+    elif probe_row:
+        try:
+            f(probe_row)
+        except (KeyError, TypeError, ZeroDivisionError):
+            pass                       # engine tolerates these per-row
+        except Exception as e:         # noqa: BLE001 — lint reports anything else
+            bad(f"formula raised {type(e).__name__} on a synthetic row: {e}")
+    # IR (optional until the datasources chains are payload-driven) must be JSON
+    if "ir" in spec:
+        import json
+        try:
+            json.dumps(spec["ir"])
+        except (TypeError, ValueError) as e:
+            bad(f"ir is not JSON-serializable: {e}")
+
+
+def _lint_source(spec, errs, where):
+    def bad(msg):
+        errs.append(f"{where}: {msg}")
+
+    for field in ("kind", "label", "requires", "redistributable", "csv",
+                  "date_col", "value_col"):
+        if field not in spec:
+            bad(f"missing required field {field!r}")
+    if spec.get("redistributable") is False and spec.get("csv") is not None:
+        bad("redistributable: False requires csv: None (licensed data must never be committed)")
+    if not isinstance(spec.get("requires", []), list):
+        bad("requires must be a list of env-var name strings")
+    for fn in ("update", "load"):
+        if spec.get(fn) is not None and not callable(spec[fn]):
+            bad(f"{fn} must be callable or None")
+
+
+def check():
+    """The contributor-contract lint. Returns a list of problem strings (empty
+    = green). Covers every DISCOVERED module plus the _template.py fixture, the
+    repo-level data-licensing rule, the workflow guard, and the templates'
+    __DATA__ sentinels. Runs with no network and no credentials."""
+    from .config import PROJECT_DIR
+    errs = []
+
+    srcs = sources()
+    for kind, s in srcs.items():
+        _lint_source(s, errs, f"source {kind}")
+        # licensed sources must have no committed data for their kind
+        if s.get("redistributable") is False:
+            ext = PROJECT_DIR / "data" / f"ext_{kind}.csv"
+            if ext.exists():
+                errs.append(f"source {kind}: redistributable=False but {ext.name} is committed")
+
+    metrics, branches = _discover_metrics()
+    branch_keys = {b["key"] for b in branches} | {"ai_peak"}
+    for b in branches:
+        for field in ("key", "label", "parent", "order"):
+            if field not in b:
+                errs.append(f"branch {b.get('key', '?')}: missing {field!r}")
+    for m in metrics:
+        _lint_metric(m, srcs, branch_keys, errs, f"metric {m.get('key', '?')}")
+
+    # the underscore template is not discovered; lint it explicitly so the
+    # credential-gating path is exercised on every CI run
+    tpl_path = PROJECT_DIR / "oracle" / "metrics" / "_template.py"
+    if tpl_path.exists():
+        tpl = importlib.import_module("oracle.metrics._template")
+        t_metric = getattr(tpl, "METRIC", None)
+        t_source = getattr(tpl, "SOURCE", None)
+        if t_metric is None or t_source is None:
+            errs.append("_template.py must export both METRIC and SOURCE")
+        else:
+            _lint_source(t_source, errs, "template source")
+            _lint_metric(t_metric, {**srcs, t_source["kind"]: t_source},
+                         branch_keys, errs, "template metric")
+            if t_metric.get("enabled_by_default", True):
+                errs.append("_template.py METRIC must set enabled_by_default: False")
+            if not t_metric.get("requires") and not t_source.get("requires"):
+                errs.append("_template.py must declare `requires` (it demonstrates credential gating)")
+            if is_active(t_metric):
+                errs.append("_template.py fixture unexpectedly ACTIVE (env leak into lint?)")
+            ext = PROJECT_DIR / "data" / f"ext_{t_source['kind']}.csv"
+            if t_source.get("redistributable") is False and ext.exists():
+                errs.append(f"template source: redistributable=False but {ext.name} is committed")
+
+    # the public site must stay public-data-only: the nightly Action never
+    # activates gated modules
+    wf = PROJECT_DIR / ".github" / "workflows" / "daily-update.yml"
+    if wf.exists() and "ORACLE_ENABLE" in wf.read_text(encoding="utf-8"):
+        errs.append("daily-update.yml must not set ORACLE_ENABLE (public site is public-data-only)")
+
+    # each template carries exactly one __DATA__ sentinel (verify-pages relies on it)
+    for tmpl in ("thennow_template.html", "dashboard_template.html", "datasources_template.html"):
+        n = (PROJECT_DIR / "oracle" / tmpl).read_text(encoding="utf-8").count("__DATA__")
+        if n != 1:
+            errs.append(f"oracle/{tmpl}: expected exactly one __DATA__ sentinel, found {n}")
+
+    return errs

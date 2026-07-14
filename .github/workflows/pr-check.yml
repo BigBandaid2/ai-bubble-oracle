@@ -1,0 +1,51 @@
+name: PR check
+
+# Deterministic contributor checks: no network, no credentials, no database.
+# 1. everything compiles
+# 2. `main.py check` — the module-spec lint (metric/source contracts, the
+#    _template.py gating fixture, the data-licensing rule, the ORACLE_ENABLE
+#    workflow guard, template sentinels)
+# 3. `main.py verify-pages` — each committed page must be its template with
+#    the __DATA__ sentinel replaced (catches template/page drift)
+# A full live-fetch build is available as a separate manually-dispatched job.
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile
+        run: python -m compileall -q oracle main.py
+      - name: Module spec lint
+        run: python main.py check
+      - name: Template/page parity
+        run: python main.py verify-pages
+
+  # Maintainer smoke test: a real end-to-end update (network; optional
+  # ANTHROPIC key; nothing is committed). Run from the Actions tab against a
+  # PR branch when a change touches fetchers.
+  full-build:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Full update (no commit)
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: python main.py update
+      - name: Parity after build
+        run: python main.py verify-pages

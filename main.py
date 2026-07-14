@@ -108,6 +108,20 @@ def cmd_payload(conn, out_dir=None):
         print(text)
 
 
+def cmd_check():
+    """The contributor-contract spec lint (no network, no credentials, no db):
+    validates every discovered metric/source module, the _template.py fixture,
+    the data-licensing rule, the workflow guard, and the template sentinels."""
+    errs = registry.check()
+    if errs:
+        for e in errs:
+            print(f"FAIL {e}")
+        print(f"\ncheck: {len(errs)} problem(s)")
+        sys.exit(1)
+    registry.report()
+    print("check: all module specs green")
+
+
 def cmd_verify_pages():
     """Template <-> generated parity, no db needed: each generated page must be
     its template with the single __DATA__ sentinel replaced by a JSON payload.
@@ -146,12 +160,15 @@ def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("command", nargs="?", default="status",
                    choices=["update", "status", "events", "html", "datasources", "thennow",
-                            "payload", "verify-pages"])
+                            "payload", "verify-pages", "check"])
     p.add_argument("--out", help="directory for `payload` output (default: stdout)")
     args = p.parse_args()
 
     if args.command == "verify-pages":
         cmd_verify_pages()
+        return
+    if args.command == "check":
+        cmd_check()
         return
 
     conn = db.connect()
