@@ -223,3 +223,11 @@ schtasks /Create /TN "AI Bubble Oracle" /SC DAILY /ST 17:15 /TR "python C:\works
 - **Phase 5 — Polymarket/UMA integration:** market price via the public
   gamma/CLOB APIs; watch oracle.uma.xyz for resolution proposals on this
   condition id (dispute window is ~2 hours).
+
+## License
+
+The code is licensed under the **Apache License 2.0** (see [LICENSE](LICENSE)).
+Files under `data/` are data, not code: each is derived from a third-party
+source and carries that source's own terms, recorded in a `#` provenance header
+inside each authored CSV and in full on the site's Data Sources page (see
+[NOTICE](NOTICE)).

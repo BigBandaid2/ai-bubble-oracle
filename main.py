@@ -165,10 +165,73 @@ def cmd_events(conn):
               f"  [{e['condition_key']}]")
 
 
+def cmd_payload(conn, out_dir=None):
+    """Dump the two engine payloads as stable (sorted, indented) JSON, for
+    payload-equality diffs across refactors. CI and the contributor dev loop
+    both rely on this staying deterministic for a fixed oracle.db."""
+    import json
+    from oracle.thennow import compute_thennow
+    from oracle.datasources import build_payload
+    payloads = {
+        "thennow": compute_thennow(conn),
+        "datasources": build_payload(conn),
+    }
+    text = json.dumps(payloads, indent=1, sort_keys=True, default=str)
+    if out_dir:
+        from pathlib import Path
+        p = Path(out_dir) / "payload.json"
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(text, encoding="utf-8")
+        print(f"payload written: {p}")
+    else:
+        print(text)
+
+
+def cmd_verify_pages():
+    """Template <-> generated parity, no db needed: each generated page must be
+    its template with the single __DATA__ sentinel replaced by a JSON payload.
+    Catches 'edited the template but forgot to regenerate' (and vice versa)."""
+    import json
+    from oracle.config import PROJECT_DIR
+    pairs = [
+        ("oracle/thennow_template.html", "thennow.html"),
+        ("oracle/dashboard_template.html", "dashboard.html"),
+        ("oracle/datasources_template.html", "datasources.html"),
+    ]
+    failed = False
+    for tmpl_rel, gen_rel in pairs:
+        tmpl = (PROJECT_DIR / tmpl_rel).read_text(encoding="utf-8")
+        gen = (PROJECT_DIR / gen_rel).read_text(encoding="utf-8")
+        if tmpl.count("__DATA__") != 1:
+            print(f"FAIL {tmpl_rel}: expected exactly one __DATA__ sentinel")
+            failed = True
+            continue
+        prefix, suffix = tmpl.split("__DATA__")
+        ok = gen.startswith(prefix) and gen.endswith(suffix)
+        span = gen[len(prefix):len(gen) - len(suffix)] if ok else ""
+        if ok:
+            try:
+                json.loads(span)
+            except ValueError:
+                ok = False
+        print(f"{'ok  ' if ok else 'FAIL'} {gen_rel} matches {tmpl_rel}"
+              + ("" if ok else " (regenerate with `python main.py html`)"))
+        failed = failed or not ok
+    if failed:
+        sys.exit(1)
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("command", choices=["update", "status", "events", "html", "datasources", "thennow"], nargs="?", default="status")
+    p.add_argument("command", nargs="?", default="status",
+                   choices=["update", "status", "events", "html", "datasources", "thennow",
+                            "payload", "verify-pages"])
+    p.add_argument("--out", help="directory for `payload` output (default: stdout)")
     args = p.parse_args()
+
+    if args.command == "verify-pages":
+        cmd_verify_pages()
+        return
 
     conn = db.connect()
     try:
@@ -190,6 +253,8 @@ def main():
             print(f"datasources written: {write_datasources(conn)}")
         elif args.command == "thennow":
             print(f"thennow written:     {write_thennow_page(conn)}")
+        elif args.command == "payload":
+            cmd_payload(conn, args.out)
     finally:
         conn.close()
 

@@ -1,0 +1,27 @@
+AI Bubble Oracle
+Copyright 2026 AI Bubble Oracle contributors
+
+Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+The Apache-2.0 license covers the CODE in this repository: the collectors, the
+evaluation engine, the site generators, the templates, and the documentation.
+
+Files under data/ are DATA, not code, and are not relicensed by this project.
+Each committed data file is derived from a third-party source and carries that
+source's own terms; provenance is recorded in a '#' comment header inside each
+authored or seeded CSV, and in full on the site's Data Sources page. Highlights:
+
+  - data/fred_history.csv       US government / Federal Reserve data via FRED
+                                (public domain).
+  - data/ipo_issuance.csv       Authored from Jay R. Ritter's IPO statistics
+                                (University of Florida), cited in-file.
+  - data/cape_history.csv       Cached fetch of multpl.com's rendering of
+                                Robert Shiller's public CAPE dataset.
+  - other data/*.csv            This project's own measurements of public APIs
+                                (Vast.ai, Polymarket, CourtListener, GDELT).
+
+Contributed data sources must document their own terms the same way. Sources
+whose terms prohibit redistribution (for example FINRA margin statistics, WSTS
+billings, or licensed vendors such as Bloomberg, Refinitiv, ICE, or massive.com)
+must never have their data committed to this repository; the module system
+supports fetch-at-runtime, credential-gated sources for exactly this case.
