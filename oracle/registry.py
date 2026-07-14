@@ -185,6 +185,47 @@ def required_tickers():
     return list(dict.fromkeys(out))
 
 
+def ir_entries():
+    """The Data Sources IR bundle order: post-order DFS of the tree (children
+    before their branch), ACTIVE metrics only, branches always. Reproduces the
+    old hand-authored GROUPS order exactly. Entries without an `ir` block are
+    skipped (the metric still runs; it just isn't documented on the page)."""
+    metrics, branches = _discover_metrics()
+    kids = {}
+    for b in branches:
+        kids.setdefault(b["parent"], []).append(("branch", b))
+    for m in metrics:
+        if is_active(m):
+            kids.setdefault(m["parent"], []).append(("leaf", m))
+
+    out = []
+
+    def walk(key):
+        for tag, spec in sorted(kids.get(key, []), key=lambda t: (t[1].get("order", 999), t[1]["key"])):
+            if tag == "branch":
+                walk(spec["key"])
+            if "ir" in spec:
+                out.append({"spec": spec, "branch": tag == "branch"})
+
+    from .metrics._tree import ROOT
+    walk(ROOT["key"])
+    return out
+
+
+def src_groups():
+    """thennow.html's leaf-kind / branch-key → Data Sources group anchor map,
+    from the modules' ir declarations (replaces the old SRC_GROUP literal)."""
+    metrics, branches = _discover_metrics()
+    out = {}
+    for m in metrics:
+        if is_active(m) and "ir" in m:
+            out[m["kind"]] = m["ir"]["group"]
+    for b in branches:
+        if "ir" in b:
+            out[b["key"]] = b["ir"]["group"]
+    return out
+
+
 def report():
     """One console block on what the module system resolved to."""
     metrics, _branches = _discover_metrics()
@@ -250,13 +291,32 @@ def _lint_metric(spec, srcs, branch_keys, errs, where):
             pass                       # engine tolerates these per-row
         except Exception as e:         # noqa: BLE001 — lint reports anything else
             bad(f"formula raised {type(e).__name__} on a synthetic row: {e}")
-    # IR (optional until the datasources chains are payload-driven) must be JSON
+    # IR (optional; a metric without one runs but isn't documented on the
+    # Data Sources page) must be pure JSON prose + the fields the page needs
     if "ir" in spec:
-        import json
-        try:
-            json.dumps(spec["ir"])
-        except (TypeError, ValueError) as e:
-            bad(f"ir is not JSON-serializable: {e}")
+        _lint_ir(spec["ir"], bad)
+
+
+def _lint_ir(ir, bad):
+    import json
+    try:
+        json.dumps(ir)
+    except (TypeError, ValueError) as e:
+        bad(f"ir is not JSON-serializable: {e}")
+        return
+    for field in ("group", "group_name", "source_info"):
+        if field not in ir:
+            bad(f"ir missing {field!r}")
+    forms = [f for f in ("assets", "leaf_chain", "rollup") if f in ir]
+    if len(forms) != 1:
+        bad("ir must declare exactly one of 'assets', 'leaf_chain', or 'rollup'")
+    g = ir.get("graph") or {}
+    if not any(k in g for k in ("vchain", "join", "explicit")):
+        bad("ir.graph must declare one of 'vchain', 'join', or 'explicit'")
+    info = ir.get("source_info") or {}
+    for field in ("blurb", "options", "ambiguities", "caveats", "cardinality"):
+        if field not in info:
+            bad(f"ir.source_info missing {field!r}")
 
 
 def _lint_source(spec, errs, where):
@@ -299,6 +359,8 @@ def check():
         for field in ("key", "label", "parent", "order"):
             if field not in b:
                 errs.append(f"branch {b.get('key', '?')}: missing {field!r}")
+        if "ir" in b:
+            _lint_ir(b["ir"], lambda msg, _k=b.get("key", "?"): errs.append(f"branch {_k}: {msg}"))
     for m in metrics:
         _lint_metric(m, srcs, branch_keys, errs, f"metric {m.get('key', '?')}")
 

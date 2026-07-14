@@ -656,17 +656,10 @@ function peakDisplay(n) {
   const s = Math.abs(pk) >= 100 ? Math.round(pk).toLocaleString() : Math.abs(pk) >= 10 ? pk.toFixed(1) : pk.toFixed(2);
   return `${n.unitLabel} ${s}`;
 }
-// Leaf kind (or blend key) → its Data Sources group anchor. The root links to
-// the datasources landing (no single group covers the whole tree).
-const SRC_GROUP = {
-  price: "tn_price", sp500: "tn_sp500", cape: "tn_cape", buffett: "tn_buffett",
-  tech_leadership: "tn_tech_leadership", it_invest: "tn_it_invest",
-  tech_orders: "tn_tech_orders", semis: "tn_semis", margin: "tn_margin",
-  ipo: "tn_ipo", curve: "tn_curve", sentiment: "tn_sentiment",
-  price_appreciation: "tn_price_appreciation", valuation: "tn_valuation",
-  market_concentration: "tn_concentration", capex: "tn_capex",
-  speculation: "tn_speculation", monetary: "tn_monetary",
-};
+// Leaf kind (or blend key) → its Data Sources group anchor, declared by each
+// metric module's ir block and shipped in the payload. The root links to the
+// datasources landing (no single group covers the whole tree).
+const SRC_GROUP = DATA.srcGroups || {};
 function derivHtml(n) {
   const bd = n.projectedBottomDate;
   const lead = n.leaf

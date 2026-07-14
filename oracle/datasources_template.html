@@ -1230,7 +1230,7 @@ const ASSETS = [
     dagster: "thennow/multpl_cape", dbt: "source('multpl','shiller_pe')",
     grain: "one HTML document (monthly CAPE table)",
     why: "The valuation-multiple tap: Shiller CAPE, comparable in absolute terms across eras. Wholly separate from the price chain.",
-    desc: "multpl.com's public 'Shiller PE by month' table (Robert Shiller's data), parsed with the stdlib. No key. oracle/cape.py.",
+    desc: "multpl.com's public 'Shiller PE by month' table (Robert Shiller's data), parsed with the stdlib. No key. oracle/sources/cape.py.",
     upstream: [],
     transforms: [{ tag: "extract", text: "HTTP GET + regex parse of the monthly table" }],
     cardinality: "one document, ~1,800 monthly rows back to the 1870s.",
@@ -1241,7 +1241,7 @@ const ASSETS = [
     dagster: "thennow/cape_history", dbt: "cape_history",
     grain: "one row per month",
     why: "The parsed CAPE series, persisted with a committed CSV as fallback.",
-    desc: "date + CAPE, kept from 1990 on, upserted on date. oracle/cape.py round-trip, data/cape_history.csv.",
+    desc: "date + CAPE, kept from 1990 on, upserted on date. oracle/sources/cape.py round-trip, data/cape_history.csv.",
     upstream: ["raw.multpl_cape"],
     schema: [
       { col: "date", type: "TEXT", kind: "key", ex: "2000-03-01" },
@@ -1575,7 +1575,7 @@ ASSETS.push(
       id: "raw.fred_ncbeilq", dbt: "source('fred','NCBEILQ027S')",
       grain: "one CSV document (quarterly Z.1 series)",
       why: "The Buffett-indicator numerator: nonfinancial corporate equities at market value, from the Fed's Z.1 financial accounts.",
-      desc: "FRED fredgraph.csv for NCBEILQ027S, keyless, public domain. Quarterly since 1945; ~1 quarter of Z.1 publication lag. oracle/fred.py.",
+      desc: "FRED fredgraph.csv for NCBEILQ027S, keyless, public domain. Quarterly since 1945; ~1 quarter of Z.1 publication lag. oracle/sources/fred.py.",
       tx: "HTTP GET fredgraph.csv?id=NCBEILQ027S", card: "one document, quarterly since 1945.",
     },
     raw: {
@@ -1611,7 +1611,7 @@ ASSETS.push(
       id: "raw.fred_a679", dbt: "source('fred','A679RC1Q027SBEA')",
       grain: "one CSV document (quarterly NIPA series)",
       why: "The economy-wide capex commitment to the boom's tooling: private fixed investment in information processing equipment and software.",
-      desc: "FRED fredgraph.csv for A679RC1Q027SBEA ($bn SAAR), keyless, public domain, quarterly since 1947. oracle/fred.py.",
+      desc: "FRED fredgraph.csv for A679RC1Q027SBEA ($bn SAAR), keyless, public domain, quarterly since 1947. oracle/sources/fred.py.",
       tx: "HTTP GET fredgraph.csv?id=A679RC1Q027SBEA", card: "one document, quarterly since 1947.",
     },
     raw: {
@@ -1637,7 +1637,7 @@ ASSETS.push(
       id: "raw.fred_a34sno", dbt: "source('fred','A34SNO')",
       grain: "one CSV document (monthly M3 survey series)",
       why: "The dollar capex cycle that actually rose, peaked, and crashed in 2000-2002: manufacturers' new orders for computers and electronic products.",
-      desc: "FRED fredgraph.csv for A34SNO ($mn SA), keyless, public domain, monthly since 1992. Census notes the M3 survey EXCLUDES semiconductor orders, which is why the semis leaf exists separately. oracle/fred.py.",
+      desc: "FRED fredgraph.csv for A34SNO ($mn SA), keyless, public domain, monthly since 1992. Census notes the M3 survey EXCLUDES semiconductor orders, which is why the semis leaf exists separately. oracle/sources/fred.py.",
       tx: "HTTP GET fredgraph.csv?id=A34SNO", card: "one document, monthly since 1992.",
     },
     raw: {
@@ -1662,7 +1662,7 @@ ASSETS.push(
       id: "raw.fred_ipg3344s", dbt: "source('fred','IPG3344S')",
       grain: "one CSV document (monthly industrial production series)",
       why: "The picks-and-shovels output index: chips carried both booms (fabs then, GPUs now).",
-      desc: "FRED fredgraph.csv for IPG3344S (industrial production, semiconductors and other electronic components, index), keyless, public domain, monthly since 1972. oracle/fred.py.",
+      desc: "FRED fredgraph.csv for IPG3344S (industrial production, semiconductors and other electronic components, index), keyless, public domain, monthly since 1972. oracle/sources/fred.py.",
       tx: "HTTP GET fredgraph.csv?id=IPG3344S", card: "one document, monthly since 1972.",
     },
     raw: {
@@ -1687,7 +1687,7 @@ ASSETS.push(
       id: "raw.fred_z1margin", dbt: "source('fred','BOGZ1FL663067003Q')",
       grain: "one CSV document (quarterly Z.1 series)",
       why: "The leverage behind the trade: broker-dealer margin loans from the Fed's Z.1 accounts, the only open margin series that reaches 1995.",
-      desc: "FRED fredgraph.csv for BOGZ1FL663067003Q (security brokers and dealers, margin loans and other receivables, $mn), keyless, public domain, quarterly since 1945. FINRA's monthly series is the cross-check but starts 1997-01 and its terms bar committing a copy. oracle/fred.py.",
+      desc: "FRED fredgraph.csv for BOGZ1FL663067003Q (security brokers and dealers, margin loans and other receivables, $mn), keyless, public domain, quarterly since 1945. FINRA's monthly series is the cross-check but starts 1997-01 and its terms bar committing a copy. oracle/sources/fred.py.",
       tx: "HTTP GET fredgraph.csv?id=BOGZ1FL663067003Q", card: "one document, quarterly since 1945.",
     },
     raw: {
@@ -1720,7 +1720,7 @@ ASSETS.push(
       id: "ipo_issuance", mat: "table · seed import", cadence: "on update",
       grain: "one row per month",
       why: "The landed monthly IPO stats.",
-      desc: "month, average first-day return, gross and net counts. Months with zero qualifying IPOs carry a NULL return (never 0), so the forward-fill holds the last real reading. oracle/ipo.py.",
+      desc: "month, average first-day return, gross and net counts. Months with zero qualifying IPOs carry a NULL return (never 0), so the forward-fill holds the last real reading. oracle/sources/ipo.py.",
       tx: "idempotent seed import",
       schema: [
         { col: "month", type: "TEXT", kind: "key", ex: "1999-12-01" },
@@ -1743,7 +1743,7 @@ ASSETS.push(
       id: "raw.fred_t10y3m", dbt: "source('fred','T10Y3M')",
       grain: "one CSV document (daily spread series)",
       why: "The late-cycle monetary tell: the 10Y minus 3M treasury spread inverts near tops.",
-      desc: "FRED fredgraph.csv for T10Y3M (percent, daily since 1982), keyless, public domain. oracle/fred.py.",
+      desc: "FRED fredgraph.csv for T10Y3M (percent, daily since 1982), keyless, public domain. oracle/sources/fred.py.",
       tx: "HTTP GET fredgraph.csv?id=T10Y3M", card: "one document, daily since 1982.",
     },
     raw: {
@@ -1768,7 +1768,7 @@ ASSETS.push(
       id: "raw.fred_umcsent", dbt: "source('fred','UMCSENT')",
       grain: "one CSV document (monthly survey index)",
       why: "The Main Street euphoria check: University of Michigan consumer sentiment.",
-      desc: "FRED fredgraph.csv for UMCSENT (index, monthly since 1952, 1-2 month publication lag), keyless, public domain. oracle/fred.py.",
+      desc: "FRED fredgraph.csv for UMCSENT (index, monthly since 1952, 1-2 month publication lag), keyless, public domain. oracle/sources/fred.py.",
       tx: "HTTP GET fredgraph.csv?id=UMCSENT", card: "one document, monthly since 1952.",
     },
     raw: {
@@ -2723,6 +2723,50 @@ Object.assign(SOURCE_INFO, {
     ],
   },
 });
+
+/* ---- P4 dual-build check. Every tn_ group above is now ALSO generated
+   server-side from the metric modules' ir declarations and shipped as
+   DATA.ir. Build both, compare canonically (key order ignored, values and
+   array order exact), and log any drift per section. Once this is green in
+   the browser on every group, the literals get deleted and DATA.ir becomes
+   the only source. ---- */
+(function verifyIR() {
+  const IR = DATA.ir;
+  if (!IR) { console.error("IR dual-build: DATA.ir missing"); return; }
+  const sortk = v => Array.isArray(v) ? v.map(sortk)
+    : (v && typeof v === "object") ? Object.fromEntries(Object.keys(v).sort().map(k => [k, sortk(v[k])]))
+    : v;
+  const canon = v => JSON.stringify(sortk(v));
+  const diffAt = (a, b, path) => {          // first differing path, for readable logs
+    if (canon(a) === canon(b)) return null;
+    if (Array.isArray(a) && Array.isArray(b)) {
+      if (a.length !== b.length) return `${path}.length ${a.length} ≠ ${b.length}`;
+      for (let i = 0; i < a.length; i++) { const d = diffAt(a[i], b[i], `${path}[${i}]`); if (d) return d; }
+      return `${path} (order)`;
+    }
+    if (a && b && typeof a === "object" && typeof b === "object") {
+      const keys = [...new Set([...Object.keys(a), ...Object.keys(b)])].sort();
+      for (const k of keys) { const d = diffAt(a[k], b[k], `${path}.${k}`); if (d) return d; }
+      return path;
+    }
+    return `${path}: ${JSON.stringify(a)} ≠ ${JSON.stringify(b)}`;
+  };
+  let bad = 0;
+  const expect = (name, lit, gen) => {
+    if (canon(lit) === canon(gen)) return;
+    bad++; console.error(`IR dual-build MISMATCH ${name}: ${diffAt(lit, gen, name)}`);
+  };
+  const tnGroups = GROUPS.filter(g => g.id.startsWith("tn_"));
+  expect("groups", tnGroups, IR.groups);
+  tnGroups.forEach(g => {
+    expect(`assets:${g.id}`, ASSETS.filter(a => a.group === g.id), IR.assets.filter(a => a.group === g.id));
+    expect(`graph:${g.id}`, GRAPHS[g.id], IR.graphs[g.id]);
+    expect(`sourceInfo:${g.id}`, SOURCE_INFO[g.id], IR.sourceInfo[g.id]);
+  });
+  expect("foreignFrom", FOREIGN_FROM, IR.foreignFrom);
+  console[bad ? "error" : "log"](
+    `IR dual-build: ${bad ? bad + " mismatched section(s)" : "all sections match"} (${tnGroups.length} tn groups)`);
+})();
 
 function landingHtml() {
   const cards = GROUPS.map(g => {

@@ -551,4 +551,7 @@ def compute_thennow(conn):
         "bandLow": dates[0] if dates else tree["projectedPeakDate"],
         "bandHigh": dates[-1] if dates else tree["projectedPeakDate"],
         "tree": tree,
+        # leaf-kind / branch-key → Data Sources group anchor, from the modules'
+        # ir declarations (drives the "full method & sources" links)
+        "srcGroups": registry.src_groups(),
     }
