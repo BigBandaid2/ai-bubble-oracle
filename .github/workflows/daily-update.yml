@@ -32,13 +32,24 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: python main.py update
 
+      # The build writes og-card.svg with the current projected peak date and
+      # the live root chart; rasterize it to the PNG that og:image points at,
+      # so the shared social card always matches today's projection. Liberation
+      # Sans (Arial-metric) keeps the render consistent with local machines.
+      - name: Rasterize the social share card
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq librsvg2-bin fonts-liberation
+          rsvg-convert -w 1200 -h 630 og-card.svg -o og-image.png
+          echo "og-image.png: $(stat -c%s og-image.png) bytes"
+
       - name: Commit regenerated site + accumulated data
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           # -A over the generated pages + data dir; oracle.db etc. are gitignored,
           # and this tolerates optional files (e.g. buzz_meta.json) being absent.
-          git add -A dashboard.html datasources.html thennow.html data/
+          git add -A dashboard.html datasources.html thennow.html og-card.svg og-image.png data/
           if git diff --staged --quiet; then
             echo "No changes to commit."
           else
