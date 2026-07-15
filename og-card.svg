@@ -18,6 +18,10 @@
   <text x="62" y="304" font-size="62" font-weight="800" fill="#ff5a44" letter-spacing="-1.6">Dec 19, 2027</text>
   <text x="64" y="356" font-size="22" font-weight="400" fill="#9aa4b3">The AI boom, on the dot-com bubble's clock.</text>
 
+  <!-- call to action -->
+  <rect x="64" y="392" width="266" height="46" rx="23" fill="#122a45" stroke="#57a6ff" stroke-opacity="0.55" stroke-width="1.5"/>
+  <text x="197" y="421" text-anchor="middle" font-size="18.5" font-weight="700" fill="#8fc0ff">See where we are now  &#8594;</text>
+
   <!-- footer -->
   <circle cx="68" cy="574" r="4" fill="#57a6ff"/>
   <text x="84" y="580" font-size="20" font-weight="600" fill="#eef1f6">aibubbleoracle.com</text>
