@@ -167,6 +167,31 @@ A **light** visual system, no palette bloat:
   `thennow-modal-redesign.html`; on the live page they call `openNode()` → the existing modal). Wire
   the **shared 4-link nav** across every page.
 
+### 4.6 Metric-detail modal — responsive (reflected in `thennow-modal-redesign.html`)
+The modal currently loses the graph and overlaps at small widths. Priority: **after the headline
+peak date, the graph is the most important element and must NEVER be hidden**; the **projected-peak
+red line + label is the single most important item on the graph** and is never dropped.
+- **Guaranteed graph height** — give the chart container a height floor so it can't collapse to zero
+  when the layout stacks (mock: `.chartwrap { min-height: 240px }`, and at ≤1000px it becomes a fixed
+  `height: clamp(240px, 42vh, 360px)` instead of `flex:1`). On the live page the chart is `<canvas>`:
+  ensure its wrapper keeps a real height at every width and the canvas re-sizes to it (the resize
+  handler already redraws — just don't let the wrapper collapse).
+- **Modal scrolls, stacks cleanly** — at ≤1000px stack the side/derivation panel BELOW the chart and
+  let the modal scroll (`overflow: hidden auto`); the side panel flows into that scroll (`overflow:
+  visible`) instead of a nested scroll. **Critical:** when stacked, set the body/main columns to
+  `flex: none` (+ `min-height: auto`) — if `.m-main` stays `flex: 1` inside a fixed-height column it
+  shrinks below its content (`min-height:0`) and the evidence tiles overflow and **overlap the "How
+  this date is derived" panel**. `flex: none` makes each block take its natural height so nothing
+  overlaps and the modal simply scrolls. At ≤600px go full-bleed (`inset:0`, no radius), tighten
+  padding, and **pin the close button** (`.m-corner { position: fixed }`) so it stays reachable.
+- **Marker labels degrade gracefully** — the four vertical markers (start / today / peak / bottom)
+  keep their LINES at all widths, but when the chart is tight (mock gate: chart width < 520px) **drop
+  only the START and PROJECTED BOTTOM chip labels**; **today and the peak label always stay**. Shrink
+  the remaining chip type on phones. Never hide the peak marker or its label.
+- Applies to the live `openNode()` modal in `thennow.html` / `oracle/thennow_template.html`; the same
+  three moves (height floor, stack+scroll+pinned close, label-drop-order) port directly to the canvas
+  renderer.
+
 ## 5. Build mechanics (unchanged, still critical)
 
 - Pages are generated from `oracle/*_template.html` via `python main.py html` (`__DATA__`
