@@ -289,3 +289,19 @@ collapse-all all present.
   case: +31 d/mo drift with only ±10d wander; 30d smoothing is measurably
   less stable than 90d, e.g. Nasdaq ±52d vs ±275d wander). The recent
   May-Jul 2026 stretch is the first genuine convergence in the window.
+
+## (h) Speculation default weights adopted: 90/10 margin-heavy (2026-07-16)
+
+- Owner decision after reviewing the ST4 out-of-sample results: the
+  speculation roll-up's default child weights are now margin_debt 0.9 /
+  ipo_froth 0.1, declared on the branch in `oracle/metrics/_tree.py` (with
+  provenance) and flowing engine -> payload -> slider seeds -> client
+  recomputes. All other roll-ups stay equal (their optimized weights lost
+  out of sample; the panel says so).
+- Effects: speculation now reads 22% intensity (was ~3%) and projects
+  Apr 27, 2031; the ROOT headline moved Dec 21, 2027 -> Sep 11, 2027.
+  The share card regenerates with the new date.
+- Consistency: the projection ledger was regenerated so "history at
+  site-default weights" means 90/10 throughout; the optimizer gate now
+  replays SITE-DEFAULT weights (0 mismatches x 7 roll-ups); the panel
+  footnote and weight-check line disclose the adopted default.

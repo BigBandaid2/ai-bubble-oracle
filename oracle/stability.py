@@ -278,7 +278,7 @@ def _structure(conn):
     dot_dates = tn._grid(tn.CLOCK["start"], tn.CLOCK["bottom"])
     ai_dates = tn._grid(tn.CLOCK["aiStart"], today.isoformat())
     root = tn._build(conn, registry.build_tree(), dot_dates, ai_dates, today)
-    st = {"children": {}, "labels": {}, "leaf_dot": {}, "subtree": {}}
+    st = {"children": {}, "labels": {}, "leaf_dot": {}, "subtree": {}, "weights": {}}
 
     def walk(n):
         if not n or n.get("wip") or n.get("stub"):
@@ -288,6 +288,8 @@ def _structure(conn):
                 if not (k.get("wip") or k.get("stub"))]
         if kids:
             st["children"][n["key"]] = [k["key"] for k in kids]
+            if n.get("weights"):
+                st["weights"][n["key"]] = n["weights"]
             sub = [n["key"]]
             for k in kids:
                 sub += walk(k)
@@ -331,7 +333,9 @@ def _node_dot(key, rows, st, cache):
         return hit
     kids = st["children"][key]
     use = [k for k in kids if rows[k]["valid"] == "1"] or kids
-    cur = _wblend([(_node_dot(k, rows, st, cache), 1.0) for k in use])
+    declared = st["weights"].get(key) or {}
+    cur = _wblend([(_node_dot(k, rows, st, cache), declared.get(k, 1.0))
+                   for k in use])
     cache[sig] = cur
     return cur
 
@@ -439,14 +443,16 @@ def optimize_weights(conn, verbose=True):
         days = [(o, a) for o, a in all_days
                 if all(k in by_day[a] for k in kids + [key])]
         equal = {k: 1.0 / len(kids) for k in kids}
+        default = st["weights"].get(key) or equal
 
-        # gate: the equal-weight replay must reproduce the ledger exactly
-        replayed = dict(_replay(key, equal, days, by_day, st, dot_cache))
+        # gate: replaying the SITE-DEFAULT weights (declared or equal) must
+        # reproduce the ledger exactly
+        replayed = dict(_replay(key, default, days, by_day, st, dot_cache))
         mism = [a for o, a in days
                 if by_day[a][key]["valid"] == "1" and o in replayed
                 and _iso(replayed[o]) != by_day[a][key]["proj_90_dominant"]]
         if verbose:
-            print(f"{key}: equal-weight replay vs ledger -- {len(mism)} mismatch(es)")
+            print(f"{key}: default-weight replay vs ledger -- {len(mism)} mismatch(es)")
         if mism:
             raise RuntimeError(f"{key}: replay does not reproduce the ledger "
                                f"(first: {mism[0]}); aborting")

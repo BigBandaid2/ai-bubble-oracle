@@ -464,6 +464,14 @@ Object.values(NODES).forEach(n => {
     "30": n.alt30 || null,
   };
 });
+// Branches with DECLARED default weights (metrics/_tree.py, e.g. speculation
+// 90/10 margin-heavy) seed the client weights so the sliders and every
+// client-side recompute start where the engine's shipped numbers start.
+Object.values(NODES).forEach(n => {
+  if (!n.weights || n._weights) return;
+  const kids = liveKids(n);
+  n._weights = kids.map(c => (n.weights[c.key] != null ? n.weights[c.key] : 1 / kids.length) * kids.length);
+});
 function recomputeUp(node) { let cur = PARENT[node.key]; while (cur) { recompute(cur); cur = PARENT[cur.key]; } }
 function tierOf(n) { return n.leaf ? ("leaf · " + (n.unitLabel || "index")) : PARENT[n.key] ? "roll-up" : "root · all metrics"; }
 function crumbOf(n) { const p = []; let c = n; while (c) { p.unshift(c); c = PARENT[c.key]; } return p; }
@@ -781,7 +789,7 @@ function renderStability(n) {
       `wanders <b>±${Math.round(s.detrended80 / 2)}d</b> around trend · <b>${s.jumps}</b> jump${s.jumps === 1 ? "" : "s"} &gt;60d</div>`;
   }
   host.innerHTML = `<div class="mstab"><h4>Projection stability <span class="more">daily backtest · Jan 2025 → ${fmtMY(S.asOf)}</span></h4>` + body + weightLine(n) +
-    `<div class="foot2">History before mid-2026 is reconstructed from final (post-revision) data; recorded live nightly from then on. Roll-ups at default equal weights; smoothing and matching follow the Options drawer.</div></div>`;
+    `<div class="foot2">History before mid-2026 is reconstructed from final (post-revision) data; recorded live nightly from then on. Roll-ups at site-default weights; smoothing and matching follow the Options drawer.</div></div>`;
   if (s.validDays) { drawStabHist(el("stab-hist"), s); drawStabTrend(el("stab-trend"), s); }
 }
 // Roll-ups only: would a different child weighting have projected more steadily?
@@ -796,9 +804,15 @@ function weightLine(n) {
   const verdict = op < eq * 0.9 ? `a real out-of-sample gain`
     : op > eq * 1.1 ? `fits the past better but does <b>worse</b> out of sample — equal weights stand`
     : `no meaningful out-of-sample difference`;
+  let adopted = "";
+  if (n.weights) {
+    const w = {};
+    e.children.forEach(c => { w[c.key] = n.weights[c.key] || 0; });
+    adopted = ` <b>${pct(w)}</b> is the site default.`;
+  }
   return `<div class="statline">Weight check (${e.children.map(c => c.label).join(" · ")}): ` +
     `equal ${pct(e.equal.w)} scores <b>${eq.toLocaleString()}</b> out-of-sample vs stability-optimized ` +
-    `${pct(e.opt.w)} at <b>${op.toLocaleString()}</b> (lower = steadier) — ${verdict}.</div>`;
+    `${pct(e.opt.w)} at <b>${op.toLocaleString()}</b> (lower = steadier) — ${verdict}.${adopted}</div>`;
 }
 function drawStabHist(canvas, s) {
   const { ctx, w, h } = setup(canvas); ctx.clearRect(0, 0, w, h);

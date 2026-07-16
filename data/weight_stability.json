@@ -27,17 +27,17 @@
    "equal": {
     "insample": {
      "days": 273,
-     "detrended80": 648,
-     "driftDpm": -141.4,
+     "detrended80": 339,
+     "driftDpm": -132.1,
      "jitterDpm": 30.0,
-     "loss": 2078.0
+     "loss": 1675.3
     },
     "oos": {
      "days": 289,
-     "detrended80": 56,
-     "driftDpm": 25.7,
+     "detrended80": 37,
+     "driftDpm": 28.4,
      "jitterDpm": 30.0,
-     "loss": 328.3
+     "loss": 337.1
     },
     "w": {
      "capex": 0.2,
@@ -50,46 +50,46 @@
    "ivw": {
     "insample": {
      "days": 273,
-     "detrended80": 612,
-     "driftDpm": -125.7,
+     "detrended80": 339,
+     "driftDpm": -132.1,
      "jitterDpm": 30.0,
-     "loss": 1884.7
+     "loss": 1675.3
     },
     "oos": {
      "days": 289,
-     "detrended80": 56,
-     "driftDpm": 25.7,
+     "detrended80": 37,
+     "driftDpm": 28.4,
      "jitterDpm": 30.0,
-     "loss": 328.3
+     "loss": 337.1
     },
     "w": {
-     "capex": 0.077,
-     "market_concentration": 0.077,
-     "monetary": 0.692,
-     "speculation": 0.077,
-     "valuation": 0.077
+     "capex": 0.078,
+     "market_concentration": 0.078,
+     "monetary": 0.69,
+     "speculation": 0.078,
+     "valuation": 0.078
     }
    },
    "opt": {
     "insample": {
      "days": 273,
-     "detrended80": 277,
-     "driftDpm": 10.8,
-     "jitterDpm": 60.0,
-     "loss": 415.4
+     "detrended80": 174,
+     "driftDpm": -4.1,
+     "jitterDpm": 30.0,
+     "loss": 230.7
     },
     "oos": {
      "days": 289,
-     "detrended80": 336,
-     "driftDpm": -14.6,
+     "detrended80": 332,
+     "driftDpm": -7.4,
      "jitterDpm": 30.0,
-     "loss": 497.3
+     "loss": 421.4
     },
     "w": {
-     "capex": 0.5,
+     "capex": 0.3,
      "market_concentration": 0.1,
-     "monetary": 0.2,
-     "speculation": 0.1,
+     "monetary": 0.3,
+     "speculation": 0.2,
      "valuation": 0.1
     }
    }

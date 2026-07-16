@@ -163,6 +163,14 @@ BRANCHES = [
     },
     {
         "key": "speculation", "label": "Speculative activity", "parent": "ai_peak", "order": 40,
+        # Default child weights, adopted 2026-07-16 from the projection-stability
+        # backtest (`python main.py optimize-weights`): margin-heavy 90/10 roughly
+        # halved the out-of-sample instability vs equal weights (loss 1310 -> 737,
+        # optimized on Jan-Sep 2025, judged Oct 2025-Jul 2026), and inverse-variance
+        # weighting independently landed at 91/9. IPO froth's validity flapping is
+        # what equal weighting kept importing. Re-derivable from the committed
+        # ledger; the page's sliders still let readers reweight live.
+        "weights": {"margin_debt": 0.9, "ipo_froth": 0.1},
         "ir": {
             "group": "tn_speculation", "group_name": "Speculation roll-up (WIP)",
             "rollup": {

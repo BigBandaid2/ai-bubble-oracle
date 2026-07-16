@@ -363,13 +363,24 @@ def _attach_observations(node, cache):
         _attach_observations(c, cache)
 
 
-def _blend(arrays):
-    """Equal-weight pointwise mean of daily intensity curves."""
+def _blend(arrays, weights=None):
+    """Pointwise mean of daily intensity curves over the values present at
+    each index — equal-weight by default, or weighted when a branch declares
+    default child weights (metrics/_tree.py)."""
     n = len(arrays[0])
     out = []
+    if weights is None:
+        for i in range(n):
+            vals = [a[i] for a in arrays if i < len(a) and a[i] is not None]
+            out.append(sum(vals) / len(vals) if vals else None)
+        return out
     for i in range(n):
-        vals = [a[i] for a in arrays if i < len(a) and a[i] is not None]
-        out.append(sum(vals) / len(vals) if vals else None)
+        s = wsum = 0.0
+        for a, w in zip(arrays, weights):
+            if i < len(a) and a[i] is not None:
+                s += a[i] * w
+                wsum += w
+        out.append(s / wsum if wsum else None)
     return out
 
 
@@ -456,16 +467,21 @@ def _build(conn, node, dot_dates, ai_dates, today):
     # full set for a curve but mark the parent invalid (projection suppressed too).
     valid_live = [k for k in live if k.get("valid", True)]
     use = valid_live or live
-    int_dot = _blend([k["_intDot"] for k in use])
-    int_ai = _blend([k["_intAi"] for k in use])
+    declared = node.get("weights")
+    weights = [declared.get(k["key"], 1.0) for k in use] if declared else None
+    int_dot = _blend([k["_intDot"] for k in use], weights)
+    int_ai = _blend([k["_intAi"] for k in use], weights)
     result = _evaluate(int_dot, int_ai, today)
     valid = len(valid_live) > 0
     validation = {"valid": valid, "crossings": 0, "checks": [
         {"name": "conforming inputs", "pass": valid,
          "detail": f"{len(valid_live)} of {len(live)} inputs fit the analogy"}]}
-    return {"key": node["key"], "label": node["label"], "display": "blended",
-            "valid": valid, "validation": validation,
-            "children": live + placeholders, "_intDot": int_dot, "_intAi": int_ai, **result}
+    out = {"key": node["key"], "label": node["label"], "display": "blended",
+           "valid": valid, "validation": validation,
+           "children": live + placeholders, "_intDot": int_dot, "_intAi": int_ai, **result}
+    if declared:
+        out["weights"] = declared
+    return out
 
 
 # ---------------------------------------------------------------- weekly downsample
@@ -504,6 +520,8 @@ def _emit(node, dw, aw):
             out["alt30"] = {"intensityDot": _pick(alt["int_dot"], dw), "intensityAi": _pick(alt["int_ai"], aw),
                             "smoothedDot": _pick(alt["sm_dot"], dw, 2), "smoothedAi": _pick(alt["sm_ai"], aw, 2),
                             "display": alt["display"]}
+    if "weights" in node:
+        out["weights"] = node["weights"]
     if "children" in node:
         out["children"] = [_emit(c, dw, aw) for c in node["children"]]
     return out

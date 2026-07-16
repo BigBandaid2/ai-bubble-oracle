@@ -167,7 +167,13 @@ def build_tree():
                 out["children"].append({"key": spec["key"], "label": spec["label"],
                                         "stub": True, "requires": _stub_reason(spec)})
             else:
-                out["children"].append(node(spec["key"], spec["label"]))
+                sub = node(spec["key"], spec["label"])
+                if spec.get("weights"):
+                    # declared default child weights (see the branch's comment in
+                    # metrics/_tree.py); the engine blend and the page's sliders
+                    # both start from these
+                    sub["weights"] = spec["weights"]
+                out["children"].append(sub)
         return out
 
     return node(ROOT["key"], ROOT["label"])
