@@ -222,10 +222,12 @@ def _match(target, int_dot, mode="dominant"):
     return crossings[0][0]
 
 
-def _evaluate(int_dot, int_ai, today):
-    """Analogy + projection on a node's daily curves (scalars, exact daily)."""
+def _evaluate(int_dot, int_ai, today, mode="dominant"):
+    """Analogy + projection on a node's daily curves (scalars, exact daily).
+    `mode` selects the ramp matching (see _match); the site default is
+    "dominant" — the backtester (oracle/stability.py) evaluates both."""
     ai_now = next((v for v in reversed(int_ai) if v is not None), 0.0)
-    eq = _match(ai_now, int_dot)
+    eq = _match(ai_now, int_dot, mode)
     equiv_date = date.fromordinal(_d(CLOCK["start"]).toordinal() + round(eq / 100 * RAMP))
     ai_elapsed = _days(CLOCK["aiStart"], today.isoformat())
     dot_done = max(eq, 0.0) / 100 * RAMP
@@ -554,4 +556,12 @@ def compute_thennow(conn):
         # leaf-kind / branch-key → Data Sources group anchor, from the modules'
         # ir declarations (drives the "full method & sources" links)
         "srcGroups": registry.src_groups(),
+        # projection-stability backtest summaries per node per option
+        # permutation, from the committed ledger (None until backfilled)
+        "stability": _stability_blocks(),
     }
+
+
+def _stability_blocks():
+    from . import stability
+    return stability.payload_blocks()

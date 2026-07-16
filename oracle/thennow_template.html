@@ -240,6 +240,16 @@
   .wrow input[type=range] { flex: 1; accent-color: var(--accent); }
   .wrow .wv { width: 42px; text-align: right; font-family: var(--mono); color: var(--text); font-size: 12px; }
 
+  /* Projection-stability panel (backtest history in the modal sidebar) */
+  .mstab { margin-top: 18px; border-top: 1px solid var(--border); padding-top: 14px; }
+  .mstab h4 { color: var(--muted2); }
+  .mstab .cap { font-family: var(--mono); font-size: 10px; letter-spacing: .6px; text-transform: uppercase; color: var(--muted2); margin-top: 11px; }
+  .mstab canvas { display: block; width: 100%; height: 92px; margin-top: 5px; }
+  .mstab canvas.trend { height: 112px; }
+  .mstab .statline { font-size: 12.5px; color: var(--muted); line-height: 1.6; margin-top: 10px; }
+  .mstab .statline b { color: var(--text); }
+  .mstab .foot2 { font-size: 11.5px; color: var(--muted2); margin-top: 7px; line-height: 1.5; }
+
   /* Options & assumptions drawer (global) */
   #drawer-scrim { position: fixed; inset: 0; background: rgba(4,6,10,.6); z-index: 50; opacity: 0; pointer-events: none; transition: opacity .2s; }
   #drawer-scrim.open { opacity: 1; pointer-events: auto; }
@@ -358,7 +368,7 @@
       <div class="chartwrap" id="chartwrap"><canvas id="modal-canvas"></canvas><div id="mklayer"></div><div id="hoverchip"></div></div>
       <div class="evidence"><div class="evTitle">Supporting evidence for the peak date</div><div class="tiles" id="m-tiles"></div></div>
     </div>
-    <div class="m-side"><div id="m-deriv"></div><div id="m-weights"></div></div>
+    <div class="m-side"><div id="m-deriv"></div><div id="m-weights"></div><div id="m-stab"></div></div>
   </div>
 </div>
 
@@ -659,7 +669,7 @@ function openNode(key) {
   if (kids.length >= 2) el("m-weights").appendChild(weightsBlock(n, kids));
   buildRibbon(n);
   el("scrim").classList.add("open"); el("modal").classList.add("open");
-  requestAnimationFrame(() => drawBig(n));
+  requestAnimationFrame(() => { drawBig(n); renderStability(n); });
 }
 function closeModal() { el("scrim").classList.remove("open"); el("modal").classList.remove("open"); CUR = null; el("hoverchip").style.display = "none"; }
 function tilesHtml(n) {
@@ -737,7 +747,103 @@ function weightsBlock(node, kids) {
 function refreshMetric(n) {
   setHead(n);
   el("m-tiles").innerHTML = tilesHtml(n); el("m-deriv").innerHTML = derivHtml(n);
-  buildRibbon(n); drawBig(n);
+  buildRibbon(n); drawBig(n); renderStability(n);
+}
+/* ---------- projection-stability panel (the committed backtest ledger) ----------
+   How consistent has this metric's projected peak BEEN, day by day since Jan 2025?
+   The histogram shows where the daily projections landed; the trend line shows the
+   projection over time (flat = a stable target; rising ~1d/day = a receding horizon
+   that never converges; cliffs = the dot-com match jumping to a different climb leg).
+   History follows the drawer's smoothing/matching options; weights are defaults. */
+function stabPerm() { return SMOOTH + "_" + MATCH_MODE; }
+function qLabel(iso) { return "Q" + (Math.floor(+iso.slice(5, 7) / 3.1) + 1) + "'" + iso.slice(2, 4); }
+function renderStability(n) {
+  const host = el("m-stab"); if (!host) return;
+  const S = DATA.stability, entry = S && S.nodes && S.nodes[n.key];
+  if (!entry) { host.innerHTML = ""; return; }
+  const s = entry[stabPerm()] || entry["90_dominant"];
+  const cov = `${s.validDays.toLocaleString()} of ${s.runs.toLocaleString()}`;
+  let body;
+  if (!s.validDays) {
+    body = `<div class="statline">Never asserted a date in the backtest window (<b>${cov}</b> daily runs) — suppressed throughout. That consistency is itself the finding.</div>`;
+  } else {
+    const [word, col] = s.driftDpm >= 25 ? ["receding ~1d per day", "var(--peak)"]
+      : s.driftDpm > 8 ? ["drifting later", "var(--text)"]
+      : s.driftDpm < -25 ? ["pulling in fast", "var(--text)"]
+      : s.driftDpm < -8 ? ["pulling earlier", "var(--text)"]
+      : ["stable trend", "var(--bottom)"];
+    const dsign = s.driftDpm > 0 ? "+" : "";
+    body =
+      `<div class="cap">Where the daily projections landed</div><canvas id="stab-hist"></canvas>` +
+      `<div class="cap">Projected date over each run day</div><canvas id="stab-trend" class="trend"></canvas>` +
+      `<div class="statline">Asserted a date <b>${cov}</b> runs · median <b>${fmtNice(s.median)}</b> · ` +
+      `drift <b style="color:${col}">${dsign}${s.driftDpm} d/mo</b> (${word}) · ` +
+      `wanders <b>±${Math.round(s.detrended80 / 2)}d</b> around trend · <b>${s.jumps}</b> jump${s.jumps === 1 ? "" : "s"} &gt;60d</div>`;
+  }
+  host.innerHTML = `<div class="mstab"><h4>Projection stability <span class="more">daily backtest · Jan 2025 → ${fmtMY(S.asOf)}</span></h4>` + body +
+    `<div class="foot2">History before mid-2026 is reconstructed from final (post-revision) data; recorded live nightly from then on. Roll-ups at default equal weights; smoothing and matching follow the Options drawer.</div></div>`;
+  if (s.validDays) { drawStabHist(el("stab-hist"), s); drawStabTrend(el("stab-trend"), s); }
+}
+function drawStabHist(canvas, s) {
+  const { ctx, w, h } = setup(canvas); ctx.clearRect(0, 0, w, h);
+  const mono = "8.5px " + getCss("--mono");
+  // contiguous quarterly axis (the shipped bins can skip empty quarters)
+  const qs = []; let d = new Date(s.bins[0][0] + "T00:00:00Z");
+  const lastD = new Date(s.bins[s.bins.length - 1][0] + "T00:00:00Z");
+  while (d <= lastD) { qs.push(d.toISOString().slice(0, 10)); d = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 3, 1)); }
+  const counts = Object.fromEntries(s.bins), maxC = Math.max(...s.bins.map(b => b[1]));
+  const P = { l: 2, r: 2, t: 16, b: 13 }, plotH = h - P.t - P.b, bw = (w - P.l - P.r) / qs.length;
+  const x0 = ord(qs[0]), x1 = ord(qs[qs.length - 1]) + 92;
+  const xOf = o => P.l + (w - P.l - P.r) * (Math.min(Math.max(o, x0), x1) - x0) / (x1 - x0 || 1);
+  ctx.fillStyle = "rgba(87,166,255,.45)";
+  qs.forEach((q, i) => { const c = counts[q]; if (!c) return;
+    const bh = Math.max(1.5, plotH * c / maxC);
+    ctx.fillRect(P.l + i * bw + 1, P.t + plotH - bh, Math.max(1, bw - 2), bh); });
+  ctx.strokeStyle = getCss("--border"); ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(P.l, P.t + plotH + .5); ctx.lineTo(w - P.r, P.t + plotH + .5); ctx.stroke();
+  // median (dashed) + the CURRENT projection (accent tick) inside its own history
+  const mx = xOf(ord(s.median)), nx = xOf(ord(s.latest));
+  ctx.strokeStyle = getCss("--muted2"); ctx.setLineDash([3, 4]);
+  ctx.beginPath(); ctx.moveTo(mx, P.t - 2); ctx.lineTo(mx, P.t + plotH); ctx.stroke(); ctx.setLineDash([]);
+  ctx.strokeStyle = getCss("--accent-hi"); ctx.lineWidth = 1.6;
+  ctx.beginPath(); ctx.moveTo(nx, P.t - 2); ctx.lineTo(nx, P.t + plotH); ctx.stroke();
+  ctx.font = mono; ctx.textBaseline = "alphabetic";
+  ctx.fillStyle = getCss("--accent-hi"); ctx.textAlign = "center";
+  ctx.fillText("NOW", Math.min(Math.max(nx, 14), w - 16), 10);
+  ctx.fillStyle = getCss("--muted2");
+  const my = Math.abs(mx - nx) < 34;   // dodge the NOW label when they collide
+  ctx.fillText("MED", Math.min(Math.max(mx, 14), w - 16), my ? P.t + plotH - 3 : 10);
+  ctx.textAlign = "left"; ctx.fillText(qLabel(qs[0]), P.l, h - 2);
+  ctx.textAlign = "right"; ctx.fillText(qLabel(qs[qs.length - 1]), w - P.r, h - 2);
+}
+function drawStabTrend(canvas, s) {
+  const { ctx, w, h } = setup(canvas); ctx.clearRect(0, 0, w, h);
+  const mono = "8.5px " + getCss("--mono"), base = ord(DATA.stability.base);
+  const pts = s.series, ys = pts.filter(p => p[1] != null).map(p => p[1]);
+  if (!ys.length) return;
+  const xMin = pts[0][0], xMax = pts[pts.length - 1][0];
+  let yMin = Math.min(...ys), yMax = Math.max(...ys);
+  const pad = Math.max(25, (yMax - yMin) * .08); yMin -= pad; yMax += pad;
+  const P = { l: 2, r: 46, t: 5, b: 13 };
+  const X = a => P.l + (w - P.l - P.r) * (a - xMin) / (xMax - xMin || 1);
+  const Y = p => P.t + (h - P.t - P.b) * (1 - (p - yMin) / (yMax - yMin || 1));
+  // y gridlines at each Jan 1 in range, labeled with the projection year
+  ctx.font = mono; ctx.textAlign = "left"; ctx.textBaseline = "middle";
+  const yr0 = +isoFromOrd(base + Math.round(yMin)).slice(0, 4) + 1;
+  const yr1 = +isoFromOrd(base + Math.round(yMax)).slice(0, 4);
+  for (let yr = yr0; yr <= yr1; yr++) {
+    const o = ord(yr + "-01-01") - base; if (o < yMin || o > yMax) continue;
+    const y = Y(o);
+    ctx.strokeStyle = getCss("--panel2"); ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(P.l, y); ctx.lineTo(w - P.r, y); ctx.stroke();
+    ctx.fillStyle = getCss("--muted2"); ctx.fillText("Jan '" + String(yr).slice(2), w - P.r + 5, y);
+  }
+  poly(ctx, pts, X, Y, getCss("--accent-hi"), 1.8);
+  ctx.strokeStyle = getCss("--border");
+  ctx.beginPath(); ctx.moveTo(P.l, h - P.b + .5); ctx.lineTo(w - P.r, h - P.b + .5); ctx.stroke();
+  ctx.fillStyle = getCss("--muted2"); ctx.textBaseline = "alphabetic";
+  ctx.textAlign = "left"; ctx.fillText(fmtMY(isoFromOrd(base + xMin)), P.l, h - 2);
+  ctx.textAlign = "right"; ctx.fillText(fmtMY(isoFromOrd(base + xMax)), w - P.r, h - 2);
 }
 // Modal headline. A non-conforming metric has no projected date, so the date
 // reads as suppressed and the copy says why, rather than showing a made-up peak.
@@ -996,7 +1102,7 @@ el("drawer-scrim").addEventListener("click", closeDrawer);
 document.addEventListener("keydown", e => { if (e.key === "Escape") { closeModal(); closeDrawer(); } });
 el("modal-canvas").addEventListener("mousemove", onMove);
 el("modal-canvas").addEventListener("mouseleave", () => { el("hoverchip").style.display = "none"; if (CUR) drawBig(CUR); });
-window.addEventListener("resize", () => { MINIS.forEach(([canvas, n]) => drawMini(canvas, n)); if (CUR) drawBig(CUR); });
+window.addEventListener("resize", () => { MINIS.forEach(([canvas, n]) => drawMini(canvas, n)); if (CUR) { drawBig(CUR); renderStability(CUR); } });
 </script>
 </body>
 </html>

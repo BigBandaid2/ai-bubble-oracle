@@ -69,6 +69,11 @@ def cmd_update(conn):
     print(f"thennow observations: {obs_changed} regenerated"
           if obs_changed else "thennow observations: unchanged")
 
+    # Projection ledger: record today's projections (all option permutations)
+    # as genuine point-in-time history for the stability panel.
+    from oracle import stability
+    print(f"projection ledger: {stability.append_today(conn)} node(s) recorded for today")
+
     db.set_meta(conn, "last_update", datetime.now(timezone.utc).isoformat(timespec="seconds"))
 
 
@@ -160,7 +165,7 @@ def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("command", nargs="?", default="status",
                    choices=["update", "status", "events", "html", "datasources", "thennow",
-                            "payload", "verify-pages", "check"])
+                            "payload", "verify-pages", "check", "backtest"])
     p.add_argument("--out", help="directory for `payload` output (default: stdout)")
     args = p.parse_args()
 
@@ -194,6 +199,9 @@ def main():
             print(f"thennow written:     {write_thennow_page(conn)}")
         elif args.command == "payload":
             cmd_payload(conn, args.out)
+        elif args.command == "backtest":
+            from oracle import stability
+            stability.backfill(conn)
     finally:
         conn.close()
 
