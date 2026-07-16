@@ -105,6 +105,14 @@
   .mcard:hover .open { opacity: 1; color: var(--accent-hi); }
   .mcard .lbl { font-family: var(--mono); font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: var(--peak); margin: 13px 0 3px; }
   .mcard .date { font-size: 31px; font-weight: 800; letter-spacing: -1px; line-height: 1; }
+  /* projection-trend indicator beside the headline date (from the backtest):
+     arrow slope ~ drift rate — up = receding, diagonal = drifting, flat = stable */
+  .trend { font-family: var(--font); font-weight: 700; font-size: 15px; margin-left: 8px; vertical-align: 5px; cursor: help; }
+  .trend.receding { color: var(--peak); }
+  .trend.stable { color: var(--bottom); }
+  .trend.later, .trend.earlier { color: var(--muted2); }
+  .trend.fastin { color: var(--accent-hi); }
+  .m-head .d .trend { font-size: 20px; vertical-align: 10px; margin-left: 10px; }
   .mcard .mini { height: 78px; margin: 12px 0 4px; }
   .mcard .mini canvas { width: 100%; height: 78px; display: block; }
   .mcard .foot { display: flex; align-items: center; justify-content: space-between; margin-top: 8px;
@@ -590,7 +598,7 @@ function renderCards() {
   list.forEach(n => grid.appendChild(makeCard(n)));
   const nop = list.filter(n => !n.wip && n.valid === false).length;
   el("count").textContent = `${list.length} shown · ${nop} no projection`;
-  MINIS.forEach(([canvas, n]) => requestAnimationFrame(() => drawMini(canvas, n)));
+  MINIS.forEach(([canvas, n]) => requestAnimationFrame(() => drawCard(canvas, n)));
 }
 function makeCard(n) {
   const c = document.createElement("div");
@@ -606,7 +614,7 @@ function makeCard(n) {
   const lvl = levelOf(n);
   const dateBlk = nop
     ? `<div class="lbl">Projection</div><div class="date">No Projection</div>`
-    : `<div class="lbl">Projected peak</div><div class="date">${fmtNice(n.projectedPeakDate)}</div>`;
+    : `<div class="lbl">Projected peak</div><div class="date">${fmtNice(n.projectedPeakDate)}${trendIcon(n)}</div>`;
   c.innerHTML =
     `<div class="top"><span class="pip ${lvl}">${PIP[lvl]}</span><span class="name">${n.label}</span><span class="open">expand ↗</span></div>` +
     dateBlk +
@@ -875,12 +883,67 @@ function drawStabTrend(canvas, s) {
   ctx.textAlign = "left"; ctx.fillText(fmtMY(isoFromOrd(base + xMin)), P.l, h - 2);
   ctx.textAlign = "right"; ctx.fillText(fmtMY(isoFromOrd(base + xMax)), w - P.r, h - 2);
 }
+/* ---------- projection-trend indicator + card-graph toggle ----------
+   trendOf classifies the backtest drift of the projected date under the
+   active options; the arrow's slope mirrors the drift rate (flat = stable
+   target, diagonal = drifting, vertical = receding one day per day). */
+function stabFor(n) {
+  const S = DATA.stability, e = S && S.nodes && S.nodes[n.key];
+  return e ? (e[stabPerm()] || e["90_dominant"]) : null;
+}
+function trendOf(n) {
+  const s = stabFor(n);
+  if (!s || !s.validDays || n.valid === false) return null;
+  const d = s.driftDpm;
+  return d >= 25 ? { g: "↑", cls: "receding", word: "receding ~1 day per day", d }
+    : d > 8 ? { g: "↗", cls: "later", word: "drifting later", d }
+    : d < -25 ? { g: "↓", cls: "fastin", word: "pulling in fast", d }
+    : d < -8 ? { g: "↘", cls: "earlier", word: "pulling earlier", d }
+    : { g: "→", cls: "stable", word: "stable trend", d };
+}
+function trendIcon(n) {
+  const t = trendOf(n);
+  if (!t) return "";
+  return `<span class="trend ${t.cls}" title="Projection trend over the daily backtest (Jan 2025 → now, current options): ${t.word} (${t.d > 0 ? "+" : ""}${t.d} d/mo)">${t.g}</span>`;
+}
+// Overview-card graph mode: the metric's intensity curves (default) or its
+// projected-peak-date-over-each-run-day trend from the backtest ledger. The
+// detail modal keeps the full intensity chart either way.
+let CARD_GRAPH = (function () { try { return localStorage.getItem("tn_cardgraph") || "intensity"; } catch (e) { return "intensity"; } })();
+function drawCard(canvas, n) {
+  if (CARD_GRAPH === "trend") {
+    const s = stabFor(n);
+    if (s && s.validDays && s.series) { drawMiniTrend(canvas, s); return; }
+  }
+  drawMini(canvas, n);
+}
+function drawMiniTrend(canvas, s) {
+  const { ctx, w, h } = setup(canvas); ctx.clearRect(0, 0, w, h);
+  const pts = s.series, ys = pts.filter(p => p[1] != null).map(p => p[1]);
+  if (!ys.length) return;
+  const xMin = pts[0][0], xMax = pts[pts.length - 1][0];
+  let yMin = Math.min(...ys), yMax = Math.max(...ys);
+  const pad = Math.max(15, (yMax - yMin) * .1); yMin -= pad; yMax += pad;
+  const P = { l: 2, r: 4, t: 6, b: 6 };
+  const X = a => P.l + (w - P.l - P.r) * (a - xMin) / (xMax - xMin || 1);
+  const Y = p => P.t + (h - P.t - P.b) * (1 - (p - yMin) / (yMax - yMin || 1));
+  // dashed guide at the median projection — the wander around it is the story
+  const med = ord(s.median) - ord(DATA.stability.base);
+  if (med > yMin && med < yMax) {
+    ctx.strokeStyle = getCss("--border2"); ctx.setLineDash([3, 4]); ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(P.l, Y(med)); ctx.lineTo(w - P.r, Y(med)); ctx.stroke(); ctx.setLineDash([]);
+  }
+  poly(ctx, pts, X, Y, getCss("--accent-hi"), 1.6);
+  const last = pts.filter(p => p[1] != null).pop();
+  if (last) { ctx.fillStyle = getCss("--accent-hi"); ctx.beginPath(); ctx.arc(X(last[0]), Y(last[1]), 2.5, 0, 7); ctx.fill(); }
+}
 // Modal headline. A non-conforming metric has no projected date, so the date
 // reads as suppressed and the copy says why, rather than showing a made-up peak.
 function setHead(n) {
   const ok = n.valid !== false;
   el("m-lbl").textContent = (ok ? "Projected peak — " : "Counter-argument — ") + n.label + (n.leaf ? "" : " (blended)");
-  el("m-date").textContent = ok ? fmtNice(n.projectedPeakDate) : "No Projection";
+  if (ok) el("m-date").innerHTML = fmtNice(n.projectedPeakDate) + trendIcon(n);
+  else el("m-date").textContent = "No Projection";
   el("m-sub").innerHTML = ok
     ? `Today it's <b>${(n.intensityNow * 100).toFixed(0)}%</b> of the way to the 2000 peak (${n.phase}); if the arc holds, a projected bottom around <b>${fmtMY(n.projectedBottomDate)}</b>.`
     : `This metric does not fit the rise-peak-fall analogy, so no peak date is projected from it. Today it reads <b>${(n.intensityNow * 100).toFixed(0)}%</b> of the 2000 peak level; the curve is shown for context.`;
@@ -1015,14 +1078,21 @@ const DRAWER_ITEMS = [
   ["Matching point", `The dot-com climb is not monotone (the 1998 crisis pulled it back below levels it had already reached), so today's level can sit at more than one date. Dominant climb leg uses the last rise through it, the final approach to the peak; First crossing uses the earliest touch, even if a later correction undid it.`],
   ["Phase bands", `Editorial splits on the Netscape-to-peak clock (${BOUNDS.join("/")}%); they set the phase label, not the projected date.`],
   ["Projection", `Past today, AI is assumed to trace the remaining dot-com shape at the measured pace — a transparent method, not a forecast.`],
-  ["Weighting", `Parents blend their children (equal weight by default). Change the weights in a parent's detail view and every date downstream moves.`]
+  ["Weighting", `Parents blend their children. Defaults are equal weight, except speculation ships margin-heavy 90/10 (adopted from the stability backtest). Change the weights in a parent's detail view and every date downstream moves.`],
+  ["Overview card graph", `What the small chart on each overview card shows. Intensity draws the metric against the dot-com reference; Stability trend draws its projected peak date over each backtest run day (flat = a consistent target, rising = receding, gaps = suppressed). The detail view keeps the full intensity chart either way.`]
 ];
 function renderDrawer() {
   el("drawer-body").innerHTML = DRAWER_ITEMS.map(([t, d]) => {
-    const ctrl = t === "Matching point" ? matchToggleHtml() : t === "Smoothing" ? smoothToggleHtml() : "";
+    const ctrl = t === "Matching point" ? matchToggleHtml() : t === "Smoothing" ? smoothToggleHtml()
+      : t === "Overview card graph" ? cardGraphToggleHtml() : "";
     return `<div class="assump"><div class="at">${t}</div><div class="ad">${d}</div>${ctrl}</div>`;
   }).join("");
-  wireMatchToggle(); wireSmoothToggle();
+  wireMatchToggle(); wireSmoothToggle(); wireCardGraphToggle();
+}
+function cardGraphToggleHtml() {
+  return `<div class="seg2" id="cardgraph-toggle">` +
+    `<button data-cg="intensity"${CARD_GRAPH === "intensity" ? ' class="on"' : ""}>Intensity</button>` +
+    `<button data-cg="trend"${CARD_GRAPH === "trend" ? ' class="on"' : ""}>Stability trend</button></div>`;
 }
 function matchToggleHtml() {
   return `<div class="seg2" id="match-toggle">` +
@@ -1037,14 +1107,22 @@ function smoothToggleHtml() {
 function wireToggle(id, cur, apply) {
   const box = el(id); if (!box) return;
   box.querySelectorAll("button").forEach(b => b.addEventListener("click", () => {
-    const v = b.dataset.mode || b.dataset.win;
+    const v = b.dataset.mode || b.dataset.win || b.dataset.cg;
     if (v === cur()) return;
     apply(v);
-    box.querySelectorAll("button").forEach(x => x.classList.toggle("on", (x.dataset.mode || x.dataset.win) === cur()));
+    box.querySelectorAll("button").forEach(x => x.classList.toggle("on", (x.dataset.mode || x.dataset.win || x.dataset.cg) === cur()));
   }));
 }
 function wireMatchToggle() { wireToggle("match-toggle", () => MATCH_MODE, applyMatchMode); }
 function wireSmoothToggle() { wireToggle("smooth-toggle", () => SMOOTH, applySmoothing); }
+function wireCardGraphToggle() { wireToggle("cardgraph-toggle", () => CARD_GRAPH, applyCardGraph); }
+// Overview cards only: swap their small chart between the intensity view and
+// the backtest stability trend. The modal's chart arrangement is untouched.
+function applyCardGraph(v) {
+  CARD_GRAPH = v;
+  try { localStorage.setItem("tn_cardgraph", v); } catch (e) {}
+  renderCards();
+}
 // Re-derive every node's scalars after a global option changes (match mode, smoothing
 // window), then repaint. Same recompute path the weight sliders use, so all three
 // compose: leaves re-evaluate from their active arrays, parents re-blend then evaluate.
@@ -1132,7 +1210,7 @@ el("drawer-scrim").addEventListener("click", closeDrawer);
 document.addEventListener("keydown", e => { if (e.key === "Escape") { closeModal(); closeDrawer(); } });
 el("modal-canvas").addEventListener("mousemove", onMove);
 el("modal-canvas").addEventListener("mouseleave", () => { el("hoverchip").style.display = "none"; if (CUR) drawBig(CUR); });
-window.addEventListener("resize", () => { MINIS.forEach(([canvas, n]) => drawMini(canvas, n)); if (CUR) { drawBig(CUR); renderStability(CUR); } });
+window.addEventListener("resize", () => { MINIS.forEach(([canvas, n]) => drawCard(canvas, n)); if (CUR) { drawBig(CUR); renderStability(CUR); } });
 </script>
 </body>
 </html>
