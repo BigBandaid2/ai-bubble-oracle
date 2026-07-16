@@ -780,9 +780,25 @@ function renderStability(n) {
       `drift <b style="color:${col}">${dsign}${s.driftDpm} d/mo</b> (${word}) · ` +
       `wanders <b>±${Math.round(s.detrended80 / 2)}d</b> around trend · <b>${s.jumps}</b> jump${s.jumps === 1 ? "" : "s"} &gt;60d</div>`;
   }
-  host.innerHTML = `<div class="mstab"><h4>Projection stability <span class="more">daily backtest · Jan 2025 → ${fmtMY(S.asOf)}</span></h4>` + body +
+  host.innerHTML = `<div class="mstab"><h4>Projection stability <span class="more">daily backtest · Jan 2025 → ${fmtMY(S.asOf)}</span></h4>` + body + weightLine(n) +
     `<div class="foot2">History before mid-2026 is reconstructed from final (post-revision) data; recorded live nightly from then on. Roll-ups at default equal weights; smoothing and matching follow the Options drawer.</div></div>`;
   if (s.validDays) { drawStabHist(el("stab-hist"), s); drawStabTrend(el("stab-trend"), s); }
+}
+// Roll-ups only: would a different child weighting have projected more steadily?
+// Optimized in-sample (through Sep 2025), judged out-of-sample (after) — an
+// optimum that only fits the past is called out as exactly that. Display-only:
+// the site's defaults stay equal-weight.
+function weightLine(n) {
+  const W = DATA.weightStability, e = W && W.rollups && W.rollups[n.key];
+  if (!e || !e.opt || !e.opt.oos || !e.equal || !e.equal.oos) return "";
+  const pct = w => e.children.map(c => Math.round(w[c.key] * 100)).join("/");
+  const eq = Math.round(e.equal.oos.loss), op = Math.round(e.opt.oos.loss);
+  const verdict = op < eq * 0.9 ? `a real out-of-sample gain`
+    : op > eq * 1.1 ? `fits the past better but does <b>worse</b> out of sample — equal weights stand`
+    : `no meaningful out-of-sample difference`;
+  return `<div class="statline">Weight check (${e.children.map(c => c.label).join(" · ")}): ` +
+    `equal ${pct(e.equal.w)} scores <b>${eq.toLocaleString()}</b> out-of-sample vs stability-optimized ` +
+    `${pct(e.opt.w)} at <b>${op.toLocaleString()}</b> (lower = steadier) — ${verdict}.</div>`;
 }
 function drawStabHist(canvas, s) {
   const { ctx, w, h } = setup(canvas); ctx.clearRect(0, 0, w, h);

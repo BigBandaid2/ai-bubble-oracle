@@ -165,7 +165,7 @@ def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("command", nargs="?", default="status",
                    choices=["update", "status", "events", "html", "datasources", "thennow",
-                            "payload", "verify-pages", "check", "backtest"])
+                            "payload", "verify-pages", "check", "backtest", "optimize-weights"])
     p.add_argument("--out", help="directory for `payload` output (default: stdout)")
     args = p.parse_args()
 
@@ -202,6 +202,9 @@ def main():
         elif args.command == "backtest":
             from oracle import stability
             stability.backfill(conn)
+        elif args.command == "optimize-weights":
+            from oracle import stability
+            stability.optimize_weights(conn)
     finally:
         conn.close()
 

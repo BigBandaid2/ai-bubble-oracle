@@ -559,9 +559,17 @@ def compute_thennow(conn):
         # projection-stability backtest summaries per node per option
         # permutation, from the committed ledger (None until backfilled)
         "stability": _stability_blocks(),
+        # stability-optimal roll-up weightings (display-only; the site's
+        # defaults stay equal-weight), from `python main.py optimize-weights`
+        "weightStability": _weight_blocks(),
     }
 
 
 def _stability_blocks():
     from . import stability
     return stability.payload_blocks()
+
+
+def _weight_blocks():
+    from . import stability
+    return stability.weight_blocks()

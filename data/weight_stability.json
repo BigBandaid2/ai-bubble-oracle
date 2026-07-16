@@ -1,0 +1,428 @@
+{
+ "lossFormula": "detrended80 + 10*|drift d/mo| + 0.5*jitter d/mo",
+ "rollups": {
+  "ai_peak": {
+   "children": [
+    {
+     "key": "valuation",
+     "label": "Valuation"
+    },
+    {
+     "key": "market_concentration",
+     "label": "Market concentration"
+    },
+    {
+     "key": "capex",
+     "label": "Infrastructure / capex"
+    },
+    {
+     "key": "speculation",
+     "label": "Speculative activity"
+    },
+    {
+     "key": "monetary",
+     "label": "Monetary & sentiment"
+    }
+   ],
+   "equal": {
+    "insample": {
+     "days": 273,
+     "detrended80": 648,
+     "driftDpm": -141.4,
+     "jitterDpm": 30.0,
+     "loss": 2078.0
+    },
+    "oos": {
+     "days": 289,
+     "detrended80": 56,
+     "driftDpm": 25.7,
+     "jitterDpm": 30.0,
+     "loss": 328.3
+    },
+    "w": {
+     "capex": 0.2,
+     "market_concentration": 0.2,
+     "monetary": 0.2,
+     "speculation": 0.2,
+     "valuation": 0.2
+    }
+   },
+   "ivw": {
+    "insample": {
+     "days": 273,
+     "detrended80": 612,
+     "driftDpm": -125.7,
+     "jitterDpm": 30.0,
+     "loss": 1884.7
+    },
+    "oos": {
+     "days": 289,
+     "detrended80": 56,
+     "driftDpm": 25.7,
+     "jitterDpm": 30.0,
+     "loss": 328.3
+    },
+    "w": {
+     "capex": 0.077,
+     "market_concentration": 0.077,
+     "monetary": 0.692,
+     "speculation": 0.077,
+     "valuation": 0.077
+    }
+   },
+   "opt": {
+    "insample": {
+     "days": 273,
+     "detrended80": 277,
+     "driftDpm": 10.8,
+     "jitterDpm": 60.0,
+     "loss": 415.4
+    },
+    "oos": {
+     "days": 289,
+     "detrended80": 336,
+     "driftDpm": -14.6,
+     "jitterDpm": 30.0,
+     "loss": 497.3
+    },
+    "w": {
+     "capex": 0.5,
+     "market_concentration": 0.1,
+     "monetary": 0.2,
+     "speculation": 0.1,
+     "valuation": 0.1
+    }
+   }
+  },
+  "capex": {
+   "children": [
+    {
+     "key": "it_invest",
+     "label": "IT investment share"
+    },
+    {
+     "key": "tech_orders",
+     "label": "Tech equipment orders"
+    },
+    {
+     "key": "semis",
+     "label": "Semiconductor production"
+    }
+   ],
+   "equal": {
+    "insample": {
+     "days": 273,
+     "detrended80": 578,
+     "driftDpm": 49.3,
+     "jitterDpm": 90.0,
+     "loss": 1115.9
+    },
+    "oos": {
+     "days": 289,
+     "detrended80": 828,
+     "driftDpm": -145.7,
+     "jitterDpm": 60.0,
+     "loss": 2315.3
+    },
+    "w": {
+     "it_invest": 0.333,
+     "semis": 0.333,
+     "tech_orders": 0.333
+    }
+   },
+   "ivw": {
+    "insample": {
+     "days": 273,
+     "detrended80": 563,
+     "driftDpm": 51.4,
+     "jitterDpm": 90.0,
+     "loss": 1122.4
+    },
+    "oos": {
+     "days": 289,
+     "detrended80": 815,
+     "driftDpm": -165.4,
+     "jitterDpm": 60.0,
+     "loss": 2500.0
+    },
+    "w": {
+     "it_invest": 0.371,
+     "semis": 0.091,
+     "tech_orders": 0.538
+    }
+   },
+   "opt": {
+    "insample": {
+     "days": 273,
+     "detrended80": 139,
+     "driftDpm": 60.0,
+     "jitterDpm": 90.0,
+     "loss": 784.0
+    },
+    "oos": {
+     "days": 289,
+     "detrended80": 847,
+     "driftDpm": -192.3,
+     "jitterDpm": 60.0,
+     "loss": 2800.3
+    },
+    "w": {
+     "it_invest": 0.15,
+     "semis": 0.35,
+     "tech_orders": 0.5
+    }
+   }
+  },
+  "monetary": {
+   "children": [
+    {
+     "key": "yield_curve",
+     "label": "Yield curve"
+    },
+    {
+     "key": "sentiment",
+     "label": "Consumer sentiment"
+    }
+   ],
+   "equal": {
+    "insample": {
+     "days": 85,
+     "detrended80": 0,
+     "driftDpm": 30.0,
+     "jitterDpm": 30.0,
+     "loss": 315.0
+    },
+    "oos": null,
+    "w": {
+     "sentiment": 0.5,
+     "yield_curve": 0.5
+    }
+   },
+   "note": "too few conforming days in-sample to optimize"
+  },
+  "price_appreciation": {
+   "children": [
+    {
+     "key": "nasdaq",
+     "label": "Nasdaq"
+    },
+    {
+     "key": "sp500",
+     "label": "S&P 500"
+    }
+   ],
+   "equal": {
+    "insample": {
+     "days": 273,
+     "detrended80": 470,
+     "driftDpm": 11.0,
+     "jitterDpm": 60.0,
+     "loss": 610.9
+    },
+    "oos": {
+     "days": 289,
+     "detrended80": 56,
+     "driftDpm": 34.8,
+     "jitterDpm": 30.0,
+     "loss": 419.1
+    },
+    "w": {
+     "nasdaq": 0.5,
+     "sp500": 0.5
+    }
+   },
+   "ivw": {
+    "insample": {
+     "days": 273,
+     "detrended80": 443,
+     "driftDpm": 11.4,
+     "jitterDpm": 60.0,
+     "loss": 587.5
+    },
+    "oos": {
+     "days": 289,
+     "detrended80": 85,
+     "driftDpm": 33.2,
+     "jitterDpm": 30.0,
+     "loss": 432.5
+    },
+    "w": {
+     "nasdaq": 0.397,
+     "sp500": 0.603
+    }
+   },
+   "opt": {
+    "insample": {
+     "days": 273,
+     "detrended80": 448,
+     "driftDpm": 11.4,
+     "jitterDpm": 60.0,
+     "loss": 592.5
+    },
+    "oos": {
+     "days": 289,
+     "detrended80": 57,
+     "driftDpm": 34.3,
+     "jitterDpm": 30.0,
+     "loss": 415.0
+    },
+    "w": {
+     "nasdaq": 0.45,
+     "sp500": 0.55
+    }
+   }
+  },
+  "speculation": {
+   "children": [
+    {
+     "key": "margin_debt",
+     "label": "Margin debt"
+    },
+    {
+     "key": "ipo_froth",
+     "label": "IPO froth"
+    }
+   ],
+   "equal": {
+    "insample": {
+     "days": 273,
+     "detrended80": 1367,
+     "driftDpm": 41.8,
+     "jitterDpm": 90.0,
+     "loss": 1830.7
+    },
+    "oos": {
+     "days": 289,
+     "detrended80": 701,
+     "driftDpm": 57.9,
+     "jitterDpm": 60.0,
+     "loss": 1310.2
+    },
+    "w": {
+     "ipo_froth": 0.5,
+     "margin_debt": 0.5
+    }
+   },
+   "ivw": {
+    "insample": {
+     "days": 273,
+     "detrended80": 568,
+     "driftDpm": 3.1,
+     "jitterDpm": 150.0,
+     "loss": 674.9
+    },
+    "oos": {
+     "days": 289,
+     "detrended80": 83,
+     "driftDpm": 62.1,
+     "jitterDpm": 60.0,
+     "loss": 734.7
+    },
+    "w": {
+     "ipo_froth": 0.094,
+     "margin_debt": 0.906
+    }
+   },
+   "opt": {
+    "insample": {
+     "days": 273,
+     "detrended80": 583,
+     "driftDpm": 3.4,
+     "jitterDpm": 150.0,
+     "loss": 693.2
+    },
+    "oos": {
+     "days": 289,
+     "detrended80": 84,
+     "driftDpm": 62.2,
+     "jitterDpm": 60.0,
+     "loss": 736.8
+    },
+    "w": {
+     "ipo_froth": 0.1,
+     "margin_debt": 0.9
+    }
+   }
+  },
+  "valuation": {
+   "children": [
+    {
+     "key": "price_appreciation",
+     "label": "Price appreciation"
+    },
+    {
+     "key": "valuation_multiple",
+     "label": "Valuation multiple"
+    },
+    {
+     "key": "buffett",
+     "label": "Market cap to GDP"
+    }
+   ],
+   "equal": {
+    "insample": {
+     "days": 273,
+     "detrended80": 656,
+     "driftDpm": 0.6,
+     "jitterDpm": 60.0,
+     "loss": 693.0
+    },
+    "oos": {
+     "days": 289,
+     "detrended80": 46,
+     "driftDpm": 39.4,
+     "jitterDpm": 30.0,
+     "loss": 455.8
+    },
+    "w": {
+     "buffett": 0.333,
+     "price_appreciation": 0.333,
+     "valuation_multiple": 0.333
+    }
+   },
+   "ivw": {
+    "insample": {
+     "days": 273,
+     "detrended80": 684,
+     "driftDpm": 4.3,
+     "jitterDpm": 60.0,
+     "loss": 757.6
+    },
+    "oos": {
+     "days": 289,
+     "detrended80": 50,
+     "driftDpm": 38.1,
+     "jitterDpm": 30.0,
+     "loss": 446.5
+    },
+    "w": {
+     "buffett": 0.198,
+     "price_appreciation": 0.441,
+     "valuation_multiple": 0.362
+    }
+   },
+   "opt": {
+    "insample": {
+     "days": 273,
+     "detrended80": 641,
+     "driftDpm": -0.5,
+     "jitterDpm": 60.0,
+     "loss": 676.7
+    },
+    "oos": {
+     "days": 289,
+     "detrended80": 43,
+     "driftDpm": 40.7,
+     "jitterDpm": 30.0,
+     "loss": 465.7
+    },
+    "w": {
+     "buffett": 0.4,
+     "price_appreciation": 0.25,
+     "valuation_multiple": 0.35
+    }
+   }
+  }
+ },
+ "split": "2025-09-30"
+}

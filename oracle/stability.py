@@ -47,7 +47,8 @@ _PROVENANCE = """\
 # source=live rows were written on their own day by the nightly update and are
 # genuinely point-in-time. `valid` is the 90d default-window verdict (the site
 # keeps that verdict across the smoothing toggle); int_90/int_30 are the node's
-# intensityNow per smoothing window. Derived entirely from this repo's own
+# end-of-day intensity per smoothing window at full float precision (the
+# weight optimizer re-blends them). Derived entirely from this repo's own
 # committed source data; regenerate with `python main.py backtest`.
 """
 
@@ -87,13 +88,15 @@ def snapshot(conn, as_of, source):
             for mode in ("dominant", "first"):
                 projs[f"proj_{win}_{mode}"] = tn._evaluate(
                     dot, ai, as_of, mode)["projectedPeakDate"]
-        int30 = tn._last_val(ai30)
+        # full float precision: the weight optimizer re-blends these, and a
+        # rounded intensity can nudge a projection across a day boundary
+        int90, int30 = tn._last_val(ai90), tn._last_val(ai30)
         rows.append({
             "as_of": as_of.isoformat(), "node": n["key"], "source": source,
             "valid": "1" if n.get("valid", True) else "0",
             **projs,
-            "int_90": f"{n['intensityNow']:.4f}",
-            "int_30": "" if int30 is None else f"{int30:.4f}",
+            "int_90": "" if int90 is None else repr(int90),
+            "int_30": "" if int30 is None else repr(int30),
         })
         for c in n.get("children", []):
             walk(c)
@@ -237,6 +240,294 @@ def _perm_stats(days, base_ord):
         "bins": [[_iso(k), c] for k, c in sorted(bins.items())],
     })
     return block
+
+
+# ------------------------------------------------------- weight optimization
+# For each roll-up: which child weighting would have made its projection most
+# STABLE over the backtest window? The replay is exact: a roll-up's blended
+# aiNow on day D is the weighted mean of its direct children's ledger
+# intensities (each already reflecting that day's engine state), and its
+# dot-com reference curve is rebuilt bottom-up from the STATIC leaf dot curves
+# using each descendant's ledger validity ON THAT DAY (composition changes
+# when a child flips conformance -- the first replay attempt missed this and
+# the gate caught it). The engine's own _match arithmetic is reused verbatim,
+# so the equal-weight replay must reproduce the ledger's roll-up projections
+# exactly -- that is the gate, and it aborts the run on any mismatch.
+#
+# Honesty rails: optimization runs IN-SAMPLE on days <= OOS_SPLIT and is
+# judged OUT-OF-SAMPLE on the rest; a 10% floor per child prevents the
+# degenerate collapse onto one child; ties within 5% of the best loss go to
+# the most diversified (max entropy) weighting; and this optimizes
+# CONSISTENCY, the only thing measurable before the real peak -- a stable
+# blend can be stably wrong.
+
+OOS_SPLIT = "2025-09-30"
+WEIGHTS_PATH = PROJECT_DIR / "data" / "weight_stability.json"
+_LOSS_DRIFT_K = 10.0     # loss = detrended80 + 10*|drift d/mo| + 0.5*jitter d/mo
+_LOSS_JITTER_K = 0.5
+_FLOOR = 0.10
+
+
+def _structure(conn):
+    """Tree shape + static per-LEAF dot curves from one engine build: children
+    per roll-up, subtree key lists (for per-day composition signatures), and
+    display labels. Only leaf dot curves are time-invariant, so roll-up dot
+    curves are reconstructed per day from these."""
+    from . import registry
+    today = tn._today()
+    dot_dates = tn._grid(tn.CLOCK["start"], tn.CLOCK["bottom"])
+    ai_dates = tn._grid(tn.CLOCK["aiStart"], today.isoformat())
+    root = tn._build(conn, registry.build_tree(), dot_dates, ai_dates, today)
+    st = {"children": {}, "labels": {}, "leaf_dot": {}, "subtree": {}}
+
+    def walk(n):
+        if not n or n.get("wip") or n.get("stub"):
+            return []
+        st["labels"][n["key"]] = n["label"]
+        kids = [k for k in n.get("children", [])
+                if not (k.get("wip") or k.get("stub"))]
+        if kids:
+            st["children"][n["key"]] = [k["key"] for k in kids]
+            sub = [n["key"]]
+            for k in kids:
+                sub += walk(k)
+            st["subtree"][n["key"]] = sub
+            return sub
+        st["leaf_dot"][n["key"]] = n["_intDot"]
+        st["subtree"][n["key"]] = [n["key"]]
+        return [n["key"]]
+
+    walk(root)
+    return st
+
+
+def _wblend(curve_weight_pairs):
+    """Weighted pointwise mean over the values present at each index -- the
+    weighted generalization of the engine's _blend (equal weights reduce to it
+    exactly)."""
+    n = len(curve_weight_pairs[0][0])
+    out = []
+    for i in range(n):
+        s = wsum = 0.0
+        for c, w in curve_weight_pairs:
+            v = c[i]
+            if v is not None:
+                s += v * w
+                wsum += w
+        out.append(s / wsum if wsum else None)
+    return out
+
+
+def _node_dot(key, rows, st, cache):
+    """A node's dot-com intensity curve AS COMPOSED on this day: leaves are
+    static; a roll-up blends the children conforming that day (falling back to
+    all, mirroring _build). Cached by the subtree's validity signature."""
+    leaf = st["leaf_dot"].get(key)
+    if leaf is not None:
+        return leaf
+    sig = (key,) + tuple(rows[d]["valid"] for d in st["subtree"][key])
+    hit = cache.get(sig)
+    if hit is not None:
+        return hit
+    kids = st["children"][key]
+    use = [k for k in kids if rows[k]["valid"] == "1"] or kids
+    cur = _wblend([(_node_dot(k, rows, st, cache), 1.0) for k in use])
+    cache[sig] = cur
+    return cur
+
+
+def _replay(rollup_key, weights, day_list, by_day, st, dot_cache):
+    """Daily projections for a roll-up under direct-child weights `weights`
+    (equal weights below it, as shipped). Returns [(as_of_ord, proj_ord)] over
+    the days the blend conforms; matching/projection arithmetic mirrors
+    _match/_evaluate exactly."""
+    ai_start = tn._d(tn.CLOCK["aiStart"]).toordinal()
+    ramp = tn.RAMP
+    kids = st["children"][rollup_key]
+    top_cache = {}
+    out = []
+    for as_ord, as_of in day_list:
+        rows = by_day[as_of]
+        valid = [k for k in kids if rows[k]["valid"] == "1"]
+        if not valid:
+            continue
+        wsum = sum(weights[k] for k in valid)
+        ai_now = sum(float(rows[k]["int_90"]) * weights[k] for k in valid) / wsum
+        sig = tuple(rows[d]["valid"] for d in st["subtree"][rollup_key])
+        curve = top_cache.get(sig)
+        if curve is None:
+            curve = _wblend([(_node_dot(k, rows, st, dot_cache), weights[k])
+                             for k in valid])
+            top_cache[sig] = curve
+        eq = tn._match(ai_now, curve, "dominant")
+        dot_done = max(eq, 0.0) / 100 * ramp
+        ratio = (as_ord - ai_start) / dot_done if dot_done > 0 else 1.0
+        proj = as_ord + round(ratio * max(100.0 - eq, 0.0) / 100 * ramp)
+        out.append((as_ord, proj))
+    return out
+
+
+def _loss(series, max_gap=3):
+    """Stability loss on [(as_of_ord, proj_ord)]: detrended 80% spread plus
+    penalized |drift| and step jitter (both in days/month). max_gap widens for
+    subsampled series so adjacent steps still count."""
+    if len(series) < 20:
+        return None
+    wk = series[::7] if len(series) > 60 else series
+    slopes = [(wk[j][1] - wk[i][1]) / (wk[j][0] - wk[i][0])
+              for i in range(len(wk)) for j in range(i + 1, len(wk))
+              if wk[j][0] > wk[i][0]]
+    drift = _median(slopes)
+    ma, mp = _median([a for a, _ in series]), _median([p for _, p in series])
+    resid = sorted(p - (mp + drift * (a - ma)) for a, p in series)
+    n = len(resid)
+    detr = resid[min(n - 1, int(n * .9))] - resid[int(n * .1)]
+    steps = [abs(series[i][1] - series[i - 1][1]) / (series[i][0] - series[i - 1][0])
+             for i in range(1, len(series))
+             if series[i][0] - series[i - 1][0] <= max_gap]
+    jitter = _median(steps) * 30 if steps else 0.0
+    return {"loss": round(detr + _LOSS_DRIFT_K * abs(drift * 30) + _LOSS_JITTER_K * jitter, 1),
+            "detrended80": int(detr), "driftDpm": round(drift * 30, 1),
+            "jitterDpm": round(jitter, 1), "days": len(series)}
+
+
+def _weight_grid(keys, step):
+    """All floor-respecting weight vectors on the simplex at `step` spacing."""
+    k = len(keys)
+    free = int(round((1.0 - k * _FLOOR) / step))
+    out = []
+
+    def rec(i, left, acc):
+        if i == k - 1:
+            out.append(acc + [left])
+            return
+        for units in range(left + 1):
+            rec(i + 1, left - units, acc + [units])
+
+    rec(0, free, [])
+    return [{key: _FLOOR + u * step for key, u in zip(keys, units)}
+            for units in out]
+
+
+def _entropy(w):
+    import math
+    return -sum(v * math.log(v) for v in w.values() if v > 0)
+
+
+def optimize_weights(conn, verbose=True):
+    """Grid-search stability-optimal child weights per roll-up (in-sample,
+    weekly-subsampled for speed), judge daily out-of-sample, compare with
+    equal and inverse-variance weighting, and write data/weight_stability.json
+    for the panel. Site defaults stay equal-weight. Prints its work."""
+    import json
+    ledger = load_ledger()
+    if not ledger:
+        raise RuntimeError("no projection ledger; run `python main.py backtest` first")
+    st = _structure(conn)
+    split_ord = tn._d(OOS_SPLIT).toordinal()
+    by_day = {}
+    for (as_of, node), r in ledger.items():
+        by_day.setdefault(as_of, {})[node] = r
+    all_days = [(tn._d(a).toordinal(), a) for a in sorted(by_day)]
+    dot_cache = {}
+
+    result = {"split": OOS_SPLIT, "lossFormula":
+              f"detrended80 + {_LOSS_DRIFT_K:g}*|drift d/mo| + {_LOSS_JITTER_K:g}*jitter d/mo",
+              "rollups": {}}
+    for key in st["children"]:
+        kids = st["children"][key]
+        days = [(o, a) for o, a in all_days
+                if all(k in by_day[a] for k in kids + [key])]
+        equal = {k: 1.0 / len(kids) for k in kids}
+
+        # gate: the equal-weight replay must reproduce the ledger exactly
+        replayed = dict(_replay(key, equal, days, by_day, st, dot_cache))
+        mism = [a for o, a in days
+                if by_day[a][key]["valid"] == "1" and o in replayed
+                and _iso(replayed[o]) != by_day[a][key]["proj_90_dominant"]]
+        if verbose:
+            print(f"{key}: equal-weight replay vs ledger -- {len(mism)} mismatch(es)")
+        if mism:
+            raise RuntimeError(f"{key}: replay does not reproduce the ledger "
+                               f"(first: {mism[0]}); aborting")
+        if len(kids) < 2:
+            continue
+
+        is_days = [d for d in days if d[0] <= split_ord]
+        oos_days = [d for d in days if d[0] > split_ord]
+        is_weekly = is_days[::7]
+
+        step = 0.10 if len(kids) >= 4 else 0.05
+        scored = []
+        for w in _weight_grid(kids, step):
+            li = _loss(_replay(key, w, is_weekly, by_day, st, dot_cache), max_gap=8)
+            if li:
+                scored.append((li["loss"], w))
+        if not scored:
+            # too few conforming in-sample days to judge any weighting (e.g.
+            # the monetary branch, valid on a handful of days): record the
+            # equal-weight stats only, honestly unoptimized
+            result["rollups"][key] = {
+                "children": [{"key": k, "label": st["labels"][k]} for k in kids],
+                "equal": {"w": {k: round(1.0 / len(kids), 3) for k in kids},
+                          "insample": _loss(_replay(key, equal, is_days, by_day, st, dot_cache)),
+                          "oos": _loss(_replay(key, equal, oos_days, by_day, st, dot_cache))},
+                "note": "too few conforming days in-sample to optimize",
+            }
+            if verbose:
+                print(f"  {key}: skipped (too few conforming in-sample days)")
+            continue
+        scored.sort(key=lambda t: t[0])
+        best = scored[0][0]
+        opt = max((w for l, w in scored if l <= best * 1.05), key=_entropy)
+
+        # inverse-variance baseline from each child's own IS-window projections
+        ivw_raw = {}
+        for k in kids:
+            projs = sorted(tn._d(by_day[a][k]["proj_90_dominant"]).toordinal()
+                           for _, a in is_days if by_day[a][k]["valid"] == "1")
+            if len(projs) >= 20:
+                sp = projs[min(len(projs) - 1, int(len(projs) * .9))] - projs[int(len(projs) * .1)]
+                ivw_raw[k] = 1.0 / max(sp, 30) ** 2
+            else:
+                ivw_raw[k] = 0.0
+        if any(v > 0 for v in ivw_raw.values()):
+            tot = sum(ivw_raw.values())
+            ivw = {k: max(_FLOOR, v / tot) for k, v in ivw_raw.items()}
+            tot2 = sum(ivw.values())
+            ivw = {k: v / tot2 for k, v in ivw.items()}
+        else:
+            ivw = dict(equal)
+
+        entry = {"children": [{"key": k, "label": st["labels"][k]} for k in kids]}
+        for name, w in (("equal", equal), ("opt", opt), ("ivw", ivw)):
+            entry[name] = {"w": {k: round(v, 3) for k, v in w.items()},
+                           "insample": _loss(_replay(key, w, is_days, by_day, st, dot_cache)),
+                           "oos": _loss(_replay(key, w, oos_days, by_day, st, dot_cache))}
+        result["rollups"][key] = entry
+        if verbose:
+            def fmt(nm):
+                e = entry[nm]
+                ins = e["insample"]["loss"] if e["insample"] else "-"
+                oo = e["oos"]["loss"] if e["oos"] else "-"
+                pct = "/".join(str(round(v * 100)) for v in e["w"].values())
+                return f"{nm} {pct} IS={ins} OOS={oo}"
+            print(f"  {key}: {fmt('equal')} | {fmt('opt')} | {fmt('ivw')}")
+
+    WEIGHTS_PATH.write_text(json.dumps(result, indent=1, sort_keys=True),
+                            encoding="utf-8")
+    if verbose:
+        print(f"wrote {WEIGHTS_PATH.name}")
+    return result
+
+
+def weight_blocks():
+    """The thennow payload's `weightStability` member (None until generated)."""
+    import json
+    try:
+        return json.loads(WEIGHTS_PATH.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
 
 
 def payload_blocks():

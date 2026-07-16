@@ -247,3 +247,45 @@ four pages; Polymarket keeps its roll-up tree + shared drawer (reskin only, no
 modal); Data Sources keeps its `#src:` anchors + drawer; kicker / one-line
 verdict / sort control / No-Projection cards / grey `nop` tree dot /
 collapse-all all present.
+
+## (g) Projection-stability backtest + weight check (2026-07-16, ST1-ST4)
+
+- **What shipped.** A daily backtest of every node's projected peak from
+  Jan 1, 2025 (562 runs x 19 nodes x 4 option permutations), committed as
+  `data/projection_history.csv` and appended nightly (rows before mid-2026
+  are `source=backfill`; from now on `source=live`). The modal sidebar gained
+  a Projection-stability panel: histogram of where the daily projections
+  landed (median + NOW markers), projected-date-over-time trend, stat line
+  (coverage, median, drift, wander, jumps), and for roll-ups a weight check.
+- **Methodology honesty.** The backfill is reconstructed from FINAL data:
+  post-revision values, no publication-lag simulation (Ritter's annual IPO
+  refresh is the biggest gap), so it measures curve-walk stability, not
+  what-was-known-when. `valid` is the 90d default verdict site-wide
+  (mirroring the page); histories are default-weights only. Trend stats
+  split DRIFT (Theil-Sen d/mo; +30 = receding one day per day, never
+  converging) from detrended WANDER, because a smoothly receding metric and
+  an erratic one have similar raw spreads but opposite characters.
+- **Ledger vs page recompute.** The ledger records daily-resolution engine
+  truth. The page's client-side recompute under non-default options matches
+  on weekly-downsampled curves, so its numbers can differ slightly (a 4-day
+  gap on speculation's 2049 tail; the root's first-crossing equals dominant
+  at weekly resolution because the weekly blend smooths away a 1998-dip
+  crossing). Known, documented, small except in extreme-extrapolation tails.
+- **Weight check (display-only; defaults stay equal).** Per roll-up, a
+  simplex grid search (10% floors, entropy tie-break, loss = detrended80 +
+  10x|drift d/mo| + 0.5x jitter) optimized in-sample (<= 2025-09-30) and
+  judged out-of-sample, vs equal and inverse-variance. The replay is exact:
+  roll-up dot curves are rebuilt per day from static leaf curves + each
+  day's ledger validity (composition changes when children flip conformance
+  - the equal-weight replay reproduces the ledger 0-mismatch on all 7
+  roll-ups after ints were stored at full precision). Findings: the root and
+  capex "optima" fit the past but do WORSE out of sample (equal stands, and
+  the panel says so); speculation is the one robust gain - 90/10
+  margin-heavy roughly halves the OOS loss and inverse-variance
+  independently lands at 91/9. Monetary has too few conforming days to
+  optimize and is skipped honestly.
+- **Backtest headline.** Through 2025-2026 most metrics were receding at
+  ~+1 day/day (root +21 d/mo with 18 jumps >60d; tech leadership the purest
+  case: +31 d/mo drift with only ±10d wander; 30d smoothing is measurably
+  less stable than 90d, e.g. Nasdaq ±52d vs ±275d wander). The recent
+  May-Jul 2026 stretch is the first genuine convergence in the window.
