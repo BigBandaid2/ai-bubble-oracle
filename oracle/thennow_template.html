@@ -156,7 +156,7 @@
   #scrim.open { opacity: 1; pointer-events: auto; }
   #modal { position: fixed; inset: 2.4vh 2.4vw; z-index: 41; background: var(--panel); border: 1px solid var(--border2);
     border-radius: 16px; display: flex; flex-direction: column; padding: 20px 24px 20px; opacity: 0; transform: scale(.99) translateY(6px);
-    pointer-events: none; transition: opacity .18s, transform .18s; box-shadow: 0 24px 70px -12px rgba(0,0,0,.7); }
+    pointer-events: none; transition: opacity .18s, transform .18s; box-shadow: 0 24px 70px -12px rgba(0,0,0,.7); overflow: hidden auto; }
   #modal.open { opacity: 1; transform: none; pointer-events: auto; }
   .m-corner { position: absolute; top: 15px; right: 17px; display: flex; gap: 8px; z-index: 4; }
   .crumb { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--muted2); font-family: var(--mono); }
@@ -185,7 +185,7 @@
   .legend i.dash { background: none !important; border-top: 2px dashed currentColor; height: 0; }
   .legend i.vline { width: 0; height: 12px; border-left: 2px solid currentColor; border-radius: 0; }
   .legend i.mk { width: 9px; height: 9px; border-radius: 50%; }
-  .chartwrap { flex: 1; position: relative; min-height: 0; overflow: hidden; background: rgba(0,0,0,.22); border: 1px solid var(--border); border-radius: 11px; }
+  .chartwrap { flex: 1; position: relative; min-height: 240px; overflow: hidden; background: rgba(0,0,0,.22); border: 1px solid var(--border); border-radius: 11px; }
   .chartwrap canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
   #mklayer { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
   .mkchip { position: absolute; transform: translateX(-50%); white-space: nowrap; }
@@ -265,16 +265,30 @@
     main.content { overflow: visible; }
     aside.tree { width: auto; border-left: none; border-top: 1px solid var(--border); }
     .cardgrid { grid-template-columns: 1fr; }
-    .m-body { flex-direction: column; } .m-side { width: auto; border-left: none; border-top: 1px solid var(--border); padding-left: 0; padding-top: 14px; }
-    .chartwrap { min-height: 320px; } .tiles { grid-template-columns: 1fr 1fr; }
+    /* modal: stack, let it scroll, and give the graph a guaranteed height so it is
+       never lost. flex:none + min-height:auto stops .m-main shrinking below its
+       content (which would overlap the derivation panel). */
+    #modal { inset: 1.6vh 1.6vw; padding: 16px 16px; }
+    .m-body { flex-direction: column; flex: none; gap: 16px; min-height: auto; }
+    .m-main { flex: none; min-height: auto; }
+    .m-side { width: auto; flex: none; border-left: none; border-top: 1px solid var(--border); padding-left: 0; padding-top: 14px; overflow: visible; }
+    .m-side h4 { flex-wrap: wrap; }
+    .chartwrap { flex: none; height: clamp(240px, 42vh, 360px); }
+    .tiles { grid-template-columns: 1fr 1fr; }
   }
-  /* Narrow widths: markers can crowd, so drop the dual chip to a single line
-     (AI date + label only) and tighten it. The dot-com date stays in the hover. */
-  @media (max-width: 640px) {
-    .mkchip .dc { display: none; }
-    .mkchip .ai { font-size: 11px; }
-    .mkchip .eb { font-size: 8px; letter-spacing: .5px; }
-    .tiles { grid-template-columns: 1fr; }
+  /* Phone: full-bleed modal, pinned close, tighter chrome — the graph stays the
+     hero and is never hidden. Marker chips shrink; START + PROJECTED BOTTOM chip
+     labels drop in JS (placeMarkers) when the chart is tight, TODAY + PEAK stay. */
+  @media (max-width: 600px) {
+    #modal { inset: 0; border-radius: 0; padding: 12px 12px 22px; }
+    .m-corner { position: fixed; top: 12px; right: 12px; } .m-corner .btn.dl { display: none; }
+    .crumb { padding-right: 84px; }
+    .m-head { gap: 10px; } .m-head .d { font-size: clamp(24px, 8.5vw, 34px); } .m-head .sub { font-size: 12.5px; }
+    .legend { font-size: 11px; gap: 5px 10px; }
+    .ribbon { font-size: 9px; } .ribbon .seg { letter-spacing: 0; }
+    .chartwrap { height: clamp(230px, 44vh, 320px); }
+    .mkchip .eb { font-size: 8.5px; } .mkchip .ai { font-size: 11px; } .mkchip .dc { font-size: 10px; }
+    .tiles { grid-template-columns: 1fr 1fr; gap: 7px; } .tile .v { font-size: 16px; }
   }
 </style>
 </head>
@@ -825,7 +839,12 @@ function placeMarkers(n, X, wrap) {
     { p: tp, eb: "TODAY", ebc: "var(--text)", col: "var(--text)", ai: fmtMY(DATA.asOf), dc: dcMonth(todayDc), row: 1, align: "C" },
     { p: 100, eb: "PROJECTED PEAK", ebc: "var(--peak)", col: "var(--peak)", ai: fmtMY(n.projectedPeakDate), dc: dcMonth(DATA.dotcomPeak), row: 0, align: "C" },
     { p: BOTTOM_PROG, eb: "PROJECTED BOTTOM", ebc: "var(--bottom)", col: "var(--bottom)", ai: fmtMY(n.projectedBottomDate), dc: dcMonth(DOT_END_ISO), row: 1, align: "R" }];
-  (ok ? MK : MK.slice(0, 2)).forEach(m => { const c = document.createElement("div"); c.className = "mkchip"; c.style.left = X(m.p) + "px"; c.style.top = (m.row === 0 ? 4 : 40) + "px";
+  // At tight chart widths the four chips crowd, so drop only the START and
+  // PROJECTED BOTTOM labels; TODAY and PEAK always stay. The vertical LINES are
+  // canvas-drawn in drawBig, so they remain at every width.
+  let chips = ok ? MK : MK.slice(0, 2);
+  if ((wrap.clientWidth || 999) < 520) chips = chips.filter(m => m.eb === "TODAY" || m.eb === "PROJECTED PEAK");
+  chips.forEach(m => { const c = document.createElement("div"); c.className = "mkchip"; c.style.left = X(m.p) + "px"; c.style.top = (m.row === 0 ? 4 : 40) + "px";
     c.style.transform = m.align === "L" ? "translateX(-8px)" : m.align === "R" ? "translateX(calc(-100% + 8px))" : "translateX(-50%)";
     c.innerHTML = `<div class="eb" style="color:${m.ebc}">${m.eb}</div><div class="ai">${m.ai}</div><div class="dc">${m.dc}</div><div class="caret2" style="color:${m.col}">▼</div>`;
     layer.appendChild(c); });

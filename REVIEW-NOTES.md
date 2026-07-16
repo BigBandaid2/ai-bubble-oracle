@@ -210,3 +210,40 @@ in the preview (no console errors on any page).
   `oracle/metrics/_template.py` (the credential-gated skeleton, also the CI
   lint fixture). PR CI (`pr-check.yml`) = compileall + `main.py check` +
   `verify-pages`, deterministic and credential-free.
+
+## (f) Design integration v2 — §4.6 responsive metric modal (2026-07-16)
+
+The v2 brief's landing refinements (§4.1-4.5), the shared 4-link nav, and the
+About port were already live from the earlier DI pass; the new work in v2 was
+the responsive metric-detail modal (§4.6). Ported the mock's rules verbatim
+into `oracle/thennow_template.html`:
+
+- **Guaranteed graph height.** Base `.chartwrap` floor raised `min-height: 0`
+  -> `240px`; at <=1000px it becomes `flex: none; height: clamp(240px, 42vh,
+  360px)` (and `clamp(230px, 44vh, 320px)` at <=600px) so the canvas wrapper
+  can never collapse when the layout stacks. The existing resize handler
+  (line ~999) already redraws the canvas to the wrapper.
+- **Stack without overlap.** Base `#modal` gets `overflow: hidden auto`; at
+  <=1000px `.m-body`/`.m-main` become `flex: none; min-height: auto` and
+  `.m-side` becomes `flex: none; overflow: visible`. This is the fix for the
+  reported bug where `.m-main` (flex:1, min-height:0) shrank below its content
+  and the evidence tiles overlapped the derivation panel. Verified: tiles
+  bottom sits 16px ABOVE the derivation panel at both 900px and phone width.
+- **Phone full-bleed + pinned close.** At <=600px the modal is `inset: 0`, no
+  radius, and `.m-corner` becomes `position: fixed` (Download hidden) so the
+  close stays reachable as the modal scrolls.
+- **Marker labels degrade in order.** `placeMarkers()` now drops only the
+  START and PROJECTED BOTTOM chip labels when the chart is < 520px wide;
+  TODAY and PROJECTED PEAK always stay. The four vertical LINES are canvas-
+  drawn in `drawBig()` and untouched, so they remain at every width.
+
+Verified by measuring live geometry at 1280 / 900 / ~500px: graph visible at
+all three (391 / 336 / 320px), no tile/derivation overlap, peak label present
+whenever a projection exists, and a no-projection metric (Semiconductor
+production) keeps its graph and shows only the TODAY chip.
+
+The rest of the brief was confirmed intact, not rebuilt: shared nav on all
+four pages; Polymarket keeps its roll-up tree + shared drawer (reskin only, no
+modal); Data Sources keeps its `#src:` anchors + drawer; kicker / one-line
+verdict / sort control / No-Projection cards / grey `nop` tree dot /
+collapse-all all present.
