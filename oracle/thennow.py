@@ -56,6 +56,31 @@ RAMP = _days(CLOCK["start"], CLOCK["peak"])   # days from cycle start to the pea
 # the projected-bottom marker and scales each metric's projected bottom by its pace.
 BOTTOM_PROG = _days(CLOCK["start"], CLOCK["bottom"]) / RAMP * 100.0
 
+# The dot-com start anchor is the model's single biggest assumption. Two declared
+# choices: the Netscape IPO (default; the popular "birth of the dot-com era") and
+# Greenspan's "irrational exuberance" speech 16 months later, the first time a
+# sitting Fed chair called the market overvalued. The later anchor shortens the
+# reference climb (~1675d -> ~1191d), which lifts AI's normalized intensity against
+# a shorter yardstick and (net) tightens the projection band, pulling the far-future
+# speculative tail in. It re-baselines and re-domains the DOT-COM reference only;
+# the AI-era start (aiStart) is a separate knob, unchanged by this choice.
+START_ANCHORS = [
+    {"key": "netscape", "start": CLOCK["start"], "event": CLOCK["startEvent"], "default": True},
+    {"key": "exuberance", "start": "1996-12-05", "event": "Irrational Exuberance speech"},
+]
+DEFAULT_START = "netscape"
+ALT_START = next(a["key"] for a in START_ANCHORS if not a.get("default"))
+# every (anchor, smoothing-window) permutation the engine materializes per node
+PERM_KEYS = [(a["key"], w) for a in START_ANCHORS for w in SMOOTH_WINDOWS]
+
+
+def _ramp_of(start_iso):
+    return _days(start_iso, CLOCK["peak"])
+
+
+def _bottom_prog_of(start_iso, ramp):
+    return _days(start_iso, CLOCK["bottom"]) / ramp * 100.0
+
 
 # ---------------------------------------------------------------- metric registry
 # Metric declarations live as one module each under oracle/metrics/ (see
@@ -164,13 +189,15 @@ def _smooth_centered(vals, window_days):
 
 
 # ---------------------------------------------------------------- normalization
-def _normalize(sm_dot, sm_ai, type_):
+def _normalize(sm_dot, sm_ai, type_, ramp=RAMP):
     """Map smoothed native values to 0-1 intensity over the dot-com range, with
     intensity = 1 anchored to the value AT the declared peak (so the reference
     line crests on the peak marker). ratio_from_start indexes each era to its own
-    start; absolute_level compares levels on the dot-com anchors."""
+    start; absolute_level compares levels on the dot-com anchors. `ramp` selects
+    the start anchor: sm_dot is built on that anchor's grid, so sm_dot[0] is the
+    value at the start and sm_dot[ramp] the value at the (fixed) peak."""
     start_dot = sm_dot[0]
-    peak_dot = sm_dot[RAMP]                              # value at the declared peak date
+    peak_dot = sm_dot[ramp]                              # value at the declared peak date
     if type_ == "ratio_from_start":
         peak_mult = peak_dot / start_dot
         denom = (peak_mult - 1) or 1e-9
@@ -193,7 +220,7 @@ def _phase_of(progress):
     return label
 
 
-def _match(target, int_dot, mode="dominant"):
+def _match(target, int_dot, mode="dominant", ramp=RAMP):
     """Where `target` sits on the dot-com ramp (progress<=100), as a progress %.
 
     The ramp is not monotone (the 1998 crisis pulls it back below levels it had
@@ -202,8 +229,10 @@ def _match(target, int_dot, mode="dominant"):
         through this level on its sustained approach to the peak. This is the
         dominant climb leg, and it is the default: an early touch that a later
         correction undid does not represent how far along the cycle we are.
-      - "first": the EARLIEST crossing (the first date the level was reached)."""
-    lim = min(len(int_dot) - 1, RAMP)
+      - "first": the EARLIEST crossing (the first date the level was reached).
+
+    `ramp` is the active start anchor's days-to-peak (int_dot is on that grid)."""
+    lim = min(len(int_dot) - 1, ramp)
     if target <= (int_dot[0] or 0):
         return 0.0
     crossings = []  # (progress, is_upward)
@@ -213,32 +242,36 @@ def _match(target, int_dot, mode="dominant"):
             continue
         if (v0 - target) * (v1 - target) <= 0:
             f = (target - v0) / (v1 - v0)
-            crossings.append(((i - 1 + f) / RAMP * 100.0, v1 > v0))
+            crossings.append(((i - 1 + f) / ramp * 100.0, v1 > v0))
     if not crossings:
-        return lim / RAMP * 100.0
+        return lim / ramp * 100.0
     if mode == "dominant":
         ups = [p for p, up in crossings if up]
         return ups[-1] if ups else crossings[-1][0]
     return crossings[0][0]
 
 
-def _evaluate(int_dot, int_ai, today, mode="dominant"):
+def _evaluate(int_dot, int_ai, today, mode="dominant",
+              start=CLOCK["start"], ramp=RAMP, bottom_prog=BOTTOM_PROG):
     """Analogy + projection on a node's daily curves (scalars, exact daily).
     `mode` selects the ramp matching (see _match); the site default is
-    "dominant" — the backtester (oracle/stability.py) evaluates both."""
+    "dominant" — the backtester (oracle/stability.py) evaluates both. `start`,
+    `ramp`, `bottom_prog` select the dot-com start anchor and default to the
+    Netscape clock; the AI elapsed time is measured from aiStart regardless, so
+    the anchor reshapes the reference timeline only."""
     ai_now = next((v for v in reversed(int_ai) if v is not None), 0.0)
-    eq = _match(ai_now, int_dot, mode)
-    equiv_date = date.fromordinal(_d(CLOCK["start"]).toordinal() + round(eq / 100 * RAMP))
+    eq = _match(ai_now, int_dot, mode, ramp)
+    equiv_date = date.fromordinal(_d(start).toordinal() + round(eq / 100 * ramp))
     ai_elapsed = _days(CLOCK["aiStart"], today.isoformat())
-    dot_done = max(eq, 0.0) / 100 * RAMP
+    dot_done = max(eq, 0.0) / 100 * ramp
     ratio = ai_elapsed / dot_done if dot_done > 0 else 1.0
-    dot_left = max(100.0 - eq, 0.0) / 100 * RAMP
+    dot_left = max(100.0 - eq, 0.0) / 100 * ramp
     proj = date.fromordinal(today.toordinal() + round(ratio * dot_left))
     # Projected bottom: the remaining distance to the declared 2002 low, at this
     # node's own measured pace (same rate-scaling as the peak).
-    bottom_left = max(BOTTOM_PROG - eq, 0.0) / 100 * RAMP
+    bottom_left = max(bottom_prog - eq, 0.0) / 100 * ramp
     bottom = date.fromordinal(today.toordinal() + round(ratio * bottom_left))
-    ramp_max = max((v for v in int_dot[:min(len(int_dot), RAMP + 1)] if v is not None), default=1.0)
+    ramp_max = max((v for v in int_dot[:min(len(int_dot), ramp + 1)] if v is not None), default=1.0)
     return {
         "intensityNow": round(ai_now, 4),
         "equiv": {"progress": round(eq, 2), "intensity": round(ai_now, 4)},
@@ -265,14 +298,14 @@ def _last_val(a):
     return next((v for v in reversed(a) if v is not None), None)
 
 
-def _validate(sm_dot, sm_ai, int_dot, int_ai, direction, min_range=0.2):
+def _validate(sm_dot, sm_ai, int_dot, int_ai, direction, min_range=0.2, ramp=RAMP):
     up = direction != "down"
     checks = []
 
     def add(name, ok, detail):
         checks.append({"name": name, "pass": bool(ok), "detail": detail})
 
-    start_dot, peak_dot = sm_dot[0], sm_dot[RAMP]
+    start_dot, peak_dot = sm_dot[0], sm_dot[ramp]
     # pass 1 — candidacy
     covers = _first(sm_dot) is not None and _first(sm_ai) is not None
     add("covers both eras", covers,
@@ -289,7 +322,7 @@ def _validate(sm_dot, sm_ai, int_dot, int_ai, direction, min_range=0.2):
     interior = bool(n) and 0.15 * n < ext_i < 0.9 * n
     reverses = bool(n) and ((seq[-1] < seq[ext_i] * 0.92) if up else (seq[-1] > seq[ext_i] * 1.08))
     add("rise, peak, fall", interior and reverses,
-        f"peaks near {ext_i / RAMP * 100:.0f}% then reverses" if interior and reverses
+        f"peaks near {ext_i / ramp * 100:.0f}% then reverses" if interior and reverses
         else "no clear interior peak in the reference era")
     ai_now = _last_val(int_ai) or 0.0
     add("AI below the peak", ai_now < 1.02, f"AI at {ai_now * 100:.0f}% of the dot-com peak")
@@ -303,7 +336,7 @@ def _validate(sm_dot, sm_ai, int_dot, int_ai, direction, min_range=0.2):
         else "AI is flat or moving away from the peak")
 
     # AI's current level crossed on the dot-com ramp (informational, not gating)
-    lim = min(len(int_dot) - 1, RAMP)
+    lim = min(len(int_dot) - 1, ramp)
     crossings = 0
     for i in range(1, lim + 1):
         v0, v1 = int_dot[i - 1], int_dot[i]
@@ -391,19 +424,20 @@ def _fmt_level(v):
     return f"{v:,.0f}" if abs(v) >= 100 else f"{v:.1f}" if abs(v) >= 10 else f"{v:.2f}"
 
 
-def _leaf_copy(m, node, sm_dot, sm_ai):
+def _leaf_copy(m, node, sm_dot, sm_ai, ramp=RAMP):
     """The 'today' display and the 'vs dot-com' note for a leaf, from a given
-    smoothed series (so it can be recomputed per smoothing window)."""
+    smoothed series (so it can be recomputed per smoothing window / start anchor).
+    `ramp` indexes the peak on the active anchor's grid."""
     name = node["label"]
     if m["type"] == "ratio_from_start":
         ai_mult = sm_ai[-1] / sm_ai[0]
-        peak_mult = sm_dot[RAMP] / sm_dot[0]
+        peak_mult = sm_dot[ramp] / sm_dot[0]
         display = f"up {ai_mult:.1f}x since ChatGPT"
         different = (f"{name} is up about {ai_mult:.1f}x since ChatGPT against roughly "
                      f"{peak_mult:.1f}x for the same series into 2000, so on this measure "
                      "the AI era reads earlier than the dot-com run.")
     else:
-        now, pk = sm_ai[-1], sm_dot[RAMP]
+        now, pk = sm_ai[-1], sm_dot[ramp]
         rel = ("already past" if now > pk else "close to" if now > 0.9 * pk and pk > 0
                else "still below")
         display = f"{m['unitLabel']} {_fmt_level(now)}"
@@ -412,29 +446,47 @@ def _leaf_copy(m, node, sm_dot, sm_ai):
     return display, different
 
 
-def _build_leaf(conn, node, dot_dates, ai_dates, today):
+def _build_leaf(conn, node, dot_grids, ai_dates, today):
     m = node["metric"]
     pairs = _load_metric(conn, m)
     if not pairs:
         return None
-    raw_dot = _fill(pairs, dot_dates)
     raw_ai = _fill(pairs, ai_dates)
-    if raw_dot[0] is None or raw_ai[0] is None:
-        return None                                   # no coverage (validator refines later)
+    if raw_ai[0] is None:
+        return None                                   # metric never reaches the AI era
 
-    # Materialize BOTH smoothing windows (Phase 4): the 90-day "3-month" default and
-    # the 30-day "1-month" alternative. Each is its own dataset; the page's Options
-    # drawer toggles which one every graph reads, visibly moving the projected date.
+    # Materialize every (start-anchor x smoothing-window) permutation. Each anchor
+    # re-domains the dot-com reference from a different start, so its raw dot series,
+    # ramp, and normalization baseline all differ; the 90-day "3-month" default and
+    # 30-day "1-month" alternative smooth each. The Options drawer toggles which
+    # (start, smoothing) pair every graph and projection reads. Because the alt start
+    # is strictly later than the default, forward-fill guarantees any leaf with
+    # coverage at the default start also has it at the alt start.
     perms = {}
-    for key, win in SMOOTH_WINDOWS.items():
-        sm_dot = _smooth_centered(raw_dot, win)
-        sm_ai = _smooth_centered(raw_ai, win)
-        int_dot, int_ai = _normalize(sm_dot, sm_ai, m["type"])
-        disp, _diff = _leaf_copy(m, node, sm_dot, sm_ai)
-        perms[key] = {"sm_dot": sm_dot, "sm_ai": sm_ai, "int_dot": int_dot,
-                      "int_ai": int_ai, "display": disp}
+    default_raw_dot = alt_raw_dot = None
+    for anchor in START_ANCHORS:
+        raw_dot = _fill(pairs, dot_grids[anchor["key"]])
+        if raw_dot[0] is None:
+            if anchor["key"] == DEFAULT_START:
+                return None                           # no coverage at the canonical start
+            continue
+        ramp = _ramp_of(anchor["start"])
+        for win, wd in SMOOTH_WINDOWS.items():
+            sm_dot = _smooth_centered(raw_dot, wd)
+            sm_ai = _smooth_centered(raw_ai, wd)
+            int_dot, int_ai = _normalize(sm_dot, sm_ai, m["type"], ramp)
+            disp, _diff = _leaf_copy(m, node, sm_dot, sm_ai, ramp)
+            perms[(anchor["key"], win)] = {"sm_dot": sm_dot, "sm_ai": sm_ai, "int_dot": int_dot,
+                                           "int_ai": int_ai, "display": disp, "ramp": ramp}
+        if anchor["key"] == DEFAULT_START:
+            default_raw_dot = raw_dot
+        elif anchor["key"] == ALT_START:
+            alt_raw_dot = raw_dot
 
-    d = perms[DEFAULT_SMOOTH]      # scalars, validation, and prose come from the default window
+    # scalars, validation, and prose come from the default (Netscape, 90-day) clock;
+    # conformance is judged once here and reused across every start (empirically the
+    # verdict is start-invariant, see REVIEW-NOTES)
+    d = perms[(DEFAULT_START, DEFAULT_SMOOTH)]
     result = _evaluate(d["int_dot"], d["int_ai"], today)
     validation = _validate(d["sm_dot"], d["sm_ai"], d["int_dot"], d["int_ai"],
                            m["direction"], m.get("minRange", 0.2))
@@ -444,10 +496,11 @@ def _build_leaf(conn, node, dot_dates, ai_dates, today):
             "unitLabel": m["unitLabel"], "type": m["type"], "display": display, "different": different,
             "valid": validation["valid"], "validation": validation,
             "_intDot": d["int_dot"], "_intAi": d["int_ai"], "_smDot": d["sm_dot"], "_smAi": d["sm_ai"],
-            "_rawDot": raw_dot, "_rawAi": raw_ai, "_perms": perms, **result}
+            "_rawDot": default_raw_dot, "_rawAi": raw_ai, "_altRawDot": alt_raw_dot,
+            "_perms": perms, **result}
 
 
-def _build(conn, node, dot_dates, ai_dates, today):
+def _build(conn, node, dot_grids, ai_dates, today):
     if node.get("wip"):
         return {"key": node["key"], "label": node["label"], "wip": True}
     if node.get("stub"):
@@ -456,8 +509,8 @@ def _build(conn, node, dot_dates, ai_dates, today):
         return {"key": node["key"], "label": node["label"], "stub": True,
                 "requires": node.get("requires", "credentials required")}
     if "metric" in node:
-        return _build_leaf(conn, node, dot_dates, ai_dates, today)
-    kids = [_build(conn, c, dot_dates, ai_dates, today) for c in node["children"]]
+        return _build_leaf(conn, node, dot_grids, ai_dates, today)
+    kids = [_build(conn, c, dot_grids, ai_dates, today) for c in node["children"]]
     live = [k for k in kids if k and not (k.get("wip") or k.get("stub"))]
     placeholders = [k for k in kids if k and (k.get("wip") or k.get("stub"))]
     if not live:
@@ -469,16 +522,22 @@ def _build(conn, node, dot_dates, ai_dates, today):
     use = valid_live or live
     declared = node.get("weights")
     weights = [declared.get(k["key"], 1.0) for k in use] if declared else None
-    int_dot = _blend([k["_intDot"] for k in use], weights)
-    int_ai = _blend([k["_intAi"] for k in use], weights)
-    result = _evaluate(int_dot, int_ai, today)
+    # Blend each (start, smoothing) permutation independently over the same
+    # conforming set + weights, so the roll-up's projection reflows correctly under
+    # whichever pair the reader selects. Every live leaf carries all PERM_KEYS (the
+    # coverage invariant in _build_leaf), so direct access is safe.
+    perms = {pk: {"int_dot": _blend([k["_perms"][pk]["int_dot"] for k in use], weights),
+                  "int_ai": _blend([k["_perms"][pk]["int_ai"] for k in use], weights)}
+             for pk in PERM_KEYS}
+    d = perms[(DEFAULT_START, DEFAULT_SMOOTH)]
+    result = _evaluate(d["int_dot"], d["int_ai"], today)
     valid = len(valid_live) > 0
     validation = {"valid": valid, "crossings": 0, "checks": [
         {"name": "conforming inputs", "pass": valid,
          "detail": f"{len(valid_live)} of {len(live)} inputs fit the analogy"}]}
     out = {"key": node["key"], "label": node["label"], "display": "blended",
-           "valid": valid, "validation": validation,
-           "children": live + placeholders, "_intDot": int_dot, "_intAi": int_ai, **result}
+           "valid": valid, "validation": validation, "children": live + placeholders,
+           "_intDot": d["int_dot"], "_intAi": d["int_ai"], "_perms": perms, **result}
     if declared:
         out["weights"] = declared
     return out
@@ -496,8 +555,10 @@ def _pick(arr, idx, nd=4):
     return [round(arr[i], nd) if arr[i] is not None else None for i in idx]
 
 
-def _emit(node, dw, aw):
-    """Recursively build the weekly payload node (arrays downsampled to weekly)."""
+def _emit(node, dw, aw, dw_alt):
+    """Recursively build the weekly payload node (arrays downsampled to weekly).
+    dw indexes the default dot grid, aw the AI grid, dw_alt the alt-anchor dot grid
+    (shorter, re-domained from the later start)."""
     if node.get("wip"):
         return {"key": node["key"], "label": node["label"], "wip": True}
     if node.get("stub"):
@@ -514,16 +575,29 @@ def _emit(node, dw, aw):
         out["type"] = node["type"]; out["different"] = node["different"]
         out["smoothedDot"] = _pick(node["_smDot"], dw, 2); out["smoothedAi"] = _pick(node["_smAi"], aw, 2)
         out["rawDot"] = _pick(node["_rawDot"], dw, 2); out["rawAi"] = _pick(node["_rawAi"], aw, 2)
-        # the alternate smoothing window (30-day); the default (90) is the top-level set
-        alt = node.get("_perms", {}).get("30")
+        perms = node.get("_perms", {})
+        # the alternate smoothing window (30-day) on the default anchor; the default
+        # (90) is the top-level set
+        alt = perms.get((DEFAULT_START, "30"))
         if alt:
             out["alt30"] = {"intensityDot": _pick(alt["int_dot"], dw), "intensityAi": _pick(alt["int_ai"], aw),
                             "smoothedDot": _pick(alt["sm_dot"], dw, 2), "smoothedAi": _pick(alt["sm_ai"], aw, 2),
                             "display": alt["display"]}
+        # the alternate START anchor: its own (shorter) dot grid + both windows, so the
+        # Options toggle can swap the whole reference. AI curves re-normalize per anchor
+        # (the denominator is the dot-com climb, which the anchor changes).
+        a90, a30 = perms.get((ALT_START, "90")), perms.get((ALT_START, "30"))
+        if a90 and a30 and node.get("_altRawDot") is not None:
+            def altw(p):
+                return {"intensityDot": _pick(p["int_dot"], dw_alt), "intensityAi": _pick(p["int_ai"], aw),
+                        "smoothedDot": _pick(p["sm_dot"], dw_alt, 2), "smoothedAi": _pick(p["sm_ai"], aw, 2),
+                        "display": p["display"]}
+            out["altStart"] = {"rawDot": _pick(node["_altRawDot"], dw_alt, 2),
+                               "90": altw(a90), "30": altw(a30)}
     if "weights" in node:
         out["weights"] = node["weights"]
     if "children" in node:
-        out["children"] = [_emit(c, dw, aw) for c in node["children"]]
+        out["children"] = [_emit(c, dw, aw, dw_alt) for c in node["children"]]
     return out
 
 
@@ -537,20 +611,43 @@ def _leaf_dates(node, acc):
 
 
 # --------------------------------------------------------------------- assemble
+def _alt_clock_block(alt_grid, ai_dates, aw, dw_alt, root, today):
+    """The non-default start anchor's clock + weekly axes, so the client can reflow
+    the whole reference when the reader toggles the start. headlineDate is the
+    alt-anchor root projection (a static preview; the client recomputes live)."""
+    anchor = next(a for a in START_ANCHORS if a["key"] == ALT_START)
+    ramp = _ramp_of(anchor["start"])
+    bprog = _bottom_prog_of(anchor["start"], ramp)
+    ad = root["_perms"][(ALT_START, DEFAULT_SMOOTH)]
+    head = _evaluate(ad["int_dot"], ad["int_ai"], today, "dominant",
+                     anchor["start"], ramp, bprog)["projectedPeakDate"]
+    return {
+        "key": anchor["key"], "start": anchor["start"], "event": anchor["event"],
+        "ramp": ramp, "bottomProgress": round(bprog, 2),
+        "peakIdx": min(range(len(dw_alt)), key=lambda k: abs(dw_alt[k] - ramp)),
+        "progDot": [round(i / ramp * 100, 2) for i in dw_alt],
+        "progAi": [round(i / ramp * 100, 2) for i in aw],
+        "dotMonths": [alt_grid[i] for i in dw_alt],
+        "headlineDate": head,
+    }
+
+
 def compute_thennow(conn):
     today = _today()
-    dot_dates = _grid(CLOCK["start"], CLOCK["bottom"])
+    dot_grids = {a["key"]: _grid(a["start"], CLOCK["bottom"]) for a in START_ANCHORS}
+    dot_dates = dot_grids[DEFAULT_START]
     ai_dates = _grid(CLOCK["aiStart"], today.isoformat())
     from . import registry
-    root = _build(conn, registry.build_tree(), dot_dates, ai_dates, today)
+    root = _build(conn, registry.build_tree(), dot_grids, ai_dates, today)
     if not root:
         return None
 
     dw, aw = _weekly_idx(len(dot_dates)), _weekly_idx(len(ai_dates))
+    dw_alt = _weekly_idx(len(dot_grids[ALT_START]))
     prog_dot = [round(i / RAMP * 100, 2) for i in dw]
     prog_ai = [round(i / RAMP * 100, 2) for i in aw]
     peak_idx = min(range(len(dw)), key=lambda k: abs(dw[k] - RAMP))
-    tree = _emit(root, dw, aw)
+    tree = _emit(root, dw, aw, dw_alt)
     _attach_observations(tree, _load_obs_cache())
 
     dates = []
@@ -571,6 +668,12 @@ def compute_thennow(conn):
         "bandLow": dates[0] if dates else tree["projectedPeakDate"],
         "bandHigh": dates[-1] if dates else tree["projectedPeakDate"],
         "tree": tree,
+        # selectable dot-com start anchors + the non-default anchor's clock/axes,
+        # for the Options "Dot-com start" toggle (default projections above are the
+        # canonical Netscape clock; the alt is opt-in and reflows client-side)
+        "startAnchors": [{"key": a["key"], "start": a["start"], "event": a["event"],
+                          "default": bool(a.get("default"))} for a in START_ANCHORS],
+        "altStart": _alt_clock_block(dot_grids[ALT_START], ai_dates, aw, dw_alt, root, today),
         # leaf-kind / branch-key → Data Sources group anchor, from the modules'
         # ir declarations (drives the "full method & sources" links)
         "srcGroups": registry.src_groups(),

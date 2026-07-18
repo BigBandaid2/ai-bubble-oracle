@@ -6,5 +6,5 @@
   "news_query_version": 3,
   "news_k": 0.0312,
   "events_version": 3,
-  "gdelt_throttle_streak": 0
+  "gdelt_throttle_streak": 1
 }

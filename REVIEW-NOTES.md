@@ -305,3 +305,61 @@ collapse-all all present.
   site-default weights" means 90/10 throughout; the optimizer gate now
   replays SITE-DEFAULT weights (0 mismatches x 7 roll-ups); the panel
   footnote and weight-check line disclose the adopted default.
+
+## (i) Alternate dot-com start anchor: Irrational Exuberance (2026-07-18)
+
+The dot-com start is the model's single biggest assumption. Added a second,
+selectable start anchor -- Greenspan's "irrational exuberance" speech
+(1996-12-05) alongside the default Netscape IPO (1995-08-09) -- as an Options
+toggle, with the full alternate projection set and backtest.
+
+What moving the anchor does. The later start shortens the reference climb
+(1675d -> 1191d). Against a shorter yardstick AI's normalized intensity reads
+higher (matches further along -> earlier) while the pace multiplier rises
+(-> later); the net differs by metric. The ROOT headline is remarkably robust
+(Sep 14 -> Sep 5, 2027, -9d today) because the blend washes out the
+sensitivity, but individual metrics move a lot and the far-future speculative
+tail collapses inward: speculation Apr 2031 -> Dec 2029, margin debt
+2031 -> 2028; the projection band tightens from ~4.3y to ~3.3y. No metric
+changes conformance (9 conforming either way). It reshapes the DOT-COM
+reference only; the AI-era start (aiStart) is untouched -- ai_elapsed is
+measured from aiStart regardless of the dot-com anchor.
+
+Engine. `START_ANCHORS` declares the two; `_normalize`/`_match`/`_evaluate`/
+`_validate`/`_leaf_copy` gained a `ramp`/`start`/`bottom_prog` parameter that
+defaults to the Netscape globals (so the default path is byte-identical --
+verified: all 15 node projections match the pre-refactor build for the same
+`today`). Every node now carries per-(anchor,window) curves in `_perms`;
+roll-ups blend each permutation over the same conforming set + weights. Leaves
+with default-start coverage always have alt-start coverage (the alt start is
+strictly later + forward-fill), so all four perm curves are present.
+
+Design choices. (1) Conformance is judged ONCE at the default anchor and
+reused across starts -- empirically start-invariant (9/9 both ways), and it
+keeps the client's single `valid`/suppression path. (2) The weight optimizer
+stays on the default anchor (replays the unchanged `proj_90_dominant`); its
+gate still reproduces the ledger with 0 mismatches across all 7 roll-ups.
+(3) The default stays Netscape: the live headline, hero, tree, and share card
+are unchanged; the alt is opt-in and resets on reload (a modeling assumption,
+like smoothing/matching, not a persisted view preference).
+
+Ledger. Schema went 4 -> 8 projection columns: the existing four
+(`proj_90_dominant` ...) remain the Netscape default (byte-stable, so the
+optimizer and older readers are untouched); four `proj_exuberance_*` columns
+were added. The 562-day backfill was regenerated (10,716 rows). Note: this
+regen also made the 30-day roll-up projections weight-consistent -- the prior
+`_curves_30` blended equal-weight and ignored declared weights, so 30-day
+speculation/root rows shifted slightly (a correction; the headline-driving
+90-day default was already weight-correct and is unchanged).
+
+Client. The start-dependent clock constants became mutable bindings re-pointed
+by `loadClock()`; a `CLOCKS` map holds each anchor's ramp/axis/baseline (xmax
+held literally so the default stays 162; the alt extends to its later ~179%
+bottom). `applyStart` swaps the clock + every leaf's active curves and
+re-blends, so headline, cards, tree, modal chart axes, the projection line,
+`stabPerm()` (hence the trend arrows, stability panel, and Projection-drift
+sort), and the ribbon all reflow to the active anchor. It composes with
+smoothing, matching, and weights. Verified in preview: default byte-identical,
+Exuberance reflow correct (chart axis starts 1996-12-05, speculation flips
+from +49.5 d/mo receding to -28.6 d/mo converging), round-trip identical,
+compositions clean, console error-free.

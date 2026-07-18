@@ -33,63 +33,72 @@ from . import thennow as tn
 LEDGER_PATH = PROJECT_DIR / "data" / "projection_history.csv"
 BACKTEST_START = "2025-01-01"
 
-PERM_KEYS = ("90_dominant", "90_first", "30_dominant", "30_first")
-_COLS = ["as_of", "node", "source", "valid",
-         "proj_90_dominant", "proj_90_first", "proj_30_dominant", "proj_30_first",
-         "int_90", "int_30"]
+def _perm_id(anchor, win, mode):
+    """Stability permutation id. The default (Netscape) anchor stays UNPREFIXED,
+    so its columns/keys are byte-identical to the 4-perm era and the weight
+    optimizer keeps reading proj_90_dominant; the alt anchor is prefixed by key
+    (e.g. exuberance_90_dominant)."""
+    base = f"{win}_{mode}"
+    return base if anchor == tn.DEFAULT_START else f"{anchor}_{base}"
+
+
+# every (start-anchor x smoothing x matching) permutation, default anchor first
+PERM_KEYS = tuple(_perm_id(a["key"], win, mode)
+                  for a in tn.START_ANCHORS
+                  for win in ("90", "30") for mode in ("dominant", "first"))
+_COLS = (["as_of", "node", "source", "valid"]
+         + [f"proj_{p}" for p in PERM_KEYS]
+         + ["int_90", "int_30"])
 
 _PROVENANCE = """\
 # projection_history.csv — the projection ledger: one row per (as_of, node).
 # For each day, the projected peak the engine produced with data through as_of,
-# under all four option permutations (90/30-day smoothing x dominant-leg/first-
-# crossing matching). source=backfill rows are reconstructed from FINAL data
-# (post-revision, no publication-lag simulation) by `python main.py backtest`;
-# source=live rows were written on their own day by the nightly update and are
-# genuinely point-in-time. `valid` is the 90d default-window verdict (the site
-# keeps that verdict across the smoothing toggle); int_90/int_30 are the node's
-# end-of-day intensity per smoothing window at full float precision (the
-# weight optimizer re-blends them). Derived entirely from this repo's own
-# committed source data; regenerate with `python main.py backtest`.
+# under every option permutation: dot-com START anchor (Netscape default /
+# Irrational-Exuberance alt) x 90/30-day smoothing x dominant-leg/first-crossing
+# matching. Default-anchor columns are unprefixed (proj_90_dominant ...); the alt
+# anchor is prefixed (proj_exuberance_90_dominant ...). source=backfill rows are
+# reconstructed from FINAL data (post-revision, no publication-lag simulation) by
+# `python main.py backtest`; source=live rows were written on their own day by the
+# nightly update and are genuinely point-in-time. `valid` is the 90d default-window
+# verdict (start-invariant; the site keeps it across every toggle); int_90/int_30
+# are the node's default-anchor end-of-day intensity per smoothing window at full
+# float precision (the weight optimizer re-blends them). Derived entirely from this
+# repo's own committed source data; regenerate with `python main.py backtest`.
 """
 
 
-def _curves_30(node):
-    """A node's 30-day-window intensity curves. Leaves carry them; roll-ups
-    blend their children's, over the same conforming set the default-window
-    verdict chose (mirrors _build + the page's recomputeTree)."""
-    perms = node.get("_perms")
-    if perms:
-        return perms["30"]["int_dot"], perms["30"]["int_ai"]
-    kids = [k for k in node.get("children", [])
-            if not (k.get("wip") or k.get("stub"))]
-    valid_live = [k for k in kids if k.get("valid", True)]
-    use = valid_live or kids
-    pairs = [_curves_30(k) for k in use]
-    return (tn._blend([d for d, _ in pairs]),
-            tn._blend([a for _, a in pairs]))
-
-
 def snapshot(conn, as_of, source):
-    """One engine build with the AI grid ending at as_of; returns ledger rows
-    for every computed node (all four permutation projections)."""
+    """One engine build with the AI grid ending at as_of; returns ledger rows for
+    every computed node, projecting under every (start, smoothing, matching)
+    permutation. The dot-com reference (both anchors) is static; only the cheap
+    evaluate step varies per permutation."""
     from . import registry
-    dot_dates = tn._grid(tn.CLOCK["start"], tn.CLOCK["bottom"])
+    dot_grids = {a["key"]: tn._grid(a["start"], tn.CLOCK["bottom"])
+                 for a in tn.START_ANCHORS}
     ai_dates = tn._grid(tn.CLOCK["aiStart"], as_of.isoformat())
-    root = tn._build(conn, registry.build_tree(), dot_dates, ai_dates, as_of)
+    root = tn._build(conn, registry.build_tree(), dot_grids, ai_dates, as_of)
     rows = []
 
     def walk(n):
         if not n or n.get("wip") or n.get("stub"):
             return
-        dot90, ai90 = n["_intDot"], n["_intAi"]
-        dot30, ai30 = _curves_30(n)
+        # every node (leaf AND roll-up) now carries per-(anchor,window) curves;
+        # each anchor brings its own clock (start / ramp / bottom-progress)
         projs = {}
-        for win, (dot, ai) in (("90", (dot90, ai90)), ("30", (dot30, ai30))):
-            for mode in ("dominant", "first"):
-                projs[f"proj_{win}_{mode}"] = tn._evaluate(
-                    dot, ai, as_of, mode)["projectedPeakDate"]
+        for a in tn.START_ANCHORS:
+            ramp = tn._ramp_of(a["start"])
+            bprog = tn._bottom_prog_of(a["start"], ramp)
+            for win in ("90", "30"):
+                c = n["_perms"][(a["key"], win)]
+                for mode in ("dominant", "first"):
+                    projs["proj_" + _perm_id(a["key"], win, mode)] = tn._evaluate(
+                        c["int_dot"], c["int_ai"], as_of, mode,
+                        a["start"], ramp, bprog)["projectedPeakDate"]
         # full float precision: the weight optimizer re-blends these, and a
-        # rounded intensity can nudge a projection across a day boundary
+        # rounded intensity can nudge a projection across a day boundary. int_90/30
+        # stay the DEFAULT anchor's AI intensity (the optimizer runs on it).
+        ai90 = n["_perms"][(tn.DEFAULT_START, "90")]["int_ai"]
+        ai30 = n["_perms"][(tn.DEFAULT_START, "30")]["int_ai"]
         int90, int30 = tn._last_val(ai90), tn._last_val(ai30)
         rows.append({
             "as_of": as_of.isoformat(), "node": n["key"], "source": source,
@@ -275,9 +284,12 @@ def _structure(conn):
     curves are reconstructed per day from these."""
     from . import registry
     today = tn._today()
-    dot_dates = tn._grid(tn.CLOCK["start"], tn.CLOCK["bottom"])
+    # the optimizer runs on the DEFAULT (Netscape) anchor -- it replays
+    # proj_90_dominant, and leaf_dot below uses the default-anchor 90-day curve
+    dot_grids = {a["key"]: tn._grid(a["start"], tn.CLOCK["bottom"])
+                 for a in tn.START_ANCHORS}
     ai_dates = tn._grid(tn.CLOCK["aiStart"], today.isoformat())
-    root = tn._build(conn, registry.build_tree(), dot_dates, ai_dates, today)
+    root = tn._build(conn, registry.build_tree(), dot_grids, ai_dates, today)
     st = {"children": {}, "labels": {}, "leaf_dot": {}, "subtree": {}, "weights": {}}
 
     def walk(n):
@@ -550,8 +562,11 @@ def payload_blocks():
     for node, rows in by_node.items():
         entry = {}
         for perm in PERM_KEYS:
+            col = "proj_" + perm
+            if col not in rows[0] or not rows[0][col]:
+                continue                       # older ledger without this perm column
             days = [(tn._d(r["as_of"]).toordinal(),
-                     tn._d(r["proj_" + perm]).toordinal(),
+                     tn._d(r[col]).toordinal(),
                      r["valid"] == "1") for r in rows]
             entry[perm] = _perm_stats(days, base_ord)
         nodes[node] = entry

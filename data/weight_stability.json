@@ -33,11 +33,11 @@
      "loss": 1675.3
     },
     "oos": {
-     "days": 289,
-     "detrended80": 37,
-     "driftDpm": 28.4,
+     "days": 291,
+     "detrended80": 36,
+     "driftDpm": 28.5,
      "jitterDpm": 30.0,
-     "loss": 337.1
+     "loss": 336.8
     },
     "w": {
      "capex": 0.2,
@@ -56,11 +56,11 @@
      "loss": 1675.3
     },
     "oos": {
-     "days": 289,
-     "detrended80": 37,
-     "driftDpm": 28.4,
+     "days": 291,
+     "detrended80": 36,
+     "driftDpm": 28.5,
      "jitterDpm": 30.0,
-     "loss": 337.1
+     "loss": 336.8
     },
     "w": {
      "capex": 0.078,
@@ -79,11 +79,11 @@
      "loss": 230.7
     },
     "oos": {
-     "days": 289,
-     "detrended80": 332,
+     "days": 291,
+     "detrended80": 331,
      "driftDpm": -7.4,
      "jitterDpm": 30.0,
-     "loss": 421.4
+     "loss": 421.0
     },
     "w": {
      "capex": 0.3,
@@ -118,11 +118,11 @@
      "loss": 1115.9
     },
     "oos": {
-     "days": 289,
-     "detrended80": 828,
+     "days": 291,
+     "detrended80": 820,
      "driftDpm": -145.7,
      "jitterDpm": 60.0,
-     "loss": 2315.3
+     "loss": 2307.3
     },
     "w": {
      "it_invest": 0.333,
@@ -139,11 +139,11 @@
      "loss": 1122.4
     },
     "oos": {
-     "days": 289,
-     "detrended80": 815,
+     "days": 291,
+     "detrended80": 812,
      "driftDpm": -165.4,
      "jitterDpm": 60.0,
-     "loss": 2500.0
+     "loss": 2496.1
     },
     "w": {
      "it_invest": 0.371,
@@ -160,11 +160,11 @@
      "loss": 784.0
     },
     "oos": {
-     "days": 289,
-     "detrended80": 847,
+     "days": 291,
+     "detrended80": 844,
      "driftDpm": -192.3,
      "jitterDpm": 60.0,
-     "loss": 2800.3
+     "loss": 2797.7
     },
     "w": {
      "it_invest": 0.15,
@@ -220,11 +220,11 @@
      "loss": 610.9
     },
     "oos": {
-     "days": 289,
-     "detrended80": 56,
+     "days": 291,
+     "detrended80": 55,
      "driftDpm": 34.8,
      "jitterDpm": 30.0,
-     "loss": 419.1
+     "loss": 418.3
     },
     "w": {
      "nasdaq": 0.5,
@@ -240,7 +240,7 @@
      "loss": 587.5
     },
     "oos": {
-     "days": 289,
+     "days": 291,
      "detrended80": 85,
      "driftDpm": 33.2,
      "jitterDpm": 30.0,
@@ -260,11 +260,11 @@
      "loss": 592.5
     },
     "oos": {
-     "days": 289,
-     "detrended80": 57,
+     "days": 291,
+     "detrended80": 56,
      "driftDpm": 34.3,
      "jitterDpm": 30.0,
-     "loss": 415.0
+     "loss": 414.4
     },
     "w": {
      "nasdaq": 0.45,
@@ -292,11 +292,11 @@
      "loss": 1830.7
     },
     "oos": {
-     "days": 289,
-     "detrended80": 701,
+     "days": 291,
+     "detrended80": 700,
      "driftDpm": 57.9,
      "jitterDpm": 60.0,
-     "loss": 1310.2
+     "loss": 1308.6
     },
     "w": {
      "ipo_froth": 0.5,
@@ -312,11 +312,11 @@
      "loss": 674.9
     },
     "oos": {
-     "days": 289,
-     "detrended80": 83,
+     "days": 291,
+     "detrended80": 81,
      "driftDpm": 62.1,
      "jitterDpm": 60.0,
-     "loss": 734.7
+     "loss": 732.6
     },
     "w": {
      "ipo_froth": 0.094,
@@ -332,11 +332,11 @@
      "loss": 693.2
     },
     "oos": {
-     "days": 289,
-     "detrended80": 84,
+     "days": 291,
+     "detrended80": 82,
      "driftDpm": 62.2,
      "jitterDpm": 60.0,
-     "loss": 736.8
+     "loss": 734.7
     },
     "w": {
      "ipo_froth": 0.1,
@@ -368,11 +368,11 @@
      "loss": 693.0
     },
     "oos": {
-     "days": 289,
+     "days": 291,
      "detrended80": 46,
-     "driftDpm": 39.4,
+     "driftDpm": 39.5,
      "jitterDpm": 30.0,
-     "loss": 455.8
+     "loss": 456.8
     },
     "w": {
      "buffett": 0.333,
@@ -389,11 +389,11 @@
      "loss": 757.6
     },
     "oos": {
-     "days": 289,
+     "days": 291,
      "detrended80": 50,
-     "driftDpm": 38.1,
+     "driftDpm": 38.3,
      "jitterDpm": 30.0,
-     "loss": 446.5
+     "loss": 448.9
     },
     "w": {
      "buffett": 0.198,
@@ -410,11 +410,11 @@
      "loss": 676.7
     },
     "oos": {
-     "days": 289,
+     "days": 291,
      "detrended80": 43,
      "driftDpm": 40.7,
      "jitterDpm": 30.0,
-     "loss": 465.7
+     "loss": 465.6
     },
     "w": {
      "buffett": 0.4,
