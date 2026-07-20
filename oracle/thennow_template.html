@@ -415,6 +415,17 @@ let SMOOTH = "90";
 // active at boot -- no swap needed).
 const DEFAULT_START = (DATA.startAnchors || [{ key: "netscape", default: true }]).find(a => a.default).key;
 let START = DEFAULT_START;
+// Which AI-era START anchor: the default ChatGPT launch, or the alt (Pichai's
+// "elements of irrationality", DATA.altAi) -- the AI-side mirror of the dot-com
+// anchor choice. It re-baselines the AI curve AND shrinks the elapsed time the pace
+// is measured over, so its projections are far less stable. Same reset-on-reload
+// treatment as the other modeling assumptions.
+const DEFAULT_AI = (DATA.aiAnchors || [{ key: "chatgpt", default: true }]).find(a => a.default).key;
+const ALT_AI_KEY = DATA.altAi ? DATA.altAi.key : null;
+let AI_START_KEY = DEFAULT_AI;
+// A projection past this many days is not a meaningful reading; suppressed for
+// display (mirrors MAX_HORIZON_DAYS in the engine).
+const MAX_HORIZON_DAYS = DATA.maxHorizonDays || 3653;
 // each anchor's clock + weekly axes, keyed by anchor id. xmax (progress-axis max) is
 // held literally so the default stays byte-identical; the alt extends to show its
 // later bottom.
@@ -430,19 +441,34 @@ if (DATA.altStart) {
     progDot: a.progDot, progAi: a.progAi, dotMonths: a.dotMonths };
 }
 if (!CLOCKS[START]) START = DEFAULT_START;
-// mutable active-clock bindings, re-pointed by loadClock() on a start toggle, so every
-// reader below stays start-agnostic. The peak and AI start are fixed across anchors.
+// the AI side, keyed the same way: each anchor's start + its own weekly grid
+const AI_CLOCKS = {};
+(DATA.aiAnchors || []).forEach(a => {
+  AI_CLOCKS[a.key] = { start: a.start, event: a.event, short: a.short,
+    aiMonths: a.default ? DATA.aiMonths : (DATA.altAi ? DATA.altAi.aiMonths : null) };
+});
+if (!AI_CLOCKS[DEFAULT_AI]) AI_CLOCKS[DEFAULT_AI] = { start: DATA.aiStart, event: DATA.aiStartEvent, short: "ChatGPT", aiMonths: DATA.aiMonths };
+if (!AI_CLOCKS[AI_START_KEY] || !AI_CLOCKS[AI_START_KEY].aiMonths) AI_START_KEY = DEFAULT_AI;
+// mutable active-clock bindings, re-pointed by loadClock() on either toggle, so every
+// reader below stays anchor-agnostic. The dot-com peak and TODAY are fixed.
 let RAMP, XMAX, PEAK_IDX, BOTTOM_PROG, DOT_START, PROG_DOT, PROG_AI, DOT_MONTHS, DOT_END_ISO, DOTCOM_START, DOTCOM_START_EVENT;
+let AI_START, AI_MONTHS, AI_START_ISO, AI_START_EVENT, AI_START_SHORT;
 function loadClock() {
   const c = CLOCKS[START] || CLOCKS[DEFAULT_START];
   RAMP = c.ramp; XMAX = c.xmax; PEAK_IDX = c.peakIdx; BOTTOM_PROG = c.bottomProg; DOT_START = c.dotStart;
-  PROG_DOT = c.progDot; PROG_AI = c.progAi; DOT_MONTHS = c.dotMonths;
+  PROG_DOT = c.progDot; DOT_MONTHS = c.dotMonths;
+  const ac = AI_CLOCKS[AI_START_KEY] || AI_CLOCKS[DEFAULT_AI];
+  AI_START_ISO = ac.start; AI_START_EVENT = ac.event; AI_START_SHORT = ac.short;
+  AI_START = ord(ac.start); AI_MONTHS = ac.aiMonths;
+  // progress % of each AI week depends on BOTH the AI grid and the active dot ramp,
+  // so it is derived here rather than shipped per pair
+  PROG_AI = AI_MONTHS.map(m => Math.round((ord(m) - AI_START) / RAMP * 1e4) / 100);
   DOT_END_ISO = c.dotMonths[c.dotMonths.length - 1];
   DOTCOM_START = c.dotcomStart; DOTCOM_START_EVENT = c.dotcomStartEvent;
 }
 loadClock();
 const DOT_PEAK = ord(DATA.dotcomPeak);
-const AI_START = ord(DATA.aiStart), TODAY = ord(DATA.asOf);
+const TODAY = ord(DATA.asOf);            // AI_START is per-anchor, set by loadClock
 const BOUNDS = DATA.phaseBounds, PHASES = DATA.phases;
 const r2 = x => Math.round(x * 100) / 100, r3 = x => Math.round(x * 1000) / 1000;
 const MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -479,6 +505,9 @@ function evaluate(intDot, intAi) {
   const bottomOrd = TODAY + Math.round(ratio * Math.max(BOTTOM_PROG - eq, 0) / 100 * RAMP);
   return { intensityNow: r3(aiNow), equivProg: eq, equivalentDotcomDate: isoFromOrd(equivOrd), daysFromPeak: equivOrd - DOT_PEAK,
     compression: r2(ratio), projectedPeakDate: isoFromOrd(projOrd), projectedBottomDate: isoFromOrd(bottomOrd), phase: phaseOf(eq),
+    // past the horizon the projection stops being a meaningful reading (mirrors the
+    // engine); the date is still computed, just not shown
+    beyondHorizon: (projOrd - TODAY) > MAX_HORIZON_DAYS,
     equiv: { progress: eq, intensity: aiNow } };
 }
 function blend(arrays, weights) {
@@ -503,20 +532,60 @@ const PARENT = {}, NODES = {};
 // 30-day is alt30; the alt anchor's are in altStart (its own shorter dot grid, so its
 // rawDot/smoothedDot/intensityDot differ; AI re-normalizes per anchor). rawDot is a
 // per-anchor property carried into both windows so a swap re-points it too.
+// Composed per (dot-anchor | ai-anchor)[window]. The dot side (intensityDot,
+// smoothedDot, rawDot) comes from the top-level/alt30/altStart blocks; the AI side
+// (smoothedAi, rawAi) from the default arrays or altAi; and intensityAi + the prose
+// depend on all three axes, so altAi carries them keyed by dot anchor. Nothing is
+// duplicated in the payload -- the cross product is assembled here.
+const CKEY = (d, a) => d + "|" + a;
 Object.values(NODES).forEach(n => {
   if (!n.leaf) return;
-  n.curves = {};
-  n.curves[DEFAULT_START] = {
-    "90": { intensityDot: n.intensityDot, intensityAi: n.intensityAi, smoothedDot: n.smoothedDot, smoothedAi: n.smoothedAi, rawDot: n.rawDot, display: n.display },
-    "30": n.alt30 ? { intensityDot: n.alt30.intensityDot, intensityAi: n.alt30.intensityAi, smoothedDot: n.alt30.smoothedDot, smoothedAi: n.alt30.smoothedAi, rawDot: n.rawDot, display: n.alt30.display } : null,
+  const dotSide = {};
+  dotSide[DEFAULT_START] = {
+    "90": { intensityDot: n.intensityDot, smoothedDot: n.smoothedDot },
+    "30": n.alt30 ? { intensityDot: n.alt30.intensityDot, smoothedDot: n.alt30.smoothedDot } : null,
+    rawDot: n.rawDot,
   };
   if (n.altStart && DATA.altStart) {
-    const a = n.altStart;
-    n.curves[DATA.altStart.key] = {
-      "90": { intensityDot: a["90"].intensityDot, intensityAi: a["90"].intensityAi, smoothedDot: a["90"].smoothedDot, smoothedAi: a["90"].smoothedAi, rawDot: a.rawDot, display: a["90"].display },
-      "30": { intensityDot: a["30"].intensityDot, intensityAi: a["30"].intensityAi, smoothedDot: a["30"].smoothedDot, smoothedAi: a["30"].smoothedAi, rawDot: a.rawDot, display: a["30"].display },
+    dotSide[DATA.altStart.key] = {
+      "90": { intensityDot: n.altStart["90"].intensityDot, smoothedDot: n.altStart["90"].smoothedDot },
+      "30": { intensityDot: n.altStart["30"].intensityDot, smoothedDot: n.altStart["30"].smoothedDot },
+      rawDot: n.altStart.rawDot,
     };
   }
+  const aiSide = {};
+  aiSide[DEFAULT_AI] = {
+    "90": { smoothedAi: n.smoothedAi }, "30": n.alt30 ? { smoothedAi: n.alt30.smoothedAi } : null,
+    rawAi: n.rawAi,
+  };
+  if (n.altAi && ALT_AI_KEY) {
+    aiSide[ALT_AI_KEY] = {
+      "90": { smoothedAi: n.altAi["90"].smoothedAi }, "30": { smoothedAi: n.altAi["30"].smoothedAi },
+      rawAi: n.altAi.rawAi,
+    };
+  }
+  // intensityAi + display for the DEFAULT ai anchor live on the dot blocks; for the
+  // alt ai anchor they live on altAi keyed by dot anchor
+  const intAi = (d, a, w) => {
+    if (a === DEFAULT_AI) {
+      if (d === DEFAULT_START) return w === "90" ? { i: n.intensityAi, t: n.display } : (n.alt30 ? { i: n.alt30.intensityAi, t: n.alt30.display } : null);
+      return n.altStart ? { i: n.altStart[w].intensityAi, t: n.altStart[w].display } : null;
+    }
+    const blk = n.altAi && n.altAi[w];
+    return blk && blk.intensityAi[d] ? { i: blk.intensityAi[d], t: blk.display[d] } : null;
+  };
+  n.curves = {};
+  Object.keys(dotSide).forEach(d => Object.keys(aiSide).forEach(a => {
+    const set = {};
+    ["90", "30"].forEach(w => {
+      const ds = dotSide[d][w], as = aiSide[a][w], ia = intAi(d, a, w);
+      set[w] = (ds && as && ia) ? {
+        intensityDot: ds.intensityDot, smoothedDot: ds.smoothedDot, rawDot: dotSide[d].rawDot,
+        intensityAi: ia.i, smoothedAi: as.smoothedAi, rawAi: aiSide[a].rawAi, display: ia.t,
+      } : null;
+    });
+    n.curves[CKEY(d, a)] = set;
+  }));
 });
 // Branches with DECLARED default weights (metrics/_tree.py, e.g. speculation
 // 90/10 margin-heavy) seed the client weights so the sliders and every
@@ -596,7 +665,7 @@ const fmtNum = v => v == null ? "-" : v >= 1000 ? Math.round(v).toLocaleString()
 /* ---------- mini card sparkline (canvas) ---------- */
 function drawMini(canvas, n) {
   const { ctx, w, h } = setup(canvas);
-  const nop = n.valid === false;   // counter-argument: full dot-com, AI to today, no projection
+  const nop = noProj(n);           // counter-argument: full dot-com, AI to today, no projection
   const all = n.intensityDot.concat(n.intensityAi).filter(v => v != null);
   const yMax = Math.max(1.05, Math.max(...all)), yMin = Math.min(0, Math.min(...all));
   const P = { l: 2, r: 2, t: 8, b: 8 }, X = p => P.l + (w - P.l - P.r) * p / XMAX, Y = v => P.t + (h - P.t - P.b) * (1 - (v - yMin) / (yMax - yMin || 1));
@@ -649,13 +718,13 @@ function renderCards() {
   const grid = el("cardgrid"); grid.innerHTML = ""; MINIS.length = 0;
   const list = visibleCards();
   list.forEach(n => grid.appendChild(makeCard(n)));
-  const nop = list.filter(n => !n.wip && n.valid === false).length;
+  const nop = list.filter(n => !n.wip && noProj(n)).length;
   el("count").textContent = `${list.length} shown · ${nop} no projection`;
   MINIS.forEach(([canvas, n]) => requestAnimationFrame(() => drawCard(canvas, n)));
 }
 function makeCard(n) {
   const c = document.createElement("div");
-  const nop = !n.wip && n.valid === false;
+  const nop = !n.wip && noProj(n);
   c.className = "mcard" + (n.wip ? " wip" : nop ? " nop" : ""); c.id = "card-" + n.key;
   c.style.setProperty("--brc", branchVar(n));
   if (n.wip) {
@@ -674,7 +743,7 @@ function makeCard(n) {
   const foot = (st && st.validDays && st.series)
     ? `<div class="foot"><span class="phase">med ${fmtMY(st.median)} · <b class="dv ${driftClass(st.driftDpm).cls}">${st.driftDpm > 0 ? "+" : ""}${st.driftDpm} d/mo</b></span>` +
       `<span class="int">±${Math.round(st.detrended80 / 2)}d · ${st.jumps} jump${st.jumps === 1 ? "" : "s"}</span></div>`
-    : `<div class="foot"><span class="phase">${nop ? "does not fit dot-com analogy" : n.phase}</span><span class="int">Intensity <b>${(n.intensityNow * 100).toFixed(0)}%</b></span></div>`;
+    : `<div class="foot"><span class="phase">${nop ? noProjWhy(n) : n.phase}</span><span class="int">Intensity <b>${(n.intensityNow * 100).toFixed(0)}%</b></span></div>`;
   c.innerHTML =
     `<div class="top"><span class="pip ${lvl}">${PIP[lvl]}</span><span class="name">${n.label}</span><span class="open">expand ↗</span></div>` +
     dateBlk +
@@ -699,7 +768,7 @@ function treeNode(n) {
   const row = document.createElement("div");
   const isBranch = PARENT[n.key] && PARENT[n.key].key === ROOT_KEY;   // top-level branch row → accent stripe
   const inert = n.wip || n.stub;   // stub = committed metric awaiting credentials
-  const nop = !inert && n.valid === false;
+  const nop = !inert && noProj(n);
   row.className = "srow" + (inert ? " wip" : "") + (isBranch ? " branch" : "") + ((nop || n.stub) ? " dim" : "");
   if (isBranch) row.style.setProperty("--brc", branchVar(n));
   const kids = orderedChildren(n), hasKids = kids.length > 0;
@@ -785,7 +854,7 @@ function derivHtml(n) {
     `Matches the dot-com path at <b>${n.equiv.progress.toFixed(1)}%</b> — <b>${n.equivalentDotcomDate}</b> (${n.phase}), ${Math.abs(n.daysFromPeak)} days ${n.daysFromPeak < 0 ? "before" : "after"} the peak.`,
     `Extending that arc at <b>${n.compression}×</b> pace projects the peak on <b>${n.projectedPeakDate}</b> and the bottom around <b>${bd}</b>.`];
   const src = SRC_GROUP[n.leaf] || SRC_GROUP[n.key] || "";
-  const ok = n.valid !== false;
+  const ok = !noProj(n);
   const steps = ok ? `<ol class="steps">${rows.map((r, i) => `<li data-n="${i + 1}">${r}</li>`).join("")}</ol>`
     : `<div class="dcnote">This metric does not fit the rise-peak-fall analogy, so no date is projected from it. The curves below are shown for context only.</div>`;
   return `<h4>How this date is derived <span class="more"><a href="${src ? "datasources.html#src:" + src : "datasources.html"}" target="_blank" rel="noopener">full method &amp; sources ↗</a></span></h4>` +
@@ -831,9 +900,14 @@ function refreshMetric(n) {
    projection over time (flat = a stable target; rising ~1d/day = a receding horizon
    that never converges; cliffs = the dot-com match jumping to a different climb leg).
    History follows the drawer's smoothing/matching options; weights are defaults. */
-// mirrors oracle/stability.py::_perm_id — default start unprefixed, alt prefixed by
-// key — so the panel, trend arrows, and drift sort read the active start's backtest
-function stabPerm() { return (START === DEFAULT_START ? "" : START + "_") + SMOOTH + "_" + MATCH_MODE; }
+// mirrors oracle/stability.py::_perm_id — default anchors are omitted from the prefix
+// — so the panel, trend arrows, and drift sort read the active combination's backtest
+function stabPerm() {
+  const p = [];
+  if (START !== DEFAULT_START) p.push(START);
+  if (AI_START_KEY !== DEFAULT_AI) p.push(AI_START_KEY);
+  return p.concat([SMOOTH, MATCH_MODE]).join("_");
+}
 function qLabel(iso) { return "Q" + (Math.floor(+iso.slice(5, 7) / 3.1) + 1) + "'" + iso.slice(2, 4); }
 function renderStability(n) {
   const host = el("m-stab"); if (!host) return;
@@ -858,8 +932,15 @@ function renderStability(n) {
       `drift <b style="color:${col}">${dsign}${s.driftDpm} d/mo</b> (${word}) · ` +
       `wanders <b>±${Math.round(s.detrended80 / 2)}d</b> around trend · <b>${s.jumps}</b> jump${s.jumps === 1 ? "" : "s"} &gt;60d</div>`;
   }
+  // An anchor that opened partway through the window has fewer runs than the
+  // backtest itself. Say so plainly rather than letting "N of N runs" imply the
+  // full history stands behind it.
+  const full = (entry[SMOOTH + "_" + MATCH_MODE] || {}).runs || 0;
+  const short = s.runs && full && s.runs < full
+    ? ` This combination only has <b>${s.runs}</b> of the backtest's ${full} days: the ${AI_START_EVENT} anchor opens ${fmtNice(AI_START_ISO)}, so there is no reading before it.`
+    : "";
   host.innerHTML = `<div class="mstab"><h4>Projection stability <span class="more">daily backtest · Jan 2025 → ${fmtMY(S.asOf)}</span></h4>` + body + weightLine(n) +
-    `<div class="foot2">History before mid-2026 is reconstructed from final (post-revision) data; recorded live nightly from then on. Roll-ups at site-default weights; smoothing and matching follow the Options drawer.</div></div>`;
+    `<div class="foot2">History before mid-2026 is reconstructed from final (post-revision) data; recorded live nightly from then on. Roll-ups at site-default weights; smoothing and matching follow the Options drawer.${short}</div></div>`;
   if (s.validDays) { drawStabHist(el("stab-hist"), s); drawStabTrend(el("stab-trend"), s); }
 }
 // Roll-ups only: would a different child weighting have projected more steadily?
@@ -953,6 +1034,14 @@ function stabFor(n) {
   const S = DATA.stability, e = S && S.nodes && S.nodes[n.key];
   return e ? (e[stabPerm()] || e["90_dominant"]) : null;
 }
+// A projection is not shown when the metric does not fit the analogy, or when it
+// lands past the meaningful horizon -- the latter is a symptom of a very short
+// measurement base (the alt AI anchor), not of the metric itself.
+function noProj(n) { return n.valid === false || !!n.beyondHorizon; }
+function noProjWhy(n) {
+  return n.valid === false ? "does not fit dot-com analogy"
+    : "projects past the " + Math.round(MAX_HORIZON_DAYS / 365) + "-year horizon";
+}
 function driftClass(d) {
   return d >= 25 ? { g: "↑", cls: "receding", word: "receding ~1 day per day" }
     : d > 8 ? { g: "↗", cls: "later", word: "drifting later" }
@@ -1005,7 +1094,7 @@ function drawMiniTrend(canvas, s) {
 // Modal headline. A non-conforming metric has no projected date, so the date
 // reads as suppressed and the copy says why, rather than showing a made-up peak.
 function setHead(n) {
-  const ok = n.valid !== false;
+  const ok = !noProj(n);
   el("m-lbl").textContent = (ok ? "Projected peak — " : "Counter-argument — ") + n.label + (n.leaf ? "" : " (blended)");
   if (ok) el("m-date").innerHTML = fmtNice(n.projectedPeakDate) + trendIcon(n);
   else el("m-date").textContent = "No Projection";
@@ -1029,7 +1118,7 @@ function drawBig(n) {
   const PAD = { l: 54, r: 30, t: 74, b: 56 }, plotW = w - PAD.l - PAD.r, plotH = h - PAD.t - PAD.b;
   const all = n.intensityDot.concat(n.intensityAi), yMax = Math.max(1.12, Math.max(...all) * 1.06), yMin = Math.min(0, Math.min(...all));
   const X = p => PAD.l + plotW * p / XMAX, Y = v => PAD.t + plotH * (1 - (v - yMin) / (yMax - yMin || 1));
-  const ok = n.valid !== false;   // non-conforming metric: no projection drawn
+  const ok = !noProj(n);   // suppressed metric: no projection drawn
   const aiP = aiPlot(n), yb = h - PAD.b, tp = todayProg(n), eqx = X(tp), eqy = Y(n.intensityNow);
   RC = { X, Y, PAD, w, h, n, px2prog: x => (x - PAD.l) / (plotW || 1) * XMAX };
   ctx.clearRect(0, 0, w, h);
@@ -1099,7 +1188,7 @@ function placeMarkers(n, X, wrap) {
   // today sits at the same ELAPSED-time point on the dot-com clock.
   const todayDc = ok ? n.equivalentDotcomDate : isoFromOrd(DOT_START + Math.round(tp / 100 * RAMP));
   const MK = [
-    { p: 0, eb: "START", ebc: "var(--then)", col: "var(--then)", ai: fmtMY(DATA.aiStart) + " · " + DATA.aiStartEvent, dc: dcMonth(DOTCOM_START) + " · " + DOTCOM_START_EVENT, row: 0, align: "L" },
+    { p: 0, eb: "START", ebc: "var(--then)", col: "var(--then)", ai: fmtMY(AI_START_ISO) + " · " + AI_START_EVENT, dc: dcMonth(DOTCOM_START) + " · " + DOTCOM_START_EVENT, row: 0, align: "L" },
     { p: tp, eb: "TODAY", ebc: "var(--text)", col: "var(--text)", ai: fmtMY(DATA.asOf), dc: dcMonth(todayDc), row: 1, align: "C" },
     { p: 100, eb: "PROJECTED PEAK", ebc: "var(--peak)", col: "var(--peak)", ai: fmtMY(n.projectedPeakDate), dc: dcMonth(DATA.dotcomPeak), row: 0, align: "C" },
     { p: BOTTOM_PROG, eb: "PROJECTED BOTTOM", ebc: "var(--bottom)", col: "var(--bottom)", ai: fmtMY(n.projectedBottomDate), dc: dcMonth(DOT_END_ISO), row: 1, align: "R" }];
@@ -1118,7 +1207,7 @@ function onMove(e) {
   let x = Math.max(RC.PAD.l, Math.min(RC.w - RC.PAD.r, e.clientX - r.left)); const p = RC.px2prog(x);
   drawBig(n); const ctx = el("modal-canvas").getContext("2d");
   ctx.strokeStyle = "rgba(238,241,246,.45)"; ctx.lineWidth = 1; ctx.setLineDash([]); ctx.beginPath(); ctx.moveTo(x, RC.PAD.t); ctx.lineTo(x, RC.h - RC.PAD.b); ctx.stroke();
-  const ok = n.valid !== false, tp = todayProg(n);
+  const ok = !noProj(n), tp = todayProg(n);
   const lv = leafVals(n), dotV = interp(PROG_DOT, n.intensityDot, p), proj = p > tp;
   chip.style.display = "block";
   let html = `<div class="hr">${fmtMY(isoFromOrd(aiOrdAt(n, p)))} · ${p.toFixed(0)}%</div>`;
@@ -1136,7 +1225,8 @@ function onMove(e) {
 
 /* ---------- global Options & assumptions drawer ---------- */
 const DRAWER_ITEMS = [
-  ["Cycle anchors", `The AI era starts ${fmtMY(DATA.aiStart)} (${DATA.aiStartEvent}). The dot-com era's start is selectable (see Dot-com start below); each anchor pins the origin so the two eras line up from there.`],
+  ["Cycle anchors", `Both eras' starts are selectable (see the two toggles below); each anchor pins an origin (see Dot-com start below); each anchor pins the origin so the two eras line up from there.`],
+  ["AI era start", `The mirror of the choice below, on the AI side. ChatGPT's launch (Nov 30, 2022) is the default: the launch that began the era, the analogue of Netscape. Elements of irrationality (Nov 18, 2025) is Sundar Pichai telling the BBC "there are elements of irrationality through a moment like this" — the AI analogue of Greenspan, and the matched pair for the Exuberance anchor. It re-bases the AI curve AND shortens the elapsed time the pace is measured over, so with under a year of history its projections are far less stable; several land past the horizon and are suppressed. Read its stability panel before trusting a date.`],
   ["Dot-com start", `The model's single biggest assumption. Netscape IPO (Aug 9, 1995) is the popular birth of the dot-com era and the site default. Irrational Exuberance (Dec 5, 1996) is Greenspan's warning 16 months later, a shorter reference climb that reads AI further along its curve and pulls the far-future projections in (the root barely moves; the speculative tail moves a lot). Switching reflows every graph, date, and the stability backtest. The AI-era start is unchanged either way.`],
   ["Peak (100%)", `The month the smoothed Nasdaq tops out, ${fmtMY(DATA.dotcomPeak)} — a hair earlier than the intraday 2000-03-10 high because of smoothing.`],
   ["Bottom", `The dot-com low, ${fmtMY(DOT_END_ISO)}. On the AI clock each metric's projected bottom scales by its own measured pace.`],
@@ -1150,10 +1240,11 @@ const DRAWER_ITEMS = [
 function renderDrawer() {
   el("drawer-body").innerHTML = DRAWER_ITEMS.map(([t, d]) => {
     const ctrl = t === "Matching point" ? matchToggleHtml() : t === "Smoothing" ? smoothToggleHtml()
-      : t === "Dot-com start" ? startToggleHtml() : t === "Overview card graph" ? cardGraphToggleHtml() : "";
+      : t === "Dot-com start" ? startToggleHtml() : t === "AI era start" ? aiStartToggleHtml()
+      : t === "Overview card graph" ? cardGraphToggleHtml() : "";
     return `<div class="assump"><div class="at">${t}</div><div class="ad">${d}</div>${ctrl}</div>`;
   }).join("");
-  wireMatchToggle(); wireSmoothToggle(); wireStartToggle(); wireCardGraphToggle();
+  wireMatchToggle(); wireSmoothToggle(); wireStartToggle(); wireAiStartToggle(); wireCardGraphToggle();
 }
 function cardGraphToggleHtml() {
   return `<div class="seg2" id="cardgraph-toggle">` +
@@ -1164,6 +1255,12 @@ function startToggleHtml() {
   return `<div class="seg2" id="start-toggle">` +
     (DATA.startAnchors || []).map(a =>
       `<button data-start="${a.key}"${START === a.key ? ' class="on"' : ""}>${a.event.replace(" speech", "")}</button>`
+    ).join("") + `</div>`;
+}
+function aiStartToggleHtml() {
+  return `<div class="seg2" id="aistart-toggle">` +
+    (DATA.aiAnchors || []).map(a =>
+      `<button data-ai="${a.key}"${AI_START_KEY === a.key ? ' class="on"' : ""}>${a.event}</button>`
     ).join("") + `</div>`;
 }
 function matchToggleHtml() {
@@ -1178,7 +1275,7 @@ function smoothToggleHtml() {
 }
 function wireToggle(id, cur, apply) {
   const box = el(id); if (!box) return;
-  const val = b => b.dataset.mode || b.dataset.win || b.dataset.cg || b.dataset.start;
+  const val = b => b.dataset.mode || b.dataset.win || b.dataset.cg || b.dataset.start || b.dataset.ai;
   box.querySelectorAll("button").forEach(b => b.addEventListener("click", () => {
     const v = val(b);
     if (v === cur()) return;
@@ -1189,6 +1286,7 @@ function wireToggle(id, cur, apply) {
 function wireMatchToggle() { wireToggle("match-toggle", () => MATCH_MODE, applyMatchMode); }
 function wireSmoothToggle() { wireToggle("smooth-toggle", () => SMOOTH, applySmoothing); }
 function wireStartToggle() { wireToggle("start-toggle", () => START, applyStart); }
+function wireAiStartToggle() { wireToggle("aistart-toggle", () => AI_START_KEY, applyAiStart); }
 function wireCardGraphToggle() { wireToggle("cardgraph-toggle", () => CARD_GRAPH, applyCardGraph); }
 // Overview cards only: swap their small chart between the intensity view and
 // the backtest stability trend. The modal's chart arrangement is untouched.
@@ -1220,12 +1318,12 @@ function applyMatchMode(mode) { MATCH_MODE = mode; recomputeTree(); }
 function applyActiveCurves() {
   Object.values(NODES).forEach(n => {
     if (!n.leaf) return;
-    const set = n.curves[START] || n.curves[DEFAULT_START];
+    const set = n.curves[CKEY(START, AI_START_KEY)] || n.curves[CKEY(DEFAULT_START, DEFAULT_AI)];
     const s = set && set[SMOOTH];
     if (!s) return;
     n.intensityDot = s.intensityDot; n.intensityAi = s.intensityAi;
     n.smoothedDot = s.smoothedDot; n.smoothedAi = s.smoothedAi;
-    n.rawDot = s.rawDot; n.display = s.display;
+    n.rawDot = s.rawDot; n.rawAi = s.rawAi; n.display = s.display;
   });
   recomputeTree();
 }
@@ -1234,6 +1332,9 @@ function applySmoothing(win) { SMOOTH = win; applyActiveCurves(); }
 // and every leaf's curves, then re-blend + repaint. stabPerm() follows START, so the
 // trend arrows, stability panel, and drift sort reflect the active anchor too.
 function applyStart(key) { START = key; loadClock(); applyActiveCurves(); }
+// Swap the AI-era start anchor: re-baselines the AI curves and shortens the elapsed
+// time the pace is measured over, so both the level AND the speed change.
+function applyAiStart(key) { AI_START_KEY = key; loadClock(); applyActiveCurves(); }
 function openDrawer() { el("drawer-scrim").classList.add("open"); el("drawer").classList.add("open"); }
 function closeDrawer() { el("drawer-scrim").classList.remove("open"); el("drawer").classList.remove("open"); }
 
@@ -1253,7 +1354,7 @@ function downloadCSV(node) {
     cells.push(csvCell(inten)); lines.push(cells.join(","));
   };
   for (let i = 0; i < DOT_MONTHS.length; i++) rd("dotcom", DOT_MONTHS[i], PROG_DOT[i], node.rawDot && node.rawDot[i], node.smoothedDot && node.smoothedDot[i], node.intensityDot[i], lv && lv.dotStart);
-  for (let i = 0; i < DATA.aiMonths.length; i++) rd("ai", DATA.aiMonths[i], aiP[i], node.rawAi && node.rawAi[i], node.smoothedAi && node.smoothedAi[i], node.intensityAi[i], lv && lv.aiStart);
+  for (let i = 0; i < AI_MONTHS.length; i++) rd("ai", AI_MONTHS[i], aiP[i], node.rawAi && node.rawAi[i], node.smoothedAi && node.smoothedAi[i], node.intensityAi[i], lv && lv.aiStart);
   // Projected lifecycle rows only when the metric conforms (projection not suppressed).
   if (node.valid !== false) for (let i = 0; i < DOT_MONTHS.length; i++) { const p = PROG_DOT[i]; if (p <= node.equiv.progress) continue;
     const day = isoFromOrd(aiOrdAt(node, p)), inten = node.intensityDot[i];

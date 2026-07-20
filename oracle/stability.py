@@ -33,18 +33,22 @@ from . import thennow as tn
 LEDGER_PATH = PROJECT_DIR / "data" / "projection_history.csv"
 BACKTEST_START = "2025-01-01"
 
-def _perm_id(anchor, win, mode):
-    """Stability permutation id. The default (Netscape) anchor stays UNPREFIXED,
-    so its columns/keys are byte-identical to the 4-perm era and the weight
-    optimizer keeps reading proj_90_dominant; the alt anchor is prefixed by key
-    (e.g. exuberance_90_dominant)."""
-    base = f"{win}_{mode}"
-    return base if anchor == tn.DEFAULT_START else f"{anchor}_{base}"
+def _perm_id(anchor, ai_anchor, win, mode):
+    """Stability permutation id. Default anchors are OMITTED from the prefix, so the
+    original columns/keys stay byte-identical as axes are added (the weight optimizer
+    keeps reading proj_90_dominant, and the dot-only ids keep their names):
+      (netscape, chatgpt) -> 90_dominant
+      (exuberance, chatgpt) -> exuberance_90_dominant
+      (netscape, pichai) -> pichai_90_dominant
+      (exuberance, pichai) -> exuberance_pichai_90_dominant"""
+    parts = ([anchor] if anchor != tn.DEFAULT_START else []) + \
+            ([ai_anchor] if ai_anchor != tn.DEFAULT_AI else [])
+    return "_".join(parts + [win, mode])
 
 
-# every (start-anchor x smoothing x matching) permutation, default anchor first
-PERM_KEYS = tuple(_perm_id(a["key"], win, mode)
-                  for a in tn.START_ANCHORS
+# every (dot-anchor x ai-anchor x smoothing x matching) permutation, defaults first
+PERM_KEYS = tuple(_perm_id(d["key"], a["key"], win, mode)
+                  for d in tn.START_ANCHORS for a in tn.AI_ANCHORS
                   for win in ("90", "30") for mode in ("dominant", "first"))
 _COLS = (["as_of", "node", "source", "valid"]
          + [f"proj_{p}" for p in PERM_KEYS]
@@ -75,30 +79,37 @@ def snapshot(conn, as_of, source):
     from . import registry
     dot_grids = {a["key"]: tn._grid(a["start"], tn.CLOCK["bottom"])
                  for a in tn.START_ANCHORS}
-    ai_dates = tn._grid(tn.CLOCK["aiStart"], as_of.isoformat())
-    root = tn._build(conn, registry.build_tree(), dot_grids, ai_dates, as_of)
+    # An AI anchor that had not happened yet on this as-of day gets an empty grid;
+    # _build skips it and its permutation columns are written blank, so the ledger
+    # honestly records "no reading" rather than a fabricated one.
+    ai_grids = {a["key"]: (tn._grid(a["start"], as_of.isoformat())
+                           if tn._d(a["start"]) <= as_of else [])
+                for a in tn.AI_ANCHORS}
+    root = tn._build(conn, registry.build_tree(), dot_grids, ai_grids, as_of)
     rows = []
 
     def walk(n):
         if not n or n.get("wip") or n.get("stub"):
             return
-        # every node (leaf AND roll-up) now carries per-(anchor,window) curves;
-        # each anchor brings its own clock (start / ramp / bottom-progress)
+        # every node (leaf AND roll-up) carries per-(dot, ai, window) curves; each
+        # dot anchor brings its ramp/bottom-progress, each AI anchor its elapsed base
         projs = {}
-        for a in tn.START_ANCHORS:
-            ramp = tn._ramp_of(a["start"])
-            bprog = tn._bottom_prog_of(a["start"], ramp)
-            for win in ("90", "30"):
-                c = n["_perms"][(a["key"], win)]
-                for mode in ("dominant", "first"):
-                    projs["proj_" + _perm_id(a["key"], win, mode)] = tn._evaluate(
-                        c["int_dot"], c["int_ai"], as_of, mode,
-                        a["start"], ramp, bprog)["projectedPeakDate"]
+        for d in tn.START_ANCHORS:
+            ramp = tn._ramp_of(d["start"])
+            bprog = tn._bottom_prog_of(d["start"], ramp)
+            for a in tn.AI_ANCHORS:
+                for win in ("90", "30"):
+                    c = n["_perms"].get((d["key"], a["key"], win))
+                    for mode in ("dominant", "first"):
+                        col = "proj_" + _perm_id(d["key"], a["key"], win, mode)
+                        projs[col] = "" if not c else tn._evaluate(
+                            c["int_dot"], c["int_ai"], as_of, mode,
+                            d["start"], ramp, bprog, a["start"])["projectedPeakDate"]
         # full float precision: the weight optimizer re-blends these, and a
         # rounded intensity can nudge a projection across a day boundary. int_90/30
-        # stay the DEFAULT anchor's AI intensity (the optimizer runs on it).
-        ai90 = n["_perms"][(tn.DEFAULT_START, "90")]["int_ai"]
-        ai30 = n["_perms"][(tn.DEFAULT_START, "30")]["int_ai"]
+        # stay the DEFAULT anchors' AI intensity (the optimizer runs on them).
+        ai90 = n["_perms"][(tn.DEFAULT_START, tn.DEFAULT_AI, "90")]["int_ai"]
+        ai30 = n["_perms"][(tn.DEFAULT_START, tn.DEFAULT_AI, "30")]["int_ai"]
         int90, int30 = tn._last_val(ai90), tn._last_val(ai30)
         rows.append({
             "as_of": as_of.isoformat(), "node": n["key"], "source": source,
@@ -284,12 +295,13 @@ def _structure(conn):
     curves are reconstructed per day from these."""
     from . import registry
     today = tn._today()
-    # the optimizer runs on the DEFAULT (Netscape) anchor -- it replays
-    # proj_90_dominant, and leaf_dot below uses the default-anchor 90-day curve
+    # the optimizer runs on the DEFAULT (Netscape / ChatGPT) anchors -- it replays
+    # proj_90_dominant, and leaf_dot below uses the default 90-day curve
     dot_grids = {a["key"]: tn._grid(a["start"], tn.CLOCK["bottom"])
                  for a in tn.START_ANCHORS}
-    ai_dates = tn._grid(tn.CLOCK["aiStart"], today.isoformat())
-    root = tn._build(conn, registry.build_tree(), dot_grids, ai_dates, today)
+    ai_grids = {a["key"]: tn._grid(a["start"], today.isoformat())
+                for a in tn.AI_ANCHORS}
+    root = tn._build(conn, registry.build_tree(), dot_grids, ai_grids, today)
     st = {"children": {}, "labels": {}, "leaf_dot": {}, "subtree": {}, "weights": {}}
 
     def walk(n):
@@ -563,11 +575,14 @@ def payload_blocks():
         entry = {}
         for perm in PERM_KEYS:
             col = "proj_" + perm
-            if col not in rows[0] or not rows[0][col]:
-                continue                       # older ledger without this perm column
+            # Filter PER ROW, not on the first row: an AI anchor that opened partway
+            # through the window legitimately has no reading on earlier days, and its
+            # stats must report that honestly (fewer runs) rather than be dropped.
             days = [(tn._d(r["as_of"]).toordinal(),
                      tn._d(r[col]).toordinal(),
-                     r["valid"] == "1") for r in rows]
+                     r["valid"] == "1") for r in rows if r.get(col)]
+            if not days:
+                continue                       # perm absent from this ledger entirely
             entry[perm] = _perm_stats(days, base_ord)
         nodes[node] = entry
     return {"base": BACKTEST_START, "asOf": max(k[0] for k in ledger),

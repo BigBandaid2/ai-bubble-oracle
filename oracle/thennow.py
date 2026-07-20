@@ -70,8 +70,35 @@ START_ANCHORS = [
 ]
 DEFAULT_START = "netscape"
 ALT_START = next(a["key"] for a in START_ANCHORS if not a.get("default"))
-# every (anchor, smoothing-window) permutation the engine materializes per node
-PERM_KEYS = [(a["key"], w) for a in START_ANCHORS for w in SMOOTH_WINDOWS]
+
+# The AI-era start is the mirror assumption. ChatGPT's launch is the default (the
+# popular "start of the AI era", the launch analogue of Netscape). Sundar Pichai's
+# 2025-11-18 BBC interview -- "there are elements of irrationality through a moment
+# like this" -- is the AI analogue of Greenspan's speech: the moment an insider with
+# authority named the excess. Pairing it with the Exuberance dot-com anchor is the
+# conceptually matched read (warning-to-warning); the other crossings are computed
+# too. It re-baselines the AI era only: with barely a year of data behind it the
+# measured pace is thin, so its projections are far less stable (see MAX_HORIZON).
+AI_ANCHORS = [
+    {"key": "chatgpt", "start": CLOCK["aiStart"], "event": CLOCK["aiStartEvent"],
+     "short": "ChatGPT", "default": True},
+    {"key": "pichai", "start": "2025-11-18", "event": "Elements of irrationality",
+     "short": "the Pichai warning"},
+]
+DEFAULT_AI = "chatgpt"
+ALT_AI = next(a["key"] for a in AI_ANCHORS if not a.get("default"))
+
+# A projection further out than this is not a meaningful reading of the analogy --
+# it means the measured pace is so slow (or the base so short) that the remaining
+# dot-com shape stretches past any useful horizon. Such dates are computed and kept
+# in the ledger, but SUPPRESSED for display, like a non-conforming metric. Nothing
+# on the default clock comes close (the furthest is ~5 years out); it exists for the
+# short-base anchors.
+MAX_HORIZON_DAYS = 3653          # ~10 years
+
+# every (dot-anchor, ai-anchor, smoothing-window) permutation materialized per node
+PERM_KEYS = [(d["key"], a["key"], w)
+             for d in START_ANCHORS for a in AI_ANCHORS for w in SMOOTH_WINDOWS]
 
 
 def _ramp_of(start_iso):
@@ -252,17 +279,18 @@ def _match(target, int_dot, mode="dominant", ramp=RAMP):
 
 
 def _evaluate(int_dot, int_ai, today, mode="dominant",
-              start=CLOCK["start"], ramp=RAMP, bottom_prog=BOTTOM_PROG):
+              start=CLOCK["start"], ramp=RAMP, bottom_prog=BOTTOM_PROG,
+              ai_start=CLOCK["aiStart"]):
     """Analogy + projection on a node's daily curves (scalars, exact daily).
     `mode` selects the ramp matching (see _match); the site default is
     "dominant" — the backtester (oracle/stability.py) evaluates both. `start`,
-    `ramp`, `bottom_prog` select the dot-com start anchor and default to the
-    Netscape clock; the AI elapsed time is measured from aiStart regardless, so
-    the anchor reshapes the reference timeline only."""
+    `ramp`, `bottom_prog` select the dot-com start anchor; `ai_start` selects the
+    AI-era anchor, which sets how much elapsed AI time produced the progress so
+    far (and hence the pace). Both default to the canonical clock."""
     ai_now = next((v for v in reversed(int_ai) if v is not None), 0.0)
     eq = _match(ai_now, int_dot, mode, ramp)
     equiv_date = date.fromordinal(_d(start).toordinal() + round(eq / 100 * ramp))
-    ai_elapsed = _days(CLOCK["aiStart"], today.isoformat())
+    ai_elapsed = _days(ai_start, today.isoformat())
     dot_done = max(eq, 0.0) / 100 * ramp
     ratio = ai_elapsed / dot_done if dot_done > 0 else 1.0
     dot_left = max(100.0 - eq, 0.0) / 100 * ramp
@@ -282,6 +310,9 @@ def _evaluate(int_dot, int_ai, today, mode="dominant",
         "projectedBottomDate": bottom.isoformat(),
         "phase": _phase_of(eq),
         "beyondDotcomPeak": ai_now > ramp_max,
+        # too far out to be a meaningful reading; kept in the ledger, suppressed
+        # for display (see MAX_HORIZON_DAYS)
+        "beyondHorizon": (proj.toordinal() - today.toordinal()) > MAX_HORIZON_DAYS,
     }
 
 
@@ -424,16 +455,17 @@ def _fmt_level(v):
     return f"{v:,.0f}" if abs(v) >= 100 else f"{v:.1f}" if abs(v) >= 10 else f"{v:.2f}"
 
 
-def _leaf_copy(m, node, sm_dot, sm_ai, ramp=RAMP):
+def _leaf_copy(m, node, sm_dot, sm_ai, ramp=RAMP, since="ChatGPT"):
     """The 'today' display and the 'vs dot-com' note for a leaf, from a given
     smoothed series (so it can be recomputed per smoothing window / start anchor).
-    `ramp` indexes the peak on the active anchor's grid."""
+    `ramp` indexes the peak on the active dot anchor's grid; `since` names the
+    active AI anchor the ratio is measured from."""
     name = node["label"]
     if m["type"] == "ratio_from_start":
         ai_mult = sm_ai[-1] / sm_ai[0]
         peak_mult = sm_dot[ramp] / sm_dot[0]
-        display = f"up {ai_mult:.1f}x since ChatGPT"
-        different = (f"{name} is up about {ai_mult:.1f}x since ChatGPT against roughly "
+        display = f"up {ai_mult:.1f}x since {since}"
+        different = (f"{name} is up about {ai_mult:.1f}x since {since} against roughly "
                      f"{peak_mult:.1f}x for the same series into 2000, so on this measure "
                      "the AI era reads earlier than the dot-com run.")
     else:
@@ -446,47 +478,65 @@ def _leaf_copy(m, node, sm_dot, sm_ai, ramp=RAMP):
     return display, different
 
 
-def _build_leaf(conn, node, dot_grids, ai_dates, today):
+def _build_leaf(conn, node, dot_grids, ai_grids, today):
     m = node["metric"]
     pairs = _load_metric(conn, m)
     if not pairs:
         return None
-    raw_ai = _fill(pairs, ai_dates)
-    if raw_ai[0] is None:
-        return None                                   # metric never reaches the AI era
 
-    # Materialize every (start-anchor x smoothing-window) permutation. Each anchor
-    # re-domains the dot-com reference from a different start, so its raw dot series,
-    # ramp, and normalization baseline all differ; the 90-day "3-month" default and
-    # 30-day "1-month" alternative smooth each. The Options drawer toggles which
-    # (start, smoothing) pair every graph and projection reads. Because the alt start
-    # is strictly later than the default, forward-fill guarantees any leaf with
-    # coverage at the default start also has it at the alt start.
-    perms = {}
-    default_raw_dot = alt_raw_dot = None
-    for anchor in START_ANCHORS:
-        raw_dot = _fill(pairs, dot_grids[anchor["key"]])
-        if raw_dot[0] is None:
-            if anchor["key"] == DEFAULT_START:
+    # AI side, per anchor: raw series + both smoothings. An anchor whose window has
+    # not opened yet (a backtest day before it) has an empty grid and is skipped --
+    # the alt AI anchor simply has no permutations on those days.
+    ai_raw, ai_sm = {}, {}
+    for a in AI_ANCHORS:
+        grid = ai_grids.get(a["key"]) or []
+        raw = _fill(pairs, grid) if grid else []
+        if not raw or raw[0] is None:
+            if a["key"] == DEFAULT_AI:
+                return None                           # metric never reaches the AI era
+            continue
+        ai_raw[a["key"]] = raw
+        for win, wd in SMOOTH_WINDOWS.items():
+            ai_sm[(a["key"], win)] = _smooth_centered(raw, wd)
+
+    # Dot side, per anchor: raw series + both smoothings + that anchor's ramp. The alt
+    # start is strictly later than the default, so forward-fill guarantees coverage.
+    dot_raw, dot_sm, ramps = {}, {}, {}
+    for anc in START_ANCHORS:
+        raw = _fill(pairs, dot_grids[anc["key"]])
+        if raw[0] is None:
+            if anc["key"] == DEFAULT_START:
                 return None                           # no coverage at the canonical start
             continue
-        ramp = _ramp_of(anchor["start"])
+        dot_raw[anc["key"]] = raw
+        ramps[anc["key"]] = _ramp_of(anc["start"])
         for win, wd in SMOOTH_WINDOWS.items():
-            sm_dot = _smooth_centered(raw_dot, wd)
-            sm_ai = _smooth_centered(raw_ai, wd)
-            int_dot, int_ai = _normalize(sm_dot, sm_ai, m["type"], ramp)
-            disp, _diff = _leaf_copy(m, node, sm_dot, sm_ai, ramp)
-            perms[(anchor["key"], win)] = {"sm_dot": sm_dot, "sm_ai": sm_ai, "int_dot": int_dot,
-                                           "int_ai": int_ai, "display": disp, "ramp": ramp}
-        if anchor["key"] == DEFAULT_START:
-            default_raw_dot = raw_dot
-        elif anchor["key"] == ALT_START:
-            alt_raw_dot = raw_dot
+            dot_sm[(anc["key"], win)] = _smooth_centered(raw, wd)
 
-    # scalars, validation, and prose come from the default (Netscape, 90-day) clock;
-    # conformance is judged once here and reused across every start (empirically the
-    # verdict is start-invariant, see REVIEW-NOTES)
-    d = perms[(DEFAULT_START, DEFAULT_SMOOTH)]
+    # Cross them. Normalization couples the two sides (the AI curve is scaled by how
+    # far the dot-com reference climbed), so every (dot, ai, window) triple is its own
+    # dataset even though the smoothed inputs are shared.
+    perms = {}
+    for anc in START_ANCHORS:
+        dk = anc["key"]
+        if dk not in dot_raw:
+            continue
+        ramp = ramps[dk]
+        for a in AI_ANCHORS:
+            ak = a["key"]
+            if ak not in ai_raw:
+                continue
+            for win in SMOOTH_WINDOWS:
+                sm_dot, sm_ai = dot_sm[(dk, win)], ai_sm[(ak, win)]
+                int_dot, int_ai = _normalize(sm_dot, sm_ai, m["type"], ramp)
+                disp, _diff = _leaf_copy(m, node, sm_dot, sm_ai, ramp, a["short"])
+                perms[(dk, ak, win)] = {
+                    "sm_dot": sm_dot, "sm_ai": sm_ai, "int_dot": int_dot, "int_ai": int_ai,
+                    "display": disp, "ramp": ramp, "start": anc["start"], "aiStart": a["start"]}
+
+    # scalars, validation, and prose come from the default (Netscape / ChatGPT /
+    # 90-day) clock; conformance is judged once here and reused across every anchor
+    d = perms[(DEFAULT_START, DEFAULT_AI, DEFAULT_SMOOTH)]
     result = _evaluate(d["int_dot"], d["int_ai"], today)
     validation = _validate(d["sm_dot"], d["sm_ai"], d["int_dot"], d["int_ai"],
                            m["direction"], m.get("minRange", 0.2))
@@ -496,11 +546,12 @@ def _build_leaf(conn, node, dot_grids, ai_dates, today):
             "unitLabel": m["unitLabel"], "type": m["type"], "display": display, "different": different,
             "valid": validation["valid"], "validation": validation,
             "_intDot": d["int_dot"], "_intAi": d["int_ai"], "_smDot": d["sm_dot"], "_smAi": d["sm_ai"],
-            "_rawDot": default_raw_dot, "_rawAi": raw_ai, "_altRawDot": alt_raw_dot,
+            "_rawDot": dot_raw.get(DEFAULT_START), "_rawAi": ai_raw[DEFAULT_AI],
+            "_altRawDot": dot_raw.get(ALT_START), "_altRawAi": ai_raw.get(ALT_AI),
             "_perms": perms, **result}
 
 
-def _build(conn, node, dot_grids, ai_dates, today):
+def _build(conn, node, dot_grids, ai_grids, today):
     if node.get("wip"):
         return {"key": node["key"], "label": node["label"], "wip": True}
     if node.get("stub"):
@@ -509,8 +560,8 @@ def _build(conn, node, dot_grids, ai_dates, today):
         return {"key": node["key"], "label": node["label"], "stub": True,
                 "requires": node.get("requires", "credentials required")}
     if "metric" in node:
-        return _build_leaf(conn, node, dot_grids, ai_dates, today)
-    kids = [_build(conn, c, dot_grids, ai_dates, today) for c in node["children"]]
+        return _build_leaf(conn, node, dot_grids, ai_grids, today)
+    kids = [_build(conn, c, dot_grids, ai_grids, today) for c in node["children"]]
     live = [k for k in kids if k and not (k.get("wip") or k.get("stub"))]
     placeholders = [k for k in kids if k and (k.get("wip") or k.get("stub"))]
     if not live:
@@ -522,14 +573,17 @@ def _build(conn, node, dot_grids, ai_dates, today):
     use = valid_live or live
     declared = node.get("weights")
     weights = [declared.get(k["key"], 1.0) for k in use] if declared else None
-    # Blend each (start, smoothing) permutation independently over the same
+    # Blend each (dot, ai, smoothing) permutation independently over the same
     # conforming set + weights, so the roll-up's projection reflows correctly under
-    # whichever pair the reader selects. Every live leaf carries all PERM_KEYS (the
-    # coverage invariant in _build_leaf), so direct access is safe.
-    perms = {pk: {"int_dot": _blend([k["_perms"][pk]["int_dot"] for k in use], weights),
-                  "int_ai": _blend([k["_perms"][pk]["int_ai"] for k in use], weights)}
-             for pk in PERM_KEYS}
-    d = perms[(DEFAULT_START, DEFAULT_SMOOTH)]
+    # whichever combination the reader selects. A permutation is only blended where
+    # EVERY used child has it (an AI anchor that had not opened yet is absent).
+    perms = {}
+    for pk in PERM_KEYS:
+        if not all(pk in k["_perms"] for k in use):
+            continue
+        perms[pk] = {"int_dot": _blend([k["_perms"][pk]["int_dot"] for k in use], weights),
+                     "int_ai": _blend([k["_perms"][pk]["int_ai"] for k in use], weights)}
+    d = perms[(DEFAULT_START, DEFAULT_AI, DEFAULT_SMOOTH)]
     result = _evaluate(d["int_dot"], d["int_ai"], today)
     valid = len(valid_live) > 0
     validation = {"valid": valid, "crossings": 0, "checks": [
@@ -555,10 +609,10 @@ def _pick(arr, idx, nd=4):
     return [round(arr[i], nd) if arr[i] is not None else None for i in idx]
 
 
-def _emit(node, dw, aw, dw_alt):
+def _emit(node, dw, aw, dw_alt, aw_alt):
     """Recursively build the weekly payload node (arrays downsampled to weekly).
-    dw indexes the default dot grid, aw the AI grid, dw_alt the alt-anchor dot grid
-    (shorter, re-domained from the later start)."""
+    dw/dw_alt index the default and alt dot grids; aw/aw_alt the default and alt
+    AI grids (the alt AI grid is much shorter, opening only at its anchor)."""
     if node.get("wip"):
         return {"key": node["key"], "label": node["label"], "wip": True}
     if node.get("stub"):
@@ -568,7 +622,8 @@ def _emit(node, dw, aw, dw_alt):
            "valid": node.get("valid", True), "validation": node.get("validation"),
            "intensityDot": _pick(node["_intDot"], dw), "intensityAi": _pick(node["_intAi"], aw)}
     for k in ("intensityNow", "equiv", "equivalentDotcomDate", "daysFromPeak",
-              "compression", "projectedPeakDate", "projectedBottomDate", "phase", "beyondDotcomPeak"):
+              "compression", "projectedPeakDate", "projectedBottomDate", "phase",
+              "beyondDotcomPeak", "beyondHorizon"):
         out[k] = node[k]
     if "leaf" in node:
         out["leaf"] = node["leaf"]; out["unit"] = node["unit"]; out["unitLabel"] = node["unitLabel"]
@@ -576,17 +631,18 @@ def _emit(node, dw, aw, dw_alt):
         out["smoothedDot"] = _pick(node["_smDot"], dw, 2); out["smoothedAi"] = _pick(node["_smAi"], aw, 2)
         out["rawDot"] = _pick(node["_rawDot"], dw, 2); out["rawAi"] = _pick(node["_rawAi"], aw, 2)
         perms = node.get("_perms", {})
-        # the alternate smoothing window (30-day) on the default anchor; the default
+        # the alternate smoothing window (30-day) on the default anchors; the default
         # (90) is the top-level set
-        alt = perms.get((DEFAULT_START, "30"))
+        alt = perms.get((DEFAULT_START, DEFAULT_AI, "30"))
         if alt:
             out["alt30"] = {"intensityDot": _pick(alt["int_dot"], dw), "intensityAi": _pick(alt["int_ai"], aw),
                             "smoothedDot": _pick(alt["sm_dot"], dw, 2), "smoothedAi": _pick(alt["sm_ai"], aw, 2),
                             "display": alt["display"]}
-        # the alternate START anchor: its own (shorter) dot grid + both windows, so the
-        # Options toggle can swap the whole reference. AI curves re-normalize per anchor
+        # the alternate DOT-COM start: its own (shorter) dot grid + both windows, so the
+        # toggle can swap the whole reference. AI curves re-normalize per dot anchor
         # (the denominator is the dot-com climb, which the anchor changes).
-        a90, a30 = perms.get((ALT_START, "90")), perms.get((ALT_START, "30"))
+        a90, a30 = (perms.get((ALT_START, DEFAULT_AI, "90")),
+                    perms.get((ALT_START, DEFAULT_AI, "30")))
         if a90 and a30 and node.get("_altRawDot") is not None:
             def altw(p):
                 return {"intensityDot": _pick(p["int_dot"], dw_alt), "intensityAi": _pick(p["int_ai"], aw),
@@ -594,17 +650,39 @@ def _emit(node, dw, aw, dw_alt):
                         "display": p["display"]}
             out["altStart"] = {"rawDot": _pick(node["_altRawDot"], dw_alt, 2),
                                "90": altw(a90), "30": altw(a30)}
+        # the alternate AI-ERA start: ONLY the AI-side arrays (its own short grid),
+        # plus the parts that genuinely depend on all three axes (intensityAi, prose)
+        # keyed by dot anchor. Dot-side arrays are not duplicated; the client composes
+        # them from the blocks above.
+        if node.get("_altRawAi") is not None and aw_alt:
+            def aiw(win):
+                base = perms.get((DEFAULT_START, ALT_AI, win))
+                if not base:
+                    return None
+                blk = {"smoothedAi": _pick(base["sm_ai"], aw_alt, 2),
+                       "intensityAi": {}, "display": {}}
+                for dkey in (DEFAULT_START, ALT_START):
+                    p = perms.get((dkey, ALT_AI, win))
+                    if p:
+                        blk["intensityAi"][dkey] = _pick(p["int_ai"], aw_alt)
+                        blk["display"][dkey] = p["display"]
+                return blk
+            b90, b30 = aiw("90"), aiw("30")
+            if b90 and b30:
+                out["altAi"] = {"rawAi": _pick(node["_altRawAi"], aw_alt, 2),
+                                "90": b90, "30": b30}
     if "weights" in node:
         out["weights"] = node["weights"]
     if "children" in node:
-        out["children"] = [_emit(c, dw, aw, dw_alt) for c in node["children"]]
+        out["children"] = [_emit(c, dw, aw, dw_alt, aw_alt) for c in node["children"]]
     return out
 
 
 def _leaf_dates(node, acc):
-    # Only conforming leaves contribute to the headline band; a non-conforming
-    # metric's projection is suppressed, so it must not widen the range either.
-    if node.get("leaf") and node.get("valid", True):
+    # Only conforming leaves with a meaningful horizon contribute to the headline
+    # band; a suppressed projection (non-conforming, or past MAX_HORIZON_DAYS) is
+    # not shown, so it must not widen the range either.
+    if node.get("leaf") and node.get("valid", True) and not node.get("beyondHorizon"):
         acc.append(node["projectedPeakDate"])
     for c in node.get("children", []):
         _leaf_dates(c, acc)
@@ -612,13 +690,13 @@ def _leaf_dates(node, acc):
 
 # --------------------------------------------------------------------- assemble
 def _alt_clock_block(alt_grid, ai_dates, aw, dw_alt, root, today):
-    """The non-default start anchor's clock + weekly axes, so the client can reflow
-    the whole reference when the reader toggles the start. headlineDate is the
+    """The non-default dot-com start anchor's clock + weekly axes, so the client can
+    reflow the whole reference when the reader toggles the start. headlineDate is the
     alt-anchor root projection (a static preview; the client recomputes live)."""
     anchor = next(a for a in START_ANCHORS if a["key"] == ALT_START)
     ramp = _ramp_of(anchor["start"])
     bprog = _bottom_prog_of(anchor["start"], ramp)
-    ad = root["_perms"][(ALT_START, DEFAULT_SMOOTH)]
+    ad = root["_perms"][(ALT_START, DEFAULT_AI, DEFAULT_SMOOTH)]
     head = _evaluate(ad["int_dot"], ad["int_ai"], today, "dominant",
                      anchor["start"], ramp, bprog)["projectedPeakDate"]
     return {
@@ -632,22 +710,47 @@ def _alt_clock_block(alt_grid, ai_dates, aw, dw_alt, root, today):
     }
 
 
+def _alt_ai_block(alt_ai_grid, aw_alt, root, today):
+    """The non-default AI-era anchor: its own (much shorter) weekly grid, plus the
+    root projection under each dot anchor as a static preview. The client derives
+    progAi from these months and the active ramp, so no per-pair axis is shipped."""
+    anchor = next(a for a in AI_ANCHORS if a["key"] == ALT_AI)
+    heads = {}
+    for d in START_ANCHORS:
+        p = root["_perms"].get((d["key"], ALT_AI, DEFAULT_SMOOTH))
+        if not p:
+            continue
+        ramp = _ramp_of(d["start"])
+        heads[d["key"]] = _evaluate(
+            p["int_dot"], p["int_ai"], today, "dominant", d["start"], ramp,
+            _bottom_prog_of(d["start"], ramp), anchor["start"])["projectedPeakDate"]
+    return {
+        "key": anchor["key"], "start": anchor["start"], "event": anchor["event"],
+        "short": anchor["short"],
+        "aiMonths": [alt_ai_grid[i] for i in aw_alt],
+        "headlineDate": heads,
+    }
+
+
 def compute_thennow(conn):
     today = _today()
     dot_grids = {a["key"]: _grid(a["start"], CLOCK["bottom"]) for a in START_ANCHORS}
     dot_dates = dot_grids[DEFAULT_START]
-    ai_dates = _grid(CLOCK["aiStart"], today.isoformat())
+    ai_grids = {a["key"]: _grid(a["start"], today.isoformat()) for a in AI_ANCHORS}
+    ai_dates = ai_grids[DEFAULT_AI]
     from . import registry
-    root = _build(conn, registry.build_tree(), dot_grids, ai_dates, today)
+    root = _build(conn, registry.build_tree(), dot_grids, ai_grids, today)
     if not root:
         return None
 
     dw, aw = _weekly_idx(len(dot_dates)), _weekly_idx(len(ai_dates))
     dw_alt = _weekly_idx(len(dot_grids[ALT_START]))
+    alt_ai_grid = ai_grids.get(ALT_AI) or []
+    aw_alt = _weekly_idx(len(alt_ai_grid)) if alt_ai_grid else []
     prog_dot = [round(i / RAMP * 100, 2) for i in dw]
     prog_ai = [round(i / RAMP * 100, 2) for i in aw]
     peak_idx = min(range(len(dw)), key=lambda k: abs(dw[k] - RAMP))
-    tree = _emit(root, dw, aw, dw_alt)
+    tree = _emit(root, dw, aw, dw_alt, aw_alt)
     _attach_observations(tree, _load_obs_cache())
 
     dates = []
@@ -674,6 +777,14 @@ def compute_thennow(conn):
         "startAnchors": [{"key": a["key"], "start": a["start"], "event": a["event"],
                           "default": bool(a.get("default"))} for a in START_ANCHORS],
         "altStart": _alt_clock_block(dot_grids[ALT_START], ai_dates, aw, dw_alt, root, today),
+        # selectable AI-era start anchors + the non-default anchor's grid. Its window
+        # is far shorter, so its projections are much less stable -- the stability
+        # panel and the horizon rule below are what keep that honest.
+        "aiAnchors": [{"key": a["key"], "start": a["start"], "event": a["event"],
+                       "short": a["short"], "default": bool(a.get("default"))}
+                      for a in AI_ANCHORS],
+        "altAi": _alt_ai_block(alt_ai_grid, aw_alt, root, today) if aw_alt else None,
+        "maxHorizonDays": MAX_HORIZON_DAYS,
         # leaf-kind / branch-key → Data Sources group anchor, from the modules'
         # ir declarations (drives the "full method & sources" links)
         "srcGroups": registry.src_groups(),

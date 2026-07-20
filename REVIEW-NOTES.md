@@ -363,3 +363,51 @@ smoothing, matching, and weights. Verified in preview: default byte-identical,
 Exuberance reflow correct (chart axis starts 1996-12-05, speculation flips
 from +49.5 d/mo receding to -28.6 d/mo converging), round-trip identical,
 compositions clean, console error-free.
+
+## (j) Alternate AI-era anchor: Pichai's "elements of irrationality" (2026-07-20)
+
+Added a second, selectable AI-ERA start to mirror the dot-com one: Sundar Pichai's
+2025-11-18 BBC interview ("I think it's both rational and there are elements of
+irrationality through a moment like this") beside the default ChatGPT launch. The
+conceptually matched pair is Exuberance + Pichai (warning-to-warning), just as
+Netscape + ChatGPT is launch-to-launch. Permutations doubled 8 -> 16.
+
+What it does. The AI window collapses from 3.6 years to ~0.7. Re-based off a recent
+high, AI's intensity falls hard (root 0.46 -> ~0.18), so it matches much earlier on
+the dot-com ramp, while the elapsed base for measuring pace shrinks to 245 days.
+Root projections today: Netscape+ChatGPT 2027-09-20, Netscape+Pichai 2027-11-04,
+Exuberance+ChatGPT 2027-09-15, Exuberance+Pichai 2029-12-26. Conformance drops
+(market cap to GDP and IPO froth stop passing the shape checks on so short a base).
+
+Honesty rails, because this anchor is genuinely weak evidence:
+- NEW horizon rule. MAX_HORIZON_DAYS = 3653 (~10y): a projection further out is not
+  a meaningful reading and is SUPPRESSED for display (own reason line, distinct from
+  "does not fit dot-com analogy"), excluded from the headline band, and its chart
+  drops the projection line. It is still computed and kept in the ledger. Nothing on
+  the default clock triggers it (furthest conforming leaf is ~5y); under
+  Exuberance+Pichai it catches speculation at 2057 and suppressed nodes go 4 -> 7.
+- Partial backtest coverage, reported not hidden. The anchor did not exist before
+  2025-11-18, so its permutations have 245 of 566 runs. snapshot writes blanks for
+  days before the anchor; payload_blocks filters PER ROW (not on the first row) so
+  the panel shows the smaller run count rather than dropping or faking the perm.
+- The stability numbers indict it directly: exuberance_pichai_90_dominant has a
+  drift of +1430 d/mo (the projected date moves ~4 years per month of real time) vs
+  +49.5 for the default. The panel, arrows, and drift sort all read the active
+  combination, so the instability is visible exactly where the date is.
+
+Engine. AI_ANCHORS mirrors START_ANCHORS; _evaluate takes ai_start (the elapsed
+base) and returns beyondHorizon; _leaf_copy takes the anchor's short label (the
+default string "since ChatGPT" is preserved). Leaves materialize the (dot x ai x
+window) cross product = 8 curve sets, computing each side's smoothing once; roll-ups
+blend only permutations EVERY used child has, so an anchor that had not opened yet
+is simply absent rather than fabricated. Conformance is still judged once at
+(Netscape, ChatGPT, 90d), and the weight optimizer still runs on the default pair --
+its replay gate stays 0-mismatch across all 7 roll-ups.
+
+Ledger/payload. _perm_id omits default anchors from the prefix, so all 8 previous
+column names are unchanged as the axis was added (90_dominant, exuberance_*) and
+8 new ones appear (pichai_*, exuberance_pichai_*). The payload ships altAi with ONLY
+the AI-side arrays plus the parts that genuinely depend on all three axes
+(intensityAi, prose) keyed by dot anchor; the client assembles the cross product, so
+no dot-side array is duplicated. progAi is derived client-side from the active AI
+months and ramp rather than shipped per pair.
