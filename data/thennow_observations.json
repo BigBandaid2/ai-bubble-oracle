@@ -1,15 +1,15 @@
 {
   "ai_peak": {
-    "hash": "e562b24966c1",
-    "text": "AI valuations show acceleration similar to late 1999, suggesting continued gains before a potential peak in 2027. The analogy breaks down if AI delivers transformative products that justify current prices, unlike dot-com's mostly vaporous promises."
+    "hash": "c046c92f71fc",
+    "text": "AI valuations are accelerating faster than dot-com did at this equivalent stage, suggesting a potential peak around late 2027. However, AI has real revenue streams and deployed products that the dot-com era largely lacked, making direct comparison hazardous."
   },
   "buffett": {
     "hash": "689ef897f9be",
     "text": "Market cap to GDP has grown 40% since ChatGPT's launch, tracking the pattern seen during dot-com's rise phase. The metric suggests AI is roughly where dot-com was three years before its peak, though compressed timelines mean nothing about actual outcomes.\n\nCaveat: Market cap to GDP can rise from genuine productivity gains, not just speculation, so historical pattern-matching tells you little about whether this boom has real foundations."
   },
   "capex": {
-    "hash": "86554553736a",
-    "text": "AI capex is climbing steeply but hasn't yet matched the frenzied dot-com spending peak. The analogy suggests the surge could crest in mid-2027 if historical compression holds. Caveat: AI infrastructure may sustain higher spending longer than dot-com did, since actual revenue-generating services now exist."
+    "hash": "c6ab3034e066",
+    "text": "AI infrastructure spending is rising steeply and matches dot-com's acceleration phase, suggesting sustained investment appetite. However, AI capex may reflect genuine long-term utility rather than speculative excess, making spending intensity alone a poor crash predictor."
   },
   "ipo_froth": {
     "hash": "3f5cb77e657b",
@@ -60,8 +60,8 @@
     "text": "Tech leadership concentration has risen sharply since ChatGPT, tracking the dot-com pattern at a compressed pace. The analogy suggests a potential peak around late 2026, though this assumes structural similarities that may not hold. Caveat: the metric measures leadership only, not whether the underlying AI investments prove economically valuable."
   },
   "tech_orders": {
-    "hash": "4b5d3259f319",
-    "text": "Equipment orders show AI accelerating much as the dot-com sector did before 2000, but AI remains well below peak dot-com intensity. The parallel suggests sustained growth ahead, though past bubbles have surprised with speed and severity.\n\nCaveat: Equipment orders reflect business confidence, which can reverse sharply if sentiment shifts faster than this metric suggests."
+    "hash": "d402aa578385",
+    "text": "Tech equipment orders show AI at roughly the same intensity as dot-com in mid-1999, suggesting roughly nine months remain before peak if timelines compress similarly. The analogy depends on whether AI's underlying demand drivers prove as ephemeral as the dot-com bubble's, which remains uncertain."
   },
   "valuation": {
     "hash": "be47b91100bd",
