@@ -1,7 +1,7 @@
 {
   "ai_peak": {
-    "hash": "e562b24966c1",
-    "text": "The AI sector shows bubble dynamics similar to dot-com's acceleration phase, roughly 11 months before peak. Caveat: a compression ratio of 1.04 assumes identical timescales, but AI's different fundamentals could extend or shorten the cycle."
+    "hash": "c046c92f71fc",
+    "text": "AI valuations are rising steeply but have not yet matched dot-com peak intensity. The analogy suggests continued gains before any reversal, though compressed into a shorter timeframe. Caveat: one input didn't fit the pattern, and analogies can't account for structural differences between markets."
   },
   "buffett": {
     "hash": "689ef897f9be",
@@ -16,8 +16,8 @@
     "text": "IPO enthusiasm shows similar early-stage dynamics to the dot-com boom, with first-day pops still modest relative to peak froth. The pattern suggests room for further euphoria before any potential reversal. Caveat: IPO metrics lag actual market peaks, so this analogy may understate how far sentiment has already advanced."
   },
   "it_invest": {
-    "hash": "4b5d3259f319",
-    "text": "IT investment share rose sharply in both eras, with AI now at roughly two-thirds of dot-com peak intensity. The acceleration phase matches 1999's early surge, suggesting similar structural shifts in capital allocation. Caveat: investment patterns can diverge from valuation bubbles, so matching spending trajectories doesn't guarantee matching crashes."
+    "hash": "8e7e57be748b",
+    "text": "IT investment share has followed the dot-com arc so far, with AI spending climbing steeply but still shy of peak bubble intensity. The analogy suggests continued acceleration, though investment patterns may compress differently given today's capital efficiency and market structure.\n\nCaveat: Historical analogies work until they don't, and AI's underlying productivity case remains genuinely contested."
   },
   "margin_debt": {
     "hash": "b0ae5058b082",
@@ -72,7 +72,7 @@
     "text": "Valuation multiples show the AI era climbing steeply like the dot-com bubble did, currently at 88 percent of peak intensity. The metric fits the analogy reasonably well, though remember that valuations can stay elevated or deflate gradually, making any timeline purely illustrative."
   },
   "yield_curve": {
-    "hash": "1415d8e45b08",
-    "text": "The yield curve hasn't tightened as the AI era matured, unlike the dot-com period when it compressed sharply into the peak. This divergence suggests either different economic conditions or that this particular metric simply doesn't track the current cycle. Skeptics should remember that yield curves respond to Fed policy and inflation expectations, not just speculative excess."
+    "hash": "157471395999",
+    "text": "The yield curve has not tightened as the AI boom has progressed, unlike the dot-com era when inversion accelerated into the peak. This suggests either different macroeconomic conditions or that this particular metric does not track the current cycle similarly. Caveat: yield curve behavior depends heavily on Federal Reserve policy, which operates under different mandates and constraints than in 2000."
   }
 }
