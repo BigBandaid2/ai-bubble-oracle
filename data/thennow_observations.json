@@ -28,8 +28,8 @@
     "text": "AI market concentration is rising steeply but remains well below dot-com extremes, suggesting earlier bubble stages. The compression ratio implies a faster timeline, but concentration alone cannot predict peaks, only describe current structure."
   },
   "monetary": {
-    "hash": "3b09a0509b71",
-    "text": "Monetary and sentiment conditions today look nothing like the dot-com bubble's peak intensity, suggesting the AI boom may follow a fundamentally different trajectory. Caveat: sentiment metrics are notoriously lagging indicators and may not capture emerging excess until it's too late."
+    "hash": "63e91414272b",
+    "text": "Monetary and sentiment conditions today are actually weaker than during the dot-com early ramp, suggesting less euphoria fueling current AI investment. Caveat: sentiment metrics are notoriously difficult to measure consistently across decades, so this comparison may reflect measurement differences rather than real divergence."
   },
   "nasdaq": {
     "hash": "1a682d9f2472",
@@ -68,8 +68,8 @@
     "text": "AI valuations are rising fast, though still below dot-com peak intensity. The pattern suggests continued gains ahead, but sector concentration and fundamental differences in profitability make valuation comparisons inherently uncertain."
   },
   "valuation_multiple": {
-    "hash": "2717a796b390",
-    "text": "AI valuations have reached 91% of dot-com peak intensity, suggesting we're in the acceleration phase roughly a year before a potential market peak. The key caveat is that valuation multiples alone cannot distinguish between justified gains from genuine productivity improvements and unsustainable speculation."
+    "hash": "6a8fd531f129",
+    "text": "Valuation multiples show AI stocks climbing the same steep path the dot-com bubble followed, currently matching late 1999 intensity. The parallel suggests markets are pricing in transformative change, though whether AI delivers on those expectations remains the crucial unknown.\n\nCaveat: historical analogy works better for identifying patterns than timing peaks, especially when the underlying technology differs fundamentally."
   },
   "yield_curve": {
     "hash": "acca7a095009",
