@@ -48,8 +48,8 @@
     "text": "Consumer sentiment shows no boom-like exuberance in the AI era, remaining flat while dot-com sentiment surged toward its peak. This breaks the analogy pattern and suggests different market psychology. Caveat: sentiment indices can lag actual economic impacts by months or quarters."
   },
   "sp500": {
-    "hash": "eb3f904521cb",
-    "text": "The S&P 500 has risen sharply since ChatGPT's launch, tracking a similar acceleration phase to the dot-com bubble's 1998 advance. If the current compression holds, the broad market could peak around early 2028. Caveat: stock indexes reflect many sectors beyond AI, so this analogy conflates bubble dynamics in one industry with economy-wide valuation."
+    "hash": "4b5d3259f319",
+    "text": "The S&P 500 has risen 1.9x since ChatGPT, reaching about 63% of dot-com peak intensity, suggesting the AI boom may have further to run before any potential reversal. The analogy points to a peak around early 2028, though this assumes current acceleration continues at a comparable pace. Caveat: market dynamics have changed significantly since 2000, and the AI boom's economic fundamentals differ from dot-com's."
   },
   "speculation": {
     "hash": "62cd379f0605",
@@ -60,8 +60,8 @@
     "text": "Tech leadership concentration has risen sharply since ChatGPT, tracking the dot-com pattern at a compressed pace. The analogy suggests a potential peak around late 2026, though this assumes structural similarities that may not hold. Caveat: the metric measures leadership only, not whether the underlying AI investments prove economically valuable."
   },
   "tech_orders": {
-    "hash": "d402aa578385",
-    "text": "Tech equipment orders show AI at roughly the same intensity as dot-com in mid-1999, suggesting roughly nine months remain before peak if timelines compress similarly. The analogy depends on whether AI's underlying demand drivers prove as ephemeral as the dot-com bubble's, which remains uncertain."
+    "hash": "ab786e3b6730",
+    "text": "Tech equipment orders show AI following the dot-com trajectory, currently at 76% of dot-com peak intensity and accelerating. The analogy suggests similar boom dynamics, though the comparison relies on historical data quality that may not fully capture structural differences between the two eras."
   },
   "valuation": {
     "hash": "be47b91100bd",
