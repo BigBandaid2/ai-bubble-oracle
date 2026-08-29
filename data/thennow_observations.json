@@ -28,8 +28,8 @@
     "text": "AI market concentration is rising steeply but remains well below dot-com extremes, suggesting earlier bubble stages. The compression ratio implies a faster timeline, but concentration alone cannot predict peaks, only describe current structure."
   },
   "monetary": {
-    "hash": "63e91414272b",
-    "text": "Monetary and sentiment conditions today are actually weaker than during the dot-com early ramp, suggesting less euphoria fueling current AI investment. Caveat: sentiment metrics are notoriously difficult to measure consistently across decades, so this comparison may reflect measurement differences rather than real divergence."
+    "hash": "f7b9c5ff1141",
+    "text": "Monetary and sentiment conditions today are actually cooler than during the dot-com early ramp, suggesting less frothy enthusiasm right now. This makes the analogy weaker for timing predictions. Caveat: sentiment can shift rapidly, especially if AI hype intensifies or funding dries up unexpectedly."
   },
   "nasdaq": {
     "hash": "1a682d9f2472",
@@ -44,8 +44,8 @@
     "text": "Semiconductor production lacks a clear peak phase in the dot-com era, making this metric unsuitable for drawing parallels. Skeptics should remember that chip demand has structural drivers today that didn't exist then, potentially invalidating any historical comparison."
   },
   "sentiment": {
-    "hash": "a7bd2951093a",
-    "text": "Consumer sentiment shows no boom-like exuberance in the AI era, remaining flat while dot-com sentiment surged toward its peak. This breaks the analogy pattern and suggests different market psychology. Caveat: sentiment indices can lag actual economic impacts by months or quarters."
+    "hash": "937d5e5f1dc2",
+    "text": "Consumer sentiment shows no signs of following the dot-com pattern. While the dot-com era saw sentiment surge toward its peak, current sentiment remains flat or declining, suggesting a fundamentally different market psychology between these booms. Skeptics should note that sentiment measures can reflect lagging rather than leading indicators of market stress."
   },
   "sp500": {
     "hash": "4b5d3259f319",
@@ -72,7 +72,7 @@
     "text": "Valuation multiples show the AI era climbing steeply on the same trajectory as dot-com, currently matching late-1999 intensity. The analogy suggests further gains ahead before any reversal, though it assumes market dynamics will repeat at similar compression rates, which is speculative."
   },
   "yield_curve": {
-    "hash": "3d2b31b61471",
-    "text": "The yield curve shows no signs of mimicking the dot-com era's dramatic inversion pattern. While the spread remains historically tight, it's flattening rather than steepening toward a peak, which breaks the analogy's core dynamic. Caveat: yield curve behavior depends heavily on Federal Reserve policy, which differs fundamentally between 2000 and today."
+    "hash": "e7c751c5795a",
+    "text": "The yield curve shows no signs of mimicking the dot-com era's dramatic inversion pattern. While the spread remains historically compressed, it has flatlined rather than accelerating toward the sharp reversal that preceded the earlier crash.\n\nCaveat: yield curve behavior depends heavily on Federal Reserve policy, which operates under different frameworks and constraints than it did in 2000."
   }
 }
