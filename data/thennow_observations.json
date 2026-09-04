@@ -28,8 +28,8 @@
     "text": "AI market concentration is rising steeply but remains well below dot-com extremes, suggesting earlier bubble stages. The compression ratio implies a faster timeline, but concentration alone cannot predict peaks, only describe current structure."
   },
   "monetary": {
-    "hash": "f7b9c5ff1141",
-    "text": "Monetary and sentiment conditions today are actually cooler than during the dot-com early ramp, suggesting less frothy enthusiasm right now. This makes the analogy weaker for timing predictions. Caveat: sentiment can shift rapidly, especially if AI hype intensifies or funding dries up unexpectedly."
+    "hash": "0765e3182818",
+    "text": "Monetary and sentiment conditions today show fundamentally different patterns than the dot-com era, suggesting any timeline based on this metric is unreliable. Skeptics should note that AI's actual funding sources and market psychology may simply follow different rules than 1990s tech stocks did."
   },
   "nasdaq": {
     "hash": "1a682d9f2472",
@@ -72,7 +72,7 @@
     "text": "Valuation multiples show the AI era climbing steeply on the same trajectory as dot-com, currently matching late-1999 intensity. The analogy suggests further gains ahead before any reversal, though it assumes market dynamics will repeat at similar compression rates, which is speculative."
   },
   "yield_curve": {
-    "hash": "e7c751c5795a",
-    "text": "The yield curve shows no signs of mimicking the dot-com era's dramatic inversion pattern. While the spread remains historically compressed, it has flatlined rather than accelerating toward the sharp reversal that preceded the earlier crash.\n\nCaveat: yield curve behavior depends heavily on Federal Reserve policy, which operates under different frameworks and constraints than it did in 2000."
+    "hash": "bc9e81f0febc",
+    "text": "The yield curve shows little sign of mimicking the dot-com era's dramatic inversion pattern. Unlike tech stocks, which surged toward their peak as the bubble inflated, the yield curve has remained flat and unresponsive. Skeptics should remember that monetary policy operates under different frameworks now, so yield curve behavior may simply reflect changed Fed tactics rather than bubble dynamics."
   }
 }
