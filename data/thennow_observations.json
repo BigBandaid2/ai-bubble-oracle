@@ -1,7 +1,7 @@
 {
   "ai_peak": {
-    "hash": "e562b24966c1",
-    "text": "AI valuations are rising at a pace similar to the late 1990s, suggesting a potential peak around late 2027 if the pattern holds. Caveat: four out of five analogy inputs matching leaves room for structural differences that could alter the trajectory."
+    "hash": "c046c92f71fc",
+    "text": "AI market intensity currently sits at less than half the dot-com peak, suggesting substantial room for further gains before any correction. The analogy points toward a 2027 peak, though this assumes the boom-bust cycle compresses at a consistent rate. Keep in mind that structural differences between internet infrastructure and AI capability could alter the trajectory entirely."
   },
   "buffett": {
     "hash": "689ef897f9be",
@@ -72,7 +72,7 @@
     "text": "Stock valuations are rising as steeply in AI's boom as they did before the dot-com crash, and we're currently at roughly 89% of peak intensity. Skeptics should remember that valuation multiples alone cannot predict crashes\u2014market peaks depend on earnings growth, sentiment shifts, and dozens of other factors that may play out very differently this time."
   },
   "yield_curve": {
-    "hash": "d9534e7cb3c4",
-    "text": "The yield curve shows little sign of the inversion that preceded the dot-com peak, suggesting different credit conditions between the two periods. This metric weakens the analogy rather than strengthens it. Caveat: yield curve dynamics depend heavily on Federal Reserve policy, which differs fundamentally between 2000 and now."
+    "hash": "7e6b02f86678",
+    "text": "The yield curve shows no signs of mimicking the dot-com era's pattern, remaining flat while the comparable dot-com period was already steepening toward its peak. This suggests financial conditions differ fundamentally between the two booms. Caveat: yield curve dynamics depend heavily on Federal Reserve policy, which operates under different constraints and philosophies than in 2000."
   }
 }
