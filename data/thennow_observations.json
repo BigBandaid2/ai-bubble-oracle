@@ -1,11 +1,11 @@
 {
   "ai_peak": {
-    "hash": "c046c92f71fc",
-    "text": "AI market intensity currently sits at less than half the dot-com peak, suggesting substantial room for further gains before any correction. The analogy points toward a 2027 peak, though this assumes the boom-bust cycle compresses at a consistent rate. Keep in mind that structural differences between internet infrastructure and AI capability could alter the trajectory entirely."
+    "hash": "150914478d26",
+    "text": "This metric suggests AI is still in the acceleration phase, roughly 340 days before a potential peak. Caveat: analogies to past bubbles often break down due to structural differences in technology, capital, and market dynamics."
   },
   "buffett": {
-    "hash": "689ef897f9be",
-    "text": "Market cap to GDP has grown 40% since ChatGPT's launch, tracking the pattern seen during dot-com's rise phase. The metric suggests AI is roughly where dot-com was three years before its peak, though compressed timelines mean nothing about actual outcomes.\n\nCaveat: Market cap to GDP can rise from genuine productivity gains, not just speculation, so historical pattern-matching tells you little about whether this boom has real foundations."
+    "hash": "eb3f904521cb",
+    "text": "Market cap to GDP suggests AI valuations are following the dot-com trajectory but at an accelerated pace, currently at late-1998 intensity levels. A skeptical reader should note that analogies based on single metrics can mislead, since AI companies have real revenue streams unlike many dot-com firms."
   },
   "capex": {
     "hash": "c6ab3034e066",
@@ -20,8 +20,8 @@
     "text": "IT investment share has followed the dot-com arc so far, with AI spending climbing steeply but still shy of peak bubble intensity. The analogy suggests continued acceleration, though investment patterns may compress differently given today's capital efficiency and market structure.\n\nCaveat: Historical analogies work until they don't, and AI's underlying productivity case remains genuinely contested."
   },
   "margin_debt": {
-    "hash": "b0ae5058b082",
-    "text": "Margin debt shows similar acceleration patterns in both eras, with AI leverage currently climbing at a pace that mirrors dot-com's mid-rise phase. The comparison suggests shared investor confidence, though leverage remains well below prior extremes. Caveat: debt behavior could diverge sharply if AI monetization proves more durable than dot-com business models."
+    "hash": "dc875a7497ef",
+    "text": "Margin debt has roughly doubled since ChatGPT, reaching 41% of dot-com peak intensity. The pattern of rising leverage mirrors the late-1990s acceleration phase, suggesting investors are increasingly confident or complacent. Keep in mind that regulatory changes and circuit breakers since 2000 may prevent debt from reaching comparable extremes."
   },
   "market_concentration": {
     "hash": "992cad6df336",
@@ -52,8 +52,8 @@
     "text": "The S&P 500 has risen 1.9x since ChatGPT, reaching about 63% of dot-com peak intensity, suggesting the AI boom may have further to run before any potential reversal. The analogy points to a peak around early 2028, though this assumes current acceleration continues at a comparable pace. Caveat: market dynamics have changed significantly since 2000, and the AI boom's economic fundamentals differ from dot-com's."
   },
   "speculation": {
-    "hash": "62cd379f0605",
-    "text": "Speculative fervor in AI is rising sharply but remains well below dot-com extremes, placing the market in a mid-1990s acceleration phase by analogy. Caveat: compressed timelines assume AI bubble dynamics will mirror dot-com ones, which ignores structural differences in modern markets."
+    "hash": "3da952406751",
+    "text": "Speculative fervor in AI is building at a pace slightly faster than the dot-com run-up, currently at about one-third the intensity seen at that market's peak. The caveat: past compression ratios offer no guarantee about when or whether AI speculation will actually peak."
   },
   "tech_leadership": {
     "hash": "5f7ab24fa4e3",
@@ -64,8 +64,8 @@
     "text": "Tech equipment orders show AI following the dot-com trajectory, currently at 76% of dot-com peak intensity and accelerating. The analogy suggests similar boom dynamics, though the comparison relies on historical data quality that may not fully capture structural differences between the two eras."
   },
   "valuation": {
-    "hash": "be47b91100bd",
-    "text": "AI valuations are rising fast, though still below dot-com peak intensity. The pattern suggests continued gains ahead, but sector concentration and fundamental differences in profitability make valuation comparisons inherently uncertain."
+    "hash": "86554553736a",
+    "text": "AI valuations are climbing steeply but haven't yet matched dot-com excess, suggesting the boom may have further to run before any reversal. Caveat: valuation alone cannot predict peaks, since market psychology and external shocks matter as much as fundamentals."
   },
   "valuation_multiple": {
     "hash": "2717a796b390",
