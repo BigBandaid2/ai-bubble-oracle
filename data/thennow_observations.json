@@ -28,8 +28,8 @@
     "text": "AI market concentration is rising steeply but remains well below dot-com extremes, suggesting earlier bubble stages. The compression ratio implies a faster timeline, but concentration alone cannot predict peaks, only describe current structure."
   },
   "monetary": {
-    "hash": "0765e3182818",
-    "text": "Monetary and sentiment conditions today show fundamentally different patterns than the dot-com era, suggesting any timeline based on this metric is unreliable. Skeptics should note that AI's actual funding sources and market psychology may simply follow different rules than 1990s tech stocks did."
+    "hash": "3b09a0509b71",
+    "text": "Monetary and sentiment conditions today lack the frothy excess of dot-com's peak, suggesting cooler fundamentals. Skeptics should note that AI's institutional backing and real revenue streams differ fundamentally from late-90s startups."
   },
   "nasdaq": {
     "hash": "1a682d9f2472",
@@ -72,7 +72,7 @@
     "text": "Stock valuations are rising as steeply in AI's boom as they did before the dot-com crash, and we're currently at roughly 89% of peak intensity. Skeptics should remember that valuation multiples alone cannot predict crashes\u2014market peaks depend on earnings growth, sentiment shifts, and dozens of other factors that may play out very differently this time."
   },
   "yield_curve": {
-    "hash": "7e6b02f86678",
-    "text": "The yield curve shows no sign of following the dot-com pattern. While the spread sits near early-1990s levels, it has flatlined rather than steepening toward the bubble peak, suggesting different credit conditions are at work. Skeptics should remember that yield curve dynamics depend heavily on Fed policy, which operates under entirely different frameworks than twenty years ago."
+    "hash": "2cb1c2c4e2e7",
+    "text": "The yield curve shows no signs of steepening as the dot-com bubble inflated, suggesting different monetary conditions between eras. This divergence weakens any analogy between AI and dot-com peaks. Caveat: yield curve behavior depends heavily on Federal Reserve policy, which operates under fundamentally different frameworks today."
   }
 }
