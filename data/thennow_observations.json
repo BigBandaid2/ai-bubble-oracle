@@ -28,8 +28,8 @@
     "text": "AI market concentration is rising steeply but remains well below dot-com extremes, suggesting earlier bubble stages. The compression ratio implies a faster timeline, but concentration alone cannot predict peaks, only describe current structure."
   },
   "monetary": {
-    "hash": "3b09a0509b71",
-    "text": "Monetary and sentiment conditions today lack the frothy excess of dot-com's peak, suggesting cooler fundamentals. Skeptics should note that AI's institutional backing and real revenue streams differ fundamentally from late-90s startups."
+    "hash": "cd0600c8b90e",
+    "text": "Monetary and sentiment conditions today show far less exuberance than the dot-com bubble, suggesting we're earlier in any cycle. The caveat: cooler sentiment could reflect lessons learned rather than indicating less froth ahead."
   },
   "nasdaq": {
     "hash": "1a682d9f2472",
@@ -44,8 +44,8 @@
     "text": "Semiconductor production lacks a clear peak phase in the dot-com era, making this metric unsuitable for drawing parallels. Skeptics should remember that chip demand has structural drivers today that didn't exist then, potentially invalidating any historical comparison."
   },
   "sentiment": {
-    "hash": "937d5e5f1dc2",
-    "text": "Consumer sentiment shows no signs of following the dot-com pattern. While the dot-com era saw sentiment surge toward its peak, current sentiment remains flat or declining, suggesting a fundamentally different market psychology between these booms. Skeptics should note that sentiment measures can reflect lagging rather than leading indicators of market stress."
+    "hash": "9da8f4462a09",
+    "text": "Consumer sentiment shows no signs of following the dot-com pattern, remaining flat or declining rather than building toward a peak. This suggests either a fundamentally different market psychology or that sentiment may not be a useful leading indicator for this cycle. Caveat: sentiment measures can reflect media narratives as much as underlying conditions, so apparent stability might mask shifting undercurrents."
   },
   "sp500": {
     "hash": "4b5d3259f319",
@@ -60,8 +60,8 @@
     "text": "Tech leadership concentration has risen sharply since ChatGPT, tracking the dot-com pattern at a compressed pace. The analogy suggests a potential peak around late 2026, though this assumes structural similarities that may not hold. Caveat: the metric measures leadership only, not whether the underlying AI investments prove economically valuable."
   },
   "tech_orders": {
-    "hash": "ab786e3b6730",
-    "text": "Tech equipment orders show AI following the dot-com trajectory, currently at 76% of dot-com peak intensity and accelerating. The analogy suggests similar boom dynamics, though the comparison relies on historical data quality that may not fully capture structural differences between the two eras."
+    "hash": "d402aa578385",
+    "text": "Equipment orders show AI adoption accelerating at a pace similar to dot-com in 1999, though at lower absolute intensity. The analogy suggests continued growth before any potential plateau. Caveat: equipment cycles depend heavily on capex plans that can shift suddenly with policy or rates."
   },
   "valuation": {
     "hash": "86554553736a",
