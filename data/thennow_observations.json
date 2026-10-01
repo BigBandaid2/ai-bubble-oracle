@@ -16,8 +16,8 @@
     "text": "IPO enthusiasm shows similar early-stage dynamics to the dot-com boom, with first-day pops still modest relative to peak froth. The pattern suggests room for further euphoria before any potential reversal. Caveat: IPO metrics lag actual market peaks, so this analogy may understate how far sentiment has already advanced."
   },
   "it_invest": {
-    "hash": "8e7e57be748b",
-    "text": "IT investment share has followed the dot-com arc so far, with AI spending climbing steeply but still shy of peak bubble intensity. The analogy suggests continued acceleration, though investment patterns may compress differently given today's capital efficiency and market structure.\n\nCaveat: Historical analogies work until they don't, and AI's underlying productivity case remains genuinely contested."
+    "hash": "ab786e3b6730",
+    "text": "IT investment share has followed the dot-com playbook so far, with AI capital flowing in at roughly three-quarters the intensity seen at the bubble's peak. The metric is still accelerating rather than plateauing, so we cannot yet say whether this trajectory will actually match the historical pattern or diverge before any reversal occurs."
   },
   "margin_debt": {
     "hash": "dc875a7497ef",
@@ -28,8 +28,8 @@
     "text": "AI market concentration is rising steeply but remains well below dot-com extremes, suggesting earlier bubble stages. The compression ratio implies a faster timeline, but concentration alone cannot predict peaks, only describe current structure."
   },
   "monetary": {
-    "hash": "cd0600c8b90e",
-    "text": "Monetary and sentiment conditions today show far less exuberance than the dot-com bubble, suggesting we're earlier in any cycle. The caveat: cooler sentiment could reflect lessons learned rather than indicating less froth ahead."
+    "hash": "8123cf472dd6",
+    "text": "Monetary and sentiment conditions today look nothing like the dot-com bubble at its peak, showing far less exuberance. This metric therefore provides no useful analogy for timing. Caveat: absence of bubble-like sentiment now could mean either the boom will last longer or that this metric simply measures something different than it did twenty-five years ago."
   },
   "nasdaq": {
     "hash": "1a682d9f2472",
