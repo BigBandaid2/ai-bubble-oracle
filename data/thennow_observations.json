@@ -72,7 +72,7 @@
     "text": "Valuation multiples show the AI era following the dot-com playbook so far, with current intensity comparable to early 1999's acceleration phase. The pattern suggests continued frothiness ahead, though this metric alone cannot distinguish between a temporary correction and a true crash."
   },
   "yield_curve": {
-    "hash": "08ad6fea8c7f",
-    "text": "The yield curve has not followed the dot-com playbook. Unlike the dramatic steepening seen before 2000, today's spread remains flat and shows no sign of the tightening that preceded that bubble peak. Skeptics should note that yield curve dynamics depend heavily on Federal Reserve policy, which operates under different frameworks and constraints than in the 1990s."
+    "hash": "96aaf25c8af4",
+    "text": "The yield curve shows no signs of mimicking the dot-com era's trajectory. Unlike the tech bubble, which saw dramatic inversion preceding its peak, current spreads remain stable and positive, suggesting different underlying credit conditions.\n\nCaveat: yield curve dynamics depend heavily on Federal Reserve policy, which operates under different mandates and frameworks than in 2000."
   }
 }
