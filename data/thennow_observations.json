@@ -68,11 +68,11 @@
     "text": "AI valuations are rising steeply but haven't reached dot-com peak intensity yet, suggesting room for further gains if the pattern holds. Caveat: different fundamentals may support higher valuations this time around."
   },
   "valuation_multiple": {
-    "hash": "5ed4ca893a70",
-    "text": "Valuation multiples show the AI era following the dot-com playbook so far, with current intensity comparable to early 1999's acceleration phase. The pattern suggests continued frothiness ahead, though this metric alone cannot distinguish between a temporary correction and a true crash."
+    "hash": "2717a796b390",
+    "text": "Valuations in AI stocks have risen sharply and now match late 1999 dot-com intensity, suggesting potential further gains before any reversal. The comparison rests on historical price patterns, but today's companies have actual revenue and profits that 1999 startups lacked."
   },
   "yield_curve": {
-    "hash": "96aaf25c8af4",
-    "text": "The yield curve shows no signs of mimicking the dot-com era's trajectory. Unlike the tech bubble, which saw dramatic inversion preceding its peak, current spreads remain stable and positive, suggesting different underlying credit conditions.\n\nCaveat: yield curve dynamics depend heavily on Federal Reserve policy, which operates under different mandates and frameworks than in 2000."
+    "hash": "08ad6fea8c7f",
+    "text": "The yield curve was already inverting during the dot-com bubble's peak, signaling economic stress. Today's yield curve remains positive and flat, showing no similar distress signal. Skeptics should note that yield curve behavior depends on Federal Reserve policy and inflation expectations, which differ fundamentally between the two periods."
   }
 }
