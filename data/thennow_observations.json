@@ -72,7 +72,7 @@
     "text": "Valuations in AI stocks have risen sharply and now match late 1999 dot-com intensity, suggesting potential further gains before any reversal. The comparison rests on historical price patterns, but today's companies have actual revenue and profits that 1999 startups lacked."
   },
   "yield_curve": {
-    "hash": "08ad6fea8c7f",
-    "text": "The yield curve was already inverting during the dot-com bubble's peak, signaling economic stress. Today's yield curve remains positive and flat, showing no similar distress signal. Skeptics should note that yield curve behavior depends on Federal Reserve policy and inflation expectations, which differ fundamentally between the two periods."
+    "hash": "96aaf25c8af4",
+    "text": "The yield curve inverted sharply before the dot-com crash but remains stubbornly positive today, suggesting different credit conditions than the previous bubble. This metric actually argues against parallel market stress, though yield curves can shift quickly if recession fears spike.\n\nCaveat: The yield curve has become noisier since 2000 due to central bank interventions, making historical comparisons less reliable."
   }
 }
