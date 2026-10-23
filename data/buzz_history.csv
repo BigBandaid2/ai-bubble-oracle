@@ -1729,6 +1729,7 @@ date,entity,news_share,dockets_total
 2026-10-20,OpenAI,,121
 2026-10-21,OpenAI,,122
 2026-10-22,OpenAI,,122
+2026-10-23,OpenAI,,125
 2022-01-01,Anthropic,0.0,
 2022-01-02,Anthropic,0.0,
 2022-01-03,Anthropic,0.0,
@@ -3459,3 +3460,4 @@ date,entity,news_share,dockets_total
 2026-10-20,Anthropic,0.0843,67
 2026-10-21,Anthropic,0.0,67
 2026-10-22,Anthropic,,67
+2026-10-23,Anthropic,,68
