@@ -28,8 +28,8 @@
     "text": "AI market concentration is rising steeply but remains well below dot-com extremes, suggesting earlier bubble stages. The compression ratio implies a faster timeline, but concentration alone cannot predict peaks, only describe current structure."
   },
   "monetary": {
-    "hash": "80574d0a7869",
-    "text": "Monetary and sentiment conditions today are actually weaker than during the dot-com early ramp, suggesting less euphoria-driven excess. Caveat: sentiment metrics are subjective and may not capture emerging belief shifts in private markets or among institutional investors."
+    "hash": "26fe64a06352",
+    "text": "Monetary and sentiment conditions show no parallel to dot-com excess, with current AI readings far below peak bubble intensity. This suggests either structural differences between the booms or that financial conditions will tighten significantly if the analogy holds. Caveat: sentiment metrics are subjective and may not capture irrational exuberance equally across different eras."
   },
   "nasdaq": {
     "hash": "1a682d9f2472",
@@ -44,8 +44,8 @@
     "text": "Semiconductor production lacks a clear peak phase in the dot-com era, making this metric unsuitable for drawing parallels. Skeptics should remember that chip demand has structural drivers today that didn't exist then, potentially invalidating any historical comparison."
   },
   "sentiment": {
-    "hash": "9da8f4462a09",
-    "text": "Consumer sentiment shows no signs of following the dot-com pattern, remaining flat or declining rather than building toward a peak. This suggests either a fundamentally different market psychology or that sentiment may not be a useful leading indicator for this cycle. Caveat: sentiment measures can reflect media narratives as much as underlying conditions, so apparent stability might mask shifting undercurrents."
+    "hash": "2d632b2254d0",
+    "text": "Consumer sentiment shows no bubble pattern in AI, remaining flat while dot-com sentiment surged toward its peak. This suggests either different investor psychology or that consumer confidence hasn't yet responded to AI hype the way it did then. Keep in mind that sentiment measures may capture institutional and retail confidence differently across eras."
   },
   "sp500": {
     "hash": "4b5d3259f319",
