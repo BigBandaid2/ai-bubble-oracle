@@ -8,8 +8,8 @@
     "text": "Market cap to GDP suggests AI valuations are following the dot-com trajectory but at an accelerated pace, currently at late-1998 intensity levels. A skeptical reader should note that analogies based on single metrics can mislead, since AI companies have real revenue streams unlike many dot-com firms."
   },
   "capex": {
-    "hash": "c6ab3034e066",
-    "text": "AI infrastructure spending is rising steeply and matches dot-com's acceleration phase, suggesting sustained investment appetite. However, AI capex may reflect genuine long-term utility rather than speculative excess, making spending intensity alone a poor crash predictor."
+    "hash": "fc52dfd261e9",
+    "text": "AI infrastructure spending is rising sharply but hasn't yet matched dot-com's peak intensity, suggesting the boom is still in acceleration phase. Caveat: capex cycles depend heavily on whether AI actually delivers returns that justify the investment."
   },
   "ipo_froth": {
     "hash": "3f5cb77e657b",
@@ -72,7 +72,7 @@
     "text": "Valuations in AI stocks have risen sharply and now match late 1999 dot-com intensity, suggesting potential further gains before any reversal. The comparison rests on historical price patterns, but today's companies have actual revenue and profits that 1999 startups lacked."
   },
   "yield_curve": {
-    "hash": "96aaf25c8af4",
-    "text": "The yield curve inverted sharply before the dot-com crash but remains stubbornly positive today, suggesting different credit conditions than the previous bubble. This metric actually argues against parallel market stress, though yield curves can shift quickly if recession fears spike.\n\nCaveat: The yield curve has become noisier since 2000 due to central bank interventions, making historical comparisons less reliable."
+    "hash": "16fff25d61c6",
+    "text": "The yield curve shows no sign of mimicking the dot-com era's pattern, remaining flat while the analogy would predict steepening. This suggests credit markets aren't pricing in the same cycle dynamics that preceded the 2000 peak. Caveat: yield curve behavior depends heavily on Federal Reserve policy, which operates under entirely different frameworks than the late 1990s."
   }
 }
