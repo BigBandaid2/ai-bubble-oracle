@@ -72,7 +72,7 @@
     "text": "Valuations in AI stocks have risen sharply and now match late 1999 dot-com intensity, suggesting potential further gains before any reversal. The comparison rests on historical price patterns, but today's companies have actual revenue and profits that 1999 startups lacked."
   },
   "yield_curve": {
-    "hash": "16fff25d61c6",
-    "text": "The yield curve shows no sign of mimicking the dot-com era's pattern, remaining flat while the analogy would predict steepening. This suggests credit markets aren't pricing in the same cycle dynamics that preceded the 2000 peak. Caveat: yield curve behavior depends heavily on Federal Reserve policy, which operates under entirely different frameworks than the late 1990s."
+    "hash": "96aaf25c8af4",
+    "text": "The yield curve shows no signs of mimicking dot-com dynamics. While the spread remains positive, it's flat or widening rather than steepening toward the inversion that preceded the bubble peak, suggesting different credit conditions.\n\nCaveat: yield curve behavior reflects Fed policy and inflation expectations as much as speculative excess, so its divergence from dot-com patterns may indicate structural differences rather than less bubble risk."
   }
 }
