@@ -8,16 +8,16 @@
     "text": "Market cap to GDP suggests AI valuations are following the dot-com trajectory but at an accelerated pace, currently at late-1998 intensity levels. A skeptical reader should note that analogies based on single metrics can mislead, since AI companies have real revenue streams unlike many dot-com firms."
   },
   "capex": {
-    "hash": "fc52dfd261e9",
-    "text": "AI infrastructure spending is rising sharply but hasn't yet matched dot-com's peak intensity, suggesting the boom is still in acceleration phase. Caveat: capex cycles depend heavily on whether AI actually delivers returns that justify the investment."
+    "hash": "79b9fc9ebf5f",
+    "text": "AI infrastructure spending mirrors the dot-com era's escalating capex cycle, suggesting sustained investment momentum ahead. Caveat: infrastructure buildout may prove more rational than dot-com spending, justifying higher absolute levels and different trajectory."
   },
   "ipo_froth": {
     "hash": "3f5cb77e657b",
     "text": "IPO enthusiasm shows similar early-stage dynamics to the dot-com boom, with first-day pops still modest relative to peak froth. The pattern suggests room for further euphoria before any potential reversal. Caveat: IPO metrics lag actual market peaks, so this analogy may understate how far sentiment has already advanced."
   },
   "it_invest": {
-    "hash": "ab786e3b6730",
-    "text": "IT investment share has followed the dot-com playbook so far, with AI capital flowing in at roughly three-quarters the intensity seen at the bubble's peak. The metric is still accelerating rather than plateauing, so we cannot yet say whether this trajectory will actually match the historical pattern or diverge before any reversal occurs."
+    "hash": "8e7fdfa49aef",
+    "text": "IT investment share shows AI spending already matching dot-com peak intensity, suggesting the sector has reached a critical valuation threshold. The analogy implies continued investment momentum through late 2026, though sector concentration may mask whether gains reflect genuine productivity or speculative excess.\n\nCaveat: Historical analogies assume similar institutional behavior, but AI's utility in cost reduction and revenue generation may justify higher sustained investment than dot-com ever achieved."
   },
   "margin_debt": {
     "hash": "dc875a7497ef",
@@ -72,7 +72,7 @@
     "text": "Valuations in AI stocks have risen sharply and now match late 1999 dot-com intensity, suggesting potential further gains before any reversal. The comparison rests on historical price patterns, but today's companies have actual revenue and profits that 1999 startups lacked."
   },
   "yield_curve": {
-    "hash": "96aaf25c8af4",
-    "text": "The yield curve shows no signs of mimicking dot-com dynamics. While the spread remains positive, it's flat or widening rather than steepening toward the inversion that preceded the bubble peak, suggesting different credit conditions.\n\nCaveat: yield curve behavior reflects Fed policy and inflation expectations as much as speculative excess, so its divergence from dot-com patterns may indicate structural differences rather than less bubble risk."
+    "hash": "16fff25d61c6",
+    "text": "The yield curve shows no signs of following the dot-com pattern, remaining flat while the dot-com curve steepened dramatically before its peak. This suggests different monetary conditions are shaping the AI era. Caveat: yield curve behavior depends heavily on Federal Reserve policy, which operates under different mandates and constraints than it did in the 1990s."
   }
 }
