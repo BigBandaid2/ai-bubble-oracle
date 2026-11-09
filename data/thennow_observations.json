@@ -72,7 +72,7 @@
     "text": "Market valuations show AI stocks climbing at a pace similar to dot-com during its acceleration phase, suggesting the current enthusiasm could sustain further gains before any correction. The caveat: valuation multiples alone don't account for actual earnings growth, which differs significantly between the two eras."
   },
   "yield_curve": {
-    "hash": "aea789f31de4",
-    "text": "The yield curve is currently much less inverted than it was before the dot-com peak, and unlike that era, it's not steepening toward recession conditions. Skeptics should note that yield curve dynamics depend heavily on Federal Reserve policy, which operates under different frameworks and constraints now than twenty years ago."
+    "hash": "3f18752ea50c",
+    "text": "The yield curve shows no signs of mimicking the dot-com era's pattern, remaining flat where it should be steepening toward a crisis peak. This suggests the current environment differs fundamentally in credit conditions, making yield curve timing unreliable for predicting an AI downturn.\n\nCaveat: The yield curve reflects Fed policy as much as market stress, so its divergence from dot-com behavior might signal different policy choices rather than different bubble dynamics."
   }
 }
