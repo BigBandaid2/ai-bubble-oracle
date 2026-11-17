@@ -28,8 +28,8 @@
     "text": "AI market concentration is rising steeply but remains well below dot-com extremes, suggesting earlier bubble stages. The compression ratio implies a faster timeline, but concentration alone cannot predict peaks, only describe current structure."
   },
   "monetary": {
-    "hash": "80574d0a7869",
-    "text": "Monetary conditions and investor sentiment around AI remain far more restrained than they were during dot-com's peak frenzy, suggesting the analogy breaks down here. Caveat: sentiment metrics are subjective and can shift rapidly with unexpected events."
+    "hash": "8123cf472dd6",
+    "text": "Monetary conditions and investor sentiment show fundamentally different dynamics in AI versus dot-com, with current AI readings far less euphoric than the late-90s peak. This metric weakens the analogy considerably. Caveat: sentiment measures are subjective and may not capture hidden leverage or irrational behavior in private markets."
   },
   "nasdaq": {
     "hash": "1a682d9f2472",
@@ -72,7 +72,7 @@
     "text": "Market valuations show AI stocks climbing at a pace similar to dot-com during its acceleration phase, suggesting the current enthusiasm could sustain further gains before any correction. The caveat: valuation multiples alone don't account for actual earnings growth, which differs significantly between the two eras."
   },
   "yield_curve": {
-    "hash": "7e6b02f86678",
-    "text": "The yield curve shows no signs of mimicking the dot-com era's dramatic inversion pattern. While both periods started from similar conditions, today's curve remains flat instead of steepening toward crisis, suggesting fundamentally different credit market dynamics.\n\nCaveat: yield curve behavior depends heavily on Federal Reserve policy, which operates under different frameworks now than in 2000."
+    "hash": "d9534e7cb3c4",
+    "text": "The yield curve shows no compression during the AI era, unlike the dot-com bubble's sharp inversion before its peak. This suggests either different economic conditions or that financial stress signals may not repeat identically across booms. Caveat: yield curve dynamics depend heavily on Federal Reserve policy, which differs substantially between these periods."
   }
 }
