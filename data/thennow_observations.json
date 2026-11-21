@@ -28,16 +28,16 @@
     "text": "AI market concentration is rising steeply but remains well below dot-com extremes, suggesting earlier bubble stages. The compression ratio implies a faster timeline, but concentration alone cannot predict peaks, only describe current structure."
   },
   "monetary": {
-    "hash": "8123cf472dd6",
-    "text": "Monetary conditions and investor sentiment show fundamentally different dynamics in AI versus dot-com, with current AI readings far less euphoric than the late-90s peak. This metric weakens the analogy considerably. Caveat: sentiment measures are subjective and may not capture hidden leverage or irrational behavior in private markets."
+    "hash": "cd0600c8b90e",
+    "text": "AI sentiment and monetary conditions are significantly cooler than dot-com's frenzied peak, suggesting the analogy breaks down here. This metric doesn't support a near-term bubble conclusion. Caveat: sentiment measures are subjective and may not capture hidden leverage or irrational deployment of capital in private markets."
   },
   "nasdaq": {
-    "hash": "1a682d9f2472",
-    "text": "The Nasdaq has risen 2.4x since ChatGPT, matching where the dot-com bubble stood roughly 11 months before its peak. This suggests the AI rally could have years to run if the analogy holds, though past bubbles don't always follow identical trajectories and sector composition matters enormously."
+    "hash": "dc875a7497ef",
+    "text": "The Nasdaq shows AI still in its acceleration phase, roughly where dot-com was a year before the peak. This metric alone doesn't tell us whether AI's fundamentals are sounder than dot-com's hype, only that the price trajectory looks similar so far."
   },
   "price_appreciation": {
-    "hash": "150914478d26",
-    "text": "AI valuations are rising sharply but remain below dot-com peak intensity, suggesting either sustained growth ahead or room for further acceleration before any reversal. Caveat: price momentum alone says nothing about whether underlying fundamentals justify these valuations."
+    "hash": "c046c92f71fc",
+    "text": "AI valuations are climbing steeply but have not yet matched dot-com's frothiest phase. The analogy suggests room for further gains before any potential peak. Caveat: past price patterns do not determine future ones, especially across different technologies and market structures."
   },
   "semis": {
     "hash": "a8a3115c57f5",
@@ -48,8 +48,8 @@
     "text": "Consumer sentiment shows no bubble pattern in AI, remaining flat while dot-com sentiment surged toward its peak. This suggests either different investor psychology or that consumer confidence hasn't yet responded to AI hype the way it did then. Keep in mind that sentiment measures may capture institutional and retail confidence differently across eras."
   },
   "sp500": {
-    "hash": "4b5d3259f319",
-    "text": "The S&P 500 has risen 1.9x since ChatGPT, reaching about 63% of dot-com peak intensity, suggesting the AI boom may have further to run before any potential reversal. The analogy points to a peak around early 2028, though this assumes current acceleration continues at a comparable pace. Caveat: market dynamics have changed significantly since 2000, and the AI boom's economic fundamentals differ from dot-com's."
+    "hash": "eb3f904521cb",
+    "text": "The S&P 500's gain since ChatGPT mirrors the dot-com acceleration phase, suggesting the AI rally has room to run before peaking. However, the compression ratio of 1.23 assumes history repeats on a faster timeline, which depends heavily on whether market cycles truly accelerate or if this comparison cherry-picks convenient similarities."
   },
   "speculation": {
     "hash": "3da952406751",
